@@ -5,7 +5,7 @@ import { applyWorkflowTransition, isApprovalComplete } from "../domain/workflow.
 import { createAuditEvent } from "./audit.js";
 import { NotFoundError, PermissionDeniedError, ValidationError } from "./errors.js";
 import { buildMockIntakeAnalysisDraft, validateIntakeAnalysisDraft } from "./intake-analysis.js";
-import { buildDryRunProvisioningPlan } from "./provisioning-plan.js";
+import { buildDryRunProvisioningPlan, resolveDistributionSource } from "./provisioning-plan.js";
 import type {
   AcceptAnalysisDraftInput,
   ApprovalDecisionInput,
@@ -394,6 +394,7 @@ export class IntakeWorkflowService {
     }
 
     const now = this.clock();
+    const source = resolveDistributionSource(record);
     const plan = buildDryRunProvisioningPlan(record, input, actor, {
       now,
       idFactory: this.idFactory,
@@ -425,6 +426,8 @@ export class IntakeWorkflowService {
         actionCount: plan.actions.length,
         valid: plan.validation.valid,
         errors: plan.validation.errors,
+        sourceType: source.type,
+        sourceId: source.sourceId,
       },
     });
 

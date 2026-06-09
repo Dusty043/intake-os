@@ -1,5 +1,34 @@
 # Build Log
 
+## 2026-06-10 — TASK-0008 distribution preview from reviewed project package
+
+Requested: make ReviewedProjectPackage the authoritative source for dry-run provisioning/distribution preview.
+
+Baseline confirmed: 44/44 tests passing before implementation.
+
+Changes made:
+- Added `DistributionSourceType`, `ProvisioningPlanSource` types and `source` field to `ProvisioningPlan` in `types.ts`.
+- Added `resolveDistributionSource` to `provisioning-plan.ts` — returns `reviewed_project_package`, `manual_discovery`, or `legacy_intake_record`. Throws if AI drafts exist but no reviewed package.
+- Added `buildIssueTitlesFromPackage` helper — uses reviewed subtask titles for GitHub initial issues.
+- Updated `buildDryRunProvisioningPlan` to use reviewed package fields (projectType, subtasks, brief, estimatedStoryPoints) when present.
+- Updated `generateProvisioningPlan` audit metadata to include `sourceType` and `sourceId`.
+- Added `tests/distribution-preview-source.test.mjs` (5 new tests).
+- Added `scripts/demo-reviewed-package-distribution-preview.mjs` and `demo:reviewed-distribution` package script.
+- Created task log, updated MEMORY_INDEX.
+
+Commands run:
+
+```bash
+npm run check                      # 49/49 pass (44 original + 5 new)
+npm run demo:analysis              # pass
+npm run demo:analysis-review       # pass
+npm run demo:review-guard          # pass
+npm run demo:reviewed-distribution # pass
+npm run demo:mvp                   # pass
+```
+
+Result: product boundary fully complete — distribution preview derives exclusively from human-reviewed package when one exists.
+
 ## 2026-06-10 — TASK-0007 require reviewed package before Gate 1 approval
 
 Requested: close the governance gap from TASK-0006 — Gate 1 approval must require a ReviewedProjectPackage when AI analysis drafts exist.

@@ -127,6 +127,18 @@ export interface DiscoveryRecord {
 
 export type ProvisioningPlanStatus = "draft" | "ready_for_provisioning";
 
+export type DistributionSourceType =
+  | "reviewed_project_package"
+  | "manual_discovery"
+  | "legacy_intake_record";
+
+export interface ProvisioningPlanSource {
+  type: DistributionSourceType;
+  sourceId: string;
+  reviewedBy?: string;
+  reviewedAt?: string;
+}
+
 export type ProvisioningActionSystem = "github" | "monday" | "bitrix24" | "docs" | "manual";
 
 export type ProvisioningActionName =
@@ -162,6 +174,7 @@ export interface ProvisioningPlan {
   status: ProvisioningPlanStatus;
   generatedAt: string;
   generatedBy: Actor;
+  source: ProvisioningPlanSource;
   repository?: RepositoryNameResult;
   githubRequirement: GitHubRequirement;
   evaluationDepth: EvaluationDepth;

@@ -23,7 +23,8 @@
     "api:docker:down": "docker compose down",
     "demo:analysis": "npm run build:core && node scripts/demo-analysis-draft.mjs",
     "demo:analysis-review": "npm run build:core && node scripts/demo-analysis-review.mjs",
-    "demo:review-guard": "npm run build:core && node scripts/demo-reviewed-package-approval-guard.mjs"
+    "demo:review-guard": "npm run build:core && node scripts/demo-reviewed-package-approval-guard.mjs",
+    "demo:reviewed-distribution": "npm run build:core && node scripts/demo-reviewed-package-distribution-preview.mjs"
   },
   "engines": {
     "node": ">=22"

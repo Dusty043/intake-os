@@ -20,6 +20,7 @@ Generated at: 2026-06-09T14:53:20.716Z
 - `docs/ai/tasks/TASK-0005-mock-ai-analysis-draft-module.md`
 - `docs/ai/tasks/TASK-0006-analysis-review-lifecycle.md`
 - `docs/ai/tasks/TASK-0007-require-reviewed-package-before-gate-1.md`
+- `docs/ai/tasks/TASK-0008-distribution-preview-from-reviewed-package.md`
 
 ## Decisions
 
