@@ -1,0 +1,200 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum RequestStatus {
+  draft
+  submitted
+  evaluating
+  clarification_required
+  intake_review
+  devops_review
+  approved
+  provisioning
+  distributed
+  provisioning_failed
+  archived
+}
+
+enum ProjectType {
+  n8n_automation
+  data_sync_integration
+  internal_dashboard
+  internal_tool
+  client_portal
+  saas_platform
+  api_service
+  ai_workflow_tool
+  discovery_research
+  reporting_automation
+}
+
+enum IntakeSourceSystem {
+  manual
+  bitrix24
+  monday
+  email
+  other
+}
+
+enum ApprovalGate {
+  gate_1
+  gate_2
+}
+
+enum ApprovalDecision {
+  approved
+  rejected
+}
+
+enum ProvisioningPlanStatus {
+  draft
+  ready_for_provisioning
+}
+
+model ProjectIntake {
+  id                  String              @id
+  title               String
+  description         String
+  requester           String
+  department          String?
+  projectType         ProjectType
+  status              RequestStatus       @default(draft)
+  sourceSystem        IntakeSourceSystem  @default(manual)
+  sourceExternalId    String?
+  sourceExternalUrl   String?
+  sourceRawPayload    Json?
+  distributionPackage Json?
+  analysisDrafts      Json?
+  latestAnalysisDraft Json?
+  recordSnapshot      Json
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+  createdById         String
+  createdByRole       String
+  createdByName       String?
+
+  discovery           DiscoveryRecord?
+  approvals           ApprovalRecord[]
+  provisioningPlans   ProvisioningPlan[]
+  externalLinks       ExternalLink[]
+  auditEvents         AuditEvent[]
+
+  @@index([status, updatedAt])
+  @@index([sourceSystem, sourceExternalId])
+}
+
+model DiscoveryRecord {
+  id                  String        @id @default(cuid())
+  intakeId            String        @unique
+  problemStatement    String
+  stakeholders        Json
+  expectedUsers       Json
+  systemsTouched      Json
+  dataSensitivity     String
+  infraNeeds          Json
+  estimatedComplexity String
+  requiresGithub      Boolean?
+  requiresMonday      Boolean?
+  relatedToBitrix24   Boolean?
+  notes               String?
+  completedById       String
+  completedByRole     String
+  completedByName     String?
+  completedAt         DateTime
+
+  intake              ProjectIntake @relation(fields: [intakeId], references: [id], onDelete: Cascade)
+}
+
+model ApprovalRecord {
+  id            String           @id @default(cuid())
+  intakeId      String
+  gate          ApprovalGate
+  decision      ApprovalDecision
+  actorId       String
+  actorRole     String
+  actorName     String?
+  comment       String?
+  locked        Boolean          @default(true)
+  completedAt   DateTime
+
+  intake        ProjectIntake    @relation(fields: [intakeId], references: [id], onDelete: Cascade)
+
+  @@unique([intakeId, gate])
+}
+
+model ProvisioningPlan {
+  id                       String                 @id
+  intakeId                 String
+  status                   ProvisioningPlanStatus @default(draft)
+  generatedAt              DateTime
+  generatedById            String
+  generatedByRole          String
+  generatedByName          String?
+  repository               Json?
+  githubRequirement        String
+  evaluationDepth          String
+  distributionMode         String
+  validation               Json
+  approvedForExecutionAt   DateTime?
+  approvedForExecutionById String?
+  approvedForExecutionByRole String?
+  approvedForExecutionByName String?
+  planSnapshot             Json
+
+  intake                   ProjectIntake          @relation(fields: [intakeId], references: [id], onDelete: Cascade)
+  actions                  ProvisioningPlanAction[]
+
+  @@index([intakeId, generatedAt])
+}
+
+model ProvisioningPlanAction {
+  id                 String           @id
+  planId             String
+  system             String
+  action             String
+  description        String
+  dryRun             Boolean          @default(true)
+  requiresCredential Boolean
+  idempotencyKey     String           @unique
+  payload            Json
+
+  plan               ProvisioningPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+}
+
+model ExternalLink {
+  id         String        @id @default(cuid())
+  intakeId   String
+  provider   String
+  externalId String
+  url        String?
+  label      String?
+  createdAt  DateTime      @default(now())
+
+  intake     ProjectIntake @relation(fields: [intakeId], references: [id], onDelete: Cascade)
+
+  @@index([provider, externalId])
+}
+
+model AuditEvent {
+  id         String        @id @default(cuid())
+  intakeId   String
+  actorId    String
+  actorRole  String
+  action     String
+  fromState  RequestStatus?
+  toState    RequestStatus?
+  reason     String?
+  metadata   Json?
+  timestamp  DateTime
+
+  intake     ProjectIntake @relation(fields: [intakeId], references: [id], onDelete: Cascade)
+
+  @@index([intakeId, timestamp])
+  @@index([action, timestamp])
+}

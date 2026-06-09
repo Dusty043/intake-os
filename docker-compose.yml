@@ -1,0 +1,33 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: intake_os
+      POSTGRES_PASSWORD: intake_os_dev
+      POSTGRES_DB: intake_os
+    ports:
+      - "5432:5432"
+    volumes:
+      - intake_os_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U intake_os -d intake_os"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    environment:
+      DATABASE_URL: postgresql://intake_os:intake_os_dev@postgres:5432/intake_os?schema=public
+      NODE_ENV: development
+      PORT: 3000
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "3000:3000"
+
+volumes:
+  intake_os_pgdata:
