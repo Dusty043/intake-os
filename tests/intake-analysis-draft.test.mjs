@@ -79,14 +79,20 @@ test("mock AI analysis draft is generated as review-only state", async () => {
 test("mock analysis cannot bypass approval or provisioning gates", async () => {
   const service = createService();
   const submitted = await createSubmittedIntake(service);
-  const reviewed = await service.generateMockAnalysisDraft(submitted.id, {}, intakeOwner);
+  const withDraft = await service.generateMockAnalysisDraft(submitted.id, {}, intakeOwner);
 
   await assert.rejects(
-    () => service.generateProvisioningPlan(reviewed.id, { teamPrefix: "Digital Solutions" }, devopsLead),
+    () => service.generateProvisioningPlan(withDraft.id, { teamPrefix: "Digital Solutions" }, devopsLead),
     ValidationError,
   );
 
-  const gate1 = await service.recordApproval(reviewed.id, { comment: "Review accepted." }, intakeOwner);
+  // TASK-0007: must accept the draft before Gate 1 approval is allowed
+  const draftAccepted = await service.acceptAnalysisDraft(
+    { intakeId: withDraft.id, draftId: withDraft.latestAnalysisDraft.id, reviewerNotes: "Confirmed." },
+    intakeOwner,
+  );
+
+  const gate1 = await service.recordApproval(draftAccepted.id, { comment: "Review accepted." }, intakeOwner);
   assert.equal(gate1.status, "devops_review");
   assert.equal(gate1.approvals.gate_1.status, "approved");
   assert.equal(gate1.provisioningPlan, undefined);

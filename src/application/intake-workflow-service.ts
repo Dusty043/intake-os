@@ -351,6 +351,12 @@ export class IntakeWorkflowService {
       throw new PermissionDeniedError("approve_gate_2");
     }
 
+    if (gate === "gate_1" && (record.analysisDrafts?.length ?? 0) > 0 && !record.reviewedProjectPackage) {
+      throw new ValidationError(
+        "Cannot approve intake review until an analysis draft has been accepted or revised into a reviewed project package.",
+      );
+    }
+
     return this.transition(id, "approve", actor, { reason: input.comment ?? `${gate} approved.` });
   }
 

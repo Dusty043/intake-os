@@ -1,5 +1,31 @@
 # Build Log
 
+## 2026-06-10 — TASK-0007 require reviewed package before Gate 1 approval
+
+Requested: close the governance gap from TASK-0006 — Gate 1 approval must require a ReviewedProjectPackage when AI analysis drafts exist.
+
+Baseline confirmed: 38/38 tests passing before implementation.
+
+Changes made:
+- Added Gate 1 guard in `recordApproval`: blocks if `analysisDrafts.length > 0` and `reviewedProjectPackage` is missing.
+- Updated existing test in `intake-analysis-draft.test.mjs` to accept draft before Gate 1 (now required).
+- Added `tests/approval-reviewed-package-guard.test.mjs` (6 new tests).
+- Added `scripts/demo-reviewed-package-approval-guard.mjs` and `demo:review-guard` package script.
+- Created task log `docs/ai/tasks/TASK-0007-require-reviewed-package-before-gate-1.md`.
+- Updated `docs/ai/MEMORY_INDEX.md`.
+
+Commands run:
+
+```bash
+npm run check            # 44/44 pass (38 original + 6 new)
+npm run demo:analysis    # pass
+npm run demo:analysis-review  # pass
+npm run demo:review-guard  # pass
+npm run demo:mvp         # pass
+```
+
+Result: governance model fully enforced — AI drafts must be human-reviewed before Gate 1 approval. No-AI/manual path unchanged.
+
 ## 2026-06-10 — TASK-0006 analysis review lifecycle
 
 Requested: implement the Analysis Review Lifecycle (TASK-0006) from the task-6-handoff.md spec.
