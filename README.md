@@ -2,9 +2,9 @@
 
 Internal pre-distribution control plane for Digital Solutions project intake, AI-assisted analysis drafts, approval, dry-run provisioning, and controlled handoff to downstream tools.
 
-## Current build state (TASK-0009)
+## Current build state (TASK-0010)
 
-The governance spine is complete through TASK-0008. The NestJS API runtime is now stable and locally runnable.
+The governance spine is complete. The NestJS API runtime is stable. The minimal Next.js review UI is running.
 
 Verified path:
 
@@ -21,8 +21,7 @@ Governance enforced:
 Intentionally disabled:
 - Live AI provider calls (OpenAI, Bedrock)
 - Live GitHub/Monday writes
-- Google SSO/RBAC
-- Next.js UI
+- Google SSO/RBAC (actor selector is dev auth shim)
 - n8n (excluded from OS orchestration by ADR-0003)
 
 ---
@@ -106,6 +105,43 @@ API will listen on `http://localhost:3000`.
 npm run smoke:api
 ```
 
+### 10. Start the web UI (separate terminal)
+
+```bash
+# Install web dependencies (first time only)
+npm install --prefix apps/web
+
+# Copy env for web
+cp apps/web/.env.local.example apps/web/.env.local
+
+# Start Next.js dev server
+npm run web:dev
+```
+
+Open **http://localhost:3001**
+
+---
+
+## Browser walkthrough
+
+Once the API and web are running:
+
+1. Open http://localhost:3001 → redirects to `/intakes`
+2. Select **Request Creator** actor (bottom of sidebar)
+3. Click **Create Intake** → fill in the form → submit
+4. Open the intake detail page
+5. Click **Submit Intake** on the Overview tab
+6. Switch to **Intake Owner** actor
+7. Click **Generate Mock AI Draft**
+8. Open the **AI Draft** tab → accept or revise the draft
+9. Confirm the **Reviewed Package** tab shows the reviewed artifact
+10. Open the **Approvals** tab → click **Approve Gate 1**
+11. Switch to **DevOps Lead** actor
+12. Click **Approve Gate 2**
+13. Open the **Distribution** tab → click **Generate Distribution Preview**
+14. Confirm source type is **Reviewed Project Package**
+15. Open the **Audit Trail** tab to confirm all events
+
 ---
 
 ## Run with Docker Compose
@@ -184,6 +220,9 @@ Canonical roles: `request_creator`, `intake_owner`, `devops_lead`, `developer`, 
 | `npm run docker:up` | docker compose up -d | Start all services |
 | `npm run docker:down` | docker compose down | Stop all services |
 | `npm run smoke:api` | node scripts/smoke-api.mjs | API smoke test |
+| `npm run web:dev` | next dev --port 3001 | Start web UI dev server |
+| `npm run web:build` | next build | Build web UI |
+| `npm run web:start` | next start --port 3001 | Start compiled web UI |
 | `npm run demo:mvp` | node scripts/demo-iteration-2.mjs | No-AI workflow demo |
 | `npm run demo:analysis` | node scripts/demo-analysis-draft.mjs | AI draft demo |
 | `npm run demo:analysis-review` | node scripts/demo-analysis-review.mjs | Accept/revise draft demo |

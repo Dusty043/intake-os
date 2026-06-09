@@ -1,5 +1,51 @@
 # Build Log
 
+## 2026-06-10 — TASK-0010 minimal Next.js review UI
+
+Requested: build the first browser-operable interface for Project Intake OS.
+
+Baseline confirmed: 49/49 tests, api:build, all demos passing before implementation.
+
+Changes made:
+- Created `apps/web` as a Next.js 15 App Router + TypeScript + Tailwind CSS v3 application.
+- Dark sidebar AppShell with actor selector; actor persists to localStorage.
+- Preconfigured actors: Request Creator, Intake Owner, DevOps Lead, Admin, Developer.
+- API client with actor headers, readable error surfacing, all workflow endpoints.
+- `/intakes` — intake list table with status badges, links, create/refresh.
+- `/intakes/new` — create intake form with workflow preview banner.
+- `/intakes/[id]` — detail page with 7 tabs: Overview, AI Draft, Reviewed Package, Approvals, Distribution, Audit Trail, Debug.
+- Governance visible: Gate 1/2 guards shown in UI, dry-run notice on Distribution, AI notice on AI Draft, reviewed package source-of-truth banner.
+- Added `web:dev`, `web:build`, `web:start` scripts to root `package.json`.
+- Added `NEXT_PUBLIC_API_BASE_URL` to `.env.example` and `apps/web/.env.local.example`.
+- Task log `docs/ai/tasks/TASK-0010-minimal-nextjs-review-ui.md`.
+- Updated `docs/ai/MEMORY_INDEX.md`.
+
+Commands run:
+
+```bash
+npm install --prefix apps/web     # pass
+npm run web:build                  # pass (6 routes)
+npm run check                      # 49/49 pass (unchanged)
+npm run api:build                  # pass
+npm run demo:analysis              # pass
+npm run demo:analysis-review       # pass
+npm run demo:review-guard          # pass
+npm run demo:reviewed-distribution # pass
+npm run demo:mvp                   # pass
+```
+
+Live stack smoke test (requires running Docker/Postgres/API):
+```bash
+cp .env.example .env
+docker compose up -d postgres
+npm run prisma:migrate
+npm run api:start:dev
+npm run web:dev
+# Open http://localhost:3001 and follow manual walkthrough
+```
+
+Result: Next.js UI is buildable and ready for manual browser walkthrough once the stack is running.
+
 ## 2026-06-10 — TASK-0009 API runtime & dependency stabilization
 
 Requested: make the NestJS/Prisma/Postgres runtime reliably installable, buildable, and locally runnable.
