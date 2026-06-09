@@ -21,6 +21,7 @@ Generated at: 2026-06-09T14:53:20.716Z
 - `docs/ai/tasks/TASK-0006-analysis-review-lifecycle.md`
 - `docs/ai/tasks/TASK-0007-require-reviewed-package-before-gate-1.md`
 - `docs/ai/tasks/TASK-0008-distribution-preview-from-reviewed-package.md`
+- `docs/ai/tasks/TASK-0009-api-runtime-dependency-stabilization.md`
 
 ## Decisions
 

@@ -1,5 +1,35 @@
 # Build Log
 
+## 2026-06-10 — TASK-0009 API runtime & dependency stabilization
+
+Requested: make the NestJS/Prisma/Postgres runtime reliably installable, buildable, and locally runnable.
+
+Baseline confirmed: 49/49 tests passing, api:build passing before implementation.
+
+Changes made:
+- Split health controller: `GET /health` is a liveness check (no DB dependency); `GET /health/db` is a readiness check (Postgres query).
+- Added npm scripts: `prisma:generate`, `prisma:migrate`, `prisma:migrate:deploy`, `prisma:migrate:reset`, `prisma:db:push`, `prisma:studio`, `api:start:dev`, `docker:up`, `docker:down`, `smoke:api`.
+- Updated `.env.example` with `NODE_ENV`, `API_PORT`, `API_HOST`, `POSTGRES_*`, `SWAGGER_*`, dual DATABASE_URL comment.
+- Created `scripts/smoke-api.mjs` — tests health, Swagger, list intakes, create, submit, optional mock draft, optional DB health.
+- Rewrote `README.md` with full local setup flow, script reference table, endpoint table, troubleshooting section.
+- Created task log `docs/ai/tasks/TASK-0009-api-runtime-dependency-stabilization.md`.
+- Updated `docs/ai/MEMORY_INDEX.md`.
+
+Commands run:
+
+```bash
+npm run check                      # 49/49 pass (unchanged)
+npm run prisma:generate            # pass
+npm run api:build                  # pass
+npm run demo:analysis              # pass
+npm run demo:analysis-review       # pass
+npm run demo:review-guard          # pass
+npm run demo:reviewed-distribution # pass
+npm run demo:mvp                   # pass
+```
+
+Result: runtime is stable and documented. A clean clone can install, generate Prisma client, build the API, start Postgres, and pass smoke tests.
+
 ## 2026-06-10 — TASK-0008 distribution preview from reviewed project package
 
 Requested: make ReviewedProjectPackage the authoritative source for dry-run provisioning/distribution preview.

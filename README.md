@@ -2,83 +2,162 @@
 
 Internal pre-distribution control plane for Digital Solutions project intake, AI-assisted analysis drafts, approval, dry-run provisioning, and controlled handoff to downstream tools.
 
-## Current build state
+## Current build state (TASK-0009)
 
-This repository now contains the MVP/POC slices through **TASK-0005**:
+The governance spine is complete through TASK-0008. The NestJS API runtime is now stable and locally runnable.
 
-1. **Iteration 1 — domain foundation**
-   - canonical workflow state transitions
-   - approval/provisioning workflow guards
-   - role and permission helpers
-   - project type registry defaults
-   - repository naming, validation, labels, and README generation helpers
+Verified path:
 
-2. **Iteration 2 — no-AI runtime foundation**
-   - framework-neutral intake workflow service
-   - in-memory persistence adapter for tests/demo
-   - durable audit trail contract
-   - dry-run provisioning plan generator
-   - Bitrix24 payload normalization seam
-   - MVP demo script and lifecycle tests
-
-3. **Iteration 2.1 — Dockerized NestJS API foundation**
-   - real NestJS module/controller layout under `apps/api`
-   - Prisma-backed `ProjectIntakeStore` adapter for Postgres
-   - Swagger/OpenAPI at `/docs`
-   - Dockerfile and Docker Compose for API + Postgres
-   - HTTP endpoints for intakes, discovery, approvals, dry-run provisioning, audit, and Bitrix24 intake creation
-
-4. **TASK-0005 — mock AI analysis draft module**
-   - schema-backed `IntakeAnalysisDraft` v1 contract
-   - deterministic mock analysis provider
-   - draft validation helper
-   - persisted `analysisDrafts` and `latestAnalysisDraft` JSON on intake records
-   - `POST /intakes/:id/analysis-drafts/mock` NestJS controller source
-   - demo script for the analysis draft path
-   - tests proving draft-only behavior and approval/provisioning guards
-
-Live AI provider calls, live GitHub/Monday writes, live Bitrix24 webhook sync, Google SSO/RBAC, queues, Next.js UI, and production deployment are intentionally deferred.
-
-n8n is intentionally excluded from Project Intake OS orchestration. The app owns source normalization, workflow state, retries, audit logs, and integration behavior directly.
-
-## Local core verification
-
-These commands verify the dependency-free core slice and do not require third-party packages to be installed in this environment:
-
-```bash
-npm run typecheck
-npm test
-npm run check
-npm run demo:mvp
-npm run demo:analysis
-npm run ai:index
+```text
+AI drafts → Human reviews → Workflow approves → Distribution preview uses ReviewedProjectPackage → System distributes
 ```
 
-## Dockerized API path
+Governance enforced:
+- AI drafts are immutable, schema-backed, never autonomous
+- Gate 1 approval requires a human-reviewed project package when AI drafts exist
+- Distribution preview derives exclusively from the reviewed package
+- Humans retain approval authority; AI may never approve or provision
 
-Once npm package installation is available, install dependencies and start the API with Postgres:
+Intentionally disabled:
+- Live AI provider calls (OpenAI, Bedrock)
+- Live GitHub/Monday writes
+- Google SSO/RBAC
+- Next.js UI
+- n8n (excluded from OS orchestration by ADR-0003)
+
+---
+
+## Prerequisites
+
+- **Node.js 22+** (`node --version`)
+- **npm 10+** (`npm --version`)
+- **Docker + Docker Compose** (for Postgres and optional API container)
+
+---
+
+## Local setup
+
+### 1. Install dependencies
 
 ```bash
 npm install
-npm run api:prisma:generate
-npm run api:db:push
+```
+
+### 2. Configure environment
+
+```bash
+cp .env.example .env
+```
+
+The default `.env` values work for local development without changes.
+
+### 3. Start Postgres
+
+```bash
+docker compose up -d postgres
+```
+
+Postgres will be available at `localhost:5432`.
+
+### 4. Generate Prisma client
+
+```bash
+npm run prisma:generate
+```
+
+### 5. Apply schema
+
+First time (or after schema changes):
+
+```bash
+npm run prisma:migrate
+```
+
+Enter a migration name when prompted (e.g. `initial`).
+
+> If you only want to push the schema without migration history, use:
+> `npm run prisma:db:push`
+
+### 6. Run core checks
+
+```bash
+npm run check
+```
+
+Expected: 49/49 tests passing.
+
+### 7. Build API
+
+```bash
 npm run api:build
-npm run api:docker:up
 ```
 
-Then open:
+### 8. Start API (dev mode with watch)
 
-```text
-http://localhost:3000/docs
+```bash
+npm run api:start:dev
 ```
 
-Health check:
+API will listen on `http://localhost:3000`.
 
-```text
-GET http://localhost:3000/health
+### 9. Smoke test (in another terminal)
+
+```bash
+npm run smoke:api
 ```
 
-The POC uses actor headers instead of SSO:
+---
+
+## Run with Docker Compose
+
+Start both Postgres and the API:
+
+```bash
+docker compose up --build
+```
+
+Or start only Postgres (run API locally):
+
+```bash
+docker compose up -d postgres
+```
+
+Stop all services:
+
+```bash
+docker compose down
+```
+
+---
+
+## Available endpoints
+
+Swagger/OpenAPI: **http://localhost:3000/docs**
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | /health | Liveness check |
+| GET | /health/db | Readiness check (Postgres) |
+| GET | /intakes | List all intakes |
+| GET | /intakes/:id | Get a single intake |
+| POST | /intakes | Create a manual intake |
+| POST | /intakes/:id/submit | Submit draft for review |
+| POST | /intakes/:id/discovery | Complete discovery |
+| POST | /intakes/:id/analysis-drafts/mock | Generate mock AI analysis draft |
+| POST | /intakes/:id/analysis-drafts/:draftId/accept | Accept draft as reviewed package |
+| POST | /intakes/:id/analysis-drafts/:draftId/reject | Reject draft |
+| POST | /intakes/:id/analysis-drafts/:draftId/revise | Revise draft into reviewed package |
+| POST | /intakes/:id/approvals | Record Gate 1 or Gate 2 approval |
+| POST | /intakes/:id/rejections | Reject at current gate |
+| POST | /intakes/:id/provisioning-plan | Generate dry-run provisioning plan |
+| POST | /intakes/:id/provisioning-ready | Mark plan ready for execution |
+| GET | /intakes/:id/audit | Read audit trail |
+
+---
+
+## Actor headers (auth shim)
+
+The POC uses HTTP headers instead of SSO:
 
 ```text
 x-actor-id: user-devops
@@ -86,61 +165,98 @@ x-actor-role: devops_lead
 x-actor-name: DevOps Lead
 ```
 
-Canonical roles:
+Canonical roles: `request_creator`, `intake_owner`, `devops_lead`, `developer`, `admin`
 
-```text
-request_creator
-intake_owner
-devops_lead
-developer
-admin
-```
+---
+
+## Script reference
+
+| Script | Command | Description |
+|--------|---------|-------------|
+| `npm run check` | typecheck + test | Full core verification |
+| `npm run prisma:generate` | prisma generate | Generate Prisma client |
+| `npm run prisma:migrate` | prisma migrate dev | Apply migrations (requires DB) |
+| `npm run prisma:migrate:deploy` | prisma migrate deploy | Deploy migrations in production |
+| `npm run prisma:studio` | prisma studio | Open Prisma Studio |
+| `npm run api:build` | tsc + prisma generate | Compile NestJS API |
+| `npm run api:start:dev` | nest start --watch | Start API in dev/watch mode |
+| `npm run api:start` | node dist/... | Start compiled API |
+| `npm run docker:up` | docker compose up -d | Start all services |
+| `npm run docker:down` | docker compose down | Stop all services |
+| `npm run smoke:api` | node scripts/smoke-api.mjs | API smoke test |
+| `npm run demo:mvp` | node scripts/demo-iteration-2.mjs | No-AI workflow demo |
+| `npm run demo:analysis` | node scripts/demo-analysis-draft.mjs | AI draft demo |
+| `npm run demo:analysis-review` | node scripts/demo-analysis-review.mjs | Accept/revise draft demo |
+| `npm run demo:review-guard` | node scripts/demo-reviewed-package-approval-guard.mjs | Gate 1 guard demo |
+| `npm run demo:reviewed-distribution` | node scripts/demo-reviewed-package-distribution-preview.mjs | Distribution preview demo |
+
+---
 
 ## Demo flows
 
-No-AI MVP flow:
+Run all demos after `npm run check`:
 
-```text
-create intake
-submit intake
-complete discovery
-record Gate 1 approval
-record Gate 2 approval
-generate dry-run provisioning plan
-mark plan ready for provisioning
-view audit trail
-preview/create intake from Bitrix24-shaped payload
+```bash
+npm run demo:mvp
+npm run demo:analysis
+npm run demo:analysis-review
+npm run demo:review-guard
+npm run demo:reviewed-distribution
 ```
 
-Mock analysis draft flow:
-
-```text
-create intake
-submit intake
-generate mock analysis draft
-enter intake review
-verify zero approvals
-verify no provisioning plan
-view audit trail
-```
+---
 
 ## Repository map
 
 ```text
-src/domain/                  Framework-neutral domain logic
-src/application/             Workflow services, store contracts, analysis draft module, Bitrix24 adapter, dry-run plans
-apps/api/src/                Real NestJS API layer
-apps/api/prisma/             Prisma/Postgres schema
-apps/api/Dockerfile          API container image
-Docker Compose               Local API + Postgres runtime
-docs/api/                    HTTP endpoint contract
-docs/deployment/             Local/container deployment notes
-docs/product/                Product behavior source of truth
-docs/ai/                     Durable build memory, sequence log, task logs, and ADRs
-tests/                       Node test runner tests against compiled core output
-scripts/                     Demo and AI index utilities
+src/domain/              Framework-neutral domain logic (workflow, permissions, project types)
+src/application/         Workflow service, store contracts, analysis drafts, provisioning plans
+apps/api/src/            NestJS API layer (controllers, modules, DTOs, Prisma adapter)
+apps/api/prisma/         Prisma schema and migrations
+apps/api/Dockerfile      API container image
+docker-compose.yml       Local Postgres + API runtime
+tests/                   Node test runner tests (49 tests)
+scripts/                 Demo scripts and smoke test
+docs/product/            Product behavior source of truth
+docs/ai/                 Build memory, task logs, ADRs, sequence log
 ```
 
-## Product principle
+---
 
-The app owns the lifecycle and audit trail. Bitrix24, Monday, GitHub, Google Chat, email, roster APIs, and future tools are channels/adapters/execution targets — not the source of truth.
+## Troubleshooting
+
+### `prisma: not found`
+
+Run `npm install` — Prisma CLI is a dev dependency and must be installed.
+
+### `DATABASE_URL missing`
+
+Run `cp .env.example .env`. The default value is correct for local Docker Compose.
+
+### `Postgres port already in use`
+
+Either stop the existing Postgres process or change the port in `docker-compose.yml` and `.env`.
+
+### Prisma client not generated
+
+Run `npm run prisma:generate` before building or starting the API.
+
+### Docker volume stale
+
+```bash
+docker compose down -v
+docker compose up -d postgres
+npm run prisma:migrate
+```
+
+### API cannot connect to database
+
+When running the API locally (`api:start:dev`), use:
+```
+DATABASE_URL=postgresql://intake_os:intake_os_dev@localhost:5432/intake_os?schema=public
+```
+
+When running the API in Docker, use:
+```
+DATABASE_URL=postgresql://intake_os:intake_os_dev@postgres:5432/intake_os?schema=public
+```
