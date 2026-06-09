@@ -2,7 +2,7 @@
 
 Internal pre-distribution control plane for Digital Solutions project intake, AI-assisted analysis drafts, approval, dry-run provisioning, and controlled handoff to downstream tools.
 
-## Current build state (TASK-0010)
+## Current build state (TASK-0011)
 
 The governance spine is complete. The NestJS API runtime is stable. The minimal Next.js review UI is running.
 
@@ -99,13 +99,22 @@ npm run api:start:dev
 
 API will listen on `http://localhost:3000`.
 
-### 9. Smoke test (in another terminal)
+### 9. Seed demo data
 
 ```bash
-npm run smoke:api
+npm run seed:demo
 ```
 
-### 10. Start the web UI (separate terminal)
+Seeds 6 demo intakes spanning every workflow stage (draft → approved + distribution preview). Safe to re-run — deletes only demo records before recreating them. Real records are never touched.
+
+### 10. Smoke test (in another terminal)
+
+```bash
+npm run smoke:api       # quick API health + CRUD checks
+npm run smoke:runtime   # full governance flow end-to-end
+```
+
+### 11. Start the web UI (separate terminal)
 
 ```bash
 # Install web dependencies (first time only)
@@ -118,29 +127,52 @@ cp apps/web/.env.local.example apps/web/.env.local
 npm run web:dev
 ```
 
-Open **http://localhost:3001**
+Open **http://localhost:3001/intakes**
+
+---
+
+## Seeded demo data
+
+After `npm run seed:demo`, the database contains 6 demo intakes spanning every workflow stage:
+
+| # | Title | Status |
+|---|-------|--------|
+| 1 | Payment Failure Notification Fix | `draft` |
+| 2 | Marketing Dashboard Request | `submitted` |
+| 3 | Customer Portal Enhancement | `intake_review` — AI draft available, no reviewed package yet |
+| 4 | Internal SSO Management Tool | `intake_review` — reviewed package ready, Gate 1 available |
+| 5 | Data Pipeline Migration | `devops_review` — Gate 1 approved, Gate 2 pending |
+| 6 | Project Intake OS UI Buildout | `approved` — both gates approved, distribution preview ready |
+
+**Idempotency:** running `seed:demo` again is safe — it deletes only demo records (identified by `requester = demo.requester@local`) before recreating them.
+
+**Reset and reseed:**
+
+```bash
+npm run db:reset:demo   # prisma migrate reset + seed:demo
+```
+
+**Seeded demo records are local-only and do not contain real client data.**
 
 ---
 
 ## Browser walkthrough
 
-Once the API and web are running:
+Once the API and web are running (with seeded demo data):
 
-1. Open http://localhost:3001 → redirects to `/intakes`
-2. Select **Request Creator** actor (bottom of sidebar)
-3. Click **Create Intake** → fill in the form → submit
-4. Open the intake detail page
-5. Click **Submit Intake** on the Overview tab
-6. Switch to **Intake Owner** actor
-7. Click **Generate Mock AI Draft**
-8. Open the **AI Draft** tab → accept or revise the draft
-9. Confirm the **Reviewed Package** tab shows the reviewed artifact
-10. Open the **Approvals** tab → click **Approve Gate 1**
-11. Switch to **DevOps Lead** actor
-12. Click **Approve Gate 2**
-13. Open the **Distribution** tab → click **Generate Distribution Preview**
-14. Confirm source type is **Reviewed Project Package**
-15. Open the **Audit Trail** tab to confirm all events
+1. Open http://localhost:3001/intakes
+2. Confirm 6 seeded intakes appear across workflow stages
+3. Open **Customer Portal Enhancement** (AI draft available, no reviewed package)
+4. Confirm the AI Draft tab is populated
+5. Switch to **Intake Owner** actor → click **Accept Draft** to create a reviewed package
+6. Open **Internal SSO Management Tool** (reviewed package ready)
+7. Confirm the Reviewed Package tab shows the human-reviewed artifact
+8. Open **Approvals** tab → click **Approve Gate 1**
+9. Open **Data Pipeline Migration** (Gate 1 approved, Gate 2 pending)
+10. Switch to **DevOps Lead** actor → click **Approve Gate 2**
+11. Open **Project Intake OS UI Buildout** (fully approved + distribution preview)
+12. Open the **Distribution** tab → confirm source type is **Reviewed Project Package**
+13. Open the **Audit Trail** tab → confirm all governance events are visible
 
 ---
 
@@ -219,7 +251,10 @@ Canonical roles: `request_creator`, `intake_owner`, `devops_lead`, `developer`, 
 | `npm run api:start` | node dist/... | Start compiled API |
 | `npm run docker:up` | docker compose up -d | Start all services |
 | `npm run docker:down` | docker compose down | Stop all services |
-| `npm run smoke:api` | node scripts/smoke-api.mjs | API smoke test |
+| `npm run smoke:api` | node scripts/smoke-api.mjs | API smoke test (quick) |
+| `npm run smoke:runtime` | node scripts/smoke-runtime-workflow.mjs | Full governance flow smoke test |
+| `npm run seed:demo` | node --env-file=.env scripts/seed-demo-data.mjs | Seed 6 demo intakes into Postgres |
+| `npm run db:reset:demo` | prisma migrate reset + seed:demo | Reset database and reseed demo data |
 | `npm run web:dev` | next dev --port 3001 | Start web UI dev server |
 | `npm run web:build` | next build | Build web UI |
 | `npm run web:start` | next start --port 3001 | Start compiled web UI |

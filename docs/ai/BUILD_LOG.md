@@ -1,5 +1,54 @@
 # Build Log
 
+## 2026-06-10 — TASK-0011 end-to-end runtime smoke & seeded demo data
+
+Requested: make the project easy to seed, demo, smoke-test, and pause cleanly.
+
+Baseline confirmed: 49/49 tests, api:build, web:build, prisma:generate, all 5 demos passing before implementation.
+
+Changes made:
+- Added `scripts/seed-demo-data.mjs` — seeds 6 demo intakes into Postgres via application service + inline Prisma store. Idempotent: deletes records where `requester = "demo.requester@local"` before recreating.
+- Added `scripts/smoke-runtime-workflow.mjs` — 8-phase governance smoke test against live API: infrastructure, CRUD, submission, AI draft, human review, Gate 1, Gate 2, distribution preview, audit trail. Hard assertions on `source.type = reviewed_project_package` and all `dryRun = true`.
+- Added `npm run seed:demo`, `npm run smoke:runtime`, `npm run db:reset:demo` scripts to root `package.json`.
+- Updated `README.md`: build state to TASK-0011, Seeded Demo Data section with table of 6 intakes, updated browser walkthrough to use seeded records, new scripts in reference table.
+- Created task log `docs/ai/tasks/TASK-0011-end-to-end-runtime-smoke-and-seeded-demo-data.md`.
+- Updated `docs/ai/MEMORY_INDEX.md`.
+
+Seeded demo records:
+1. Payment Failure Notification Fix → draft
+2. Marketing Dashboard Request → submitted
+3. Customer Portal Enhancement → intake_review (AI draft, no reviewed package)
+4. Internal SSO Management Tool → intake_review (reviewed package ready)
+5. Data Pipeline Migration → devops_review (Gate 1 approved)
+6. Project Intake OS UI Buildout → approved + provisioning plan
+
+Commands run:
+
+```bash
+npm run check           # 49/49 pass (unchanged)
+npm run api:build       # pass
+npm run web:build       # pass
+npm run prisma:generate # pass
+npm run demo:analysis   # pass
+npm run demo:analysis-review   # pass
+npm run demo:review-guard      # pass
+npm run demo:reviewed-distribution  # pass
+npm run demo:mvp        # pass
+```
+
+Live runtime verification (requires Docker/Postgres):
+```bash
+docker compose up -d postgres
+npm run prisma:migrate
+npm run seed:demo           # seeds 6 demo intakes
+npm run api:start:dev
+npm run smoke:api           # quick health/CRUD
+npm run smoke:runtime       # full governance flow
+npm run web:dev             # open http://localhost:3001/intakes
+```
+
+Result: seed script, runtime smoke, and docs are complete. This is a clean pause point.
+
 ## 2026-06-10 — TASK-0010 minimal Next.js review UI
 
 Requested: build the first browser-operable interface for Project Intake OS.
