@@ -2,9 +2,9 @@
 
 Internal pre-distribution control plane for Digital Solutions project intake, AI-assisted analysis drafts, approval, dry-run provisioning, and controlled handoff to downstream tools.
 
-## Current build state (TASK-0011)
+## Current build state (TASK-0012)
 
-The governance spine is complete. The NestJS API runtime is stable. The minimal Next.js review UI is running.
+The governance spine is complete. The NestJS API runtime is stable. The minimal Next.js review UI is running. The private server runtime is ready for deployment.
 
 Verified path:
 
@@ -253,11 +253,20 @@ Canonical roles: `request_creator`, `intake_owner`, `devops_lead`, `developer`, 
 | `npm run docker:down` | docker compose down | Stop all services |
 | `npm run smoke:api` | node scripts/smoke-api.mjs | API smoke test (quick) |
 | `npm run smoke:runtime` | node scripts/smoke-runtime-workflow.mjs | Full governance flow smoke test |
-| `npm run seed:demo` | node --env-file=.env scripts/seed-demo-data.mjs | Seed 6 demo intakes into Postgres |
+| `npm run seed:demo` | node --env-file=.env scripts/seed-demo-data.mjs | Seed 6 demo intakes (local dev) |
+| `npm run seed:demo:server` | node scripts/seed-demo-data.mjs | Seed 6 demo intakes (inside Docker) |
 | `npm run db:reset:demo` | prisma migrate reset + seed:demo | Reset database and reseed demo data |
 | `npm run web:dev` | next dev --port 3001 | Start web UI dev server |
 | `npm run web:build` | next build | Build web UI |
 | `npm run web:start` | next start --port 3001 | Start compiled web UI |
+| `npm run server:build` | docker compose build | Build server Docker images |
+| `npm run server:up` | docker compose up -d | Start server stack |
+| `npm run server:down` | docker compose down | Stop server stack |
+| `npm run server:ps` | docker compose ps | Show service status |
+| `npm run server:logs` | docker compose logs -f | Follow all logs |
+| `npm run server:health` | bash deploy/healthcheck-server.sh | Run server healthcheck |
+| `npm run server:deploy` | bash deploy/deploy-server.sh | Pull + build + start |
+| `npm run server:backup` | bash deploy/backup-postgres.sh | Dump Postgres to backups/ |
 | `npm run demo:mvp` | node scripts/demo-iteration-2.mjs | No-AI workflow demo |
 | `npm run demo:analysis` | node scripts/demo-analysis-draft.mjs | AI draft demo |
 | `npm run demo:analysis-review` | node scripts/demo-analysis-review.mjs | Accept/revise draft demo |
@@ -294,6 +303,98 @@ scripts/                 Demo scripts and smoke test
 docs/product/            Product behavior source of truth
 docs/ai/                 Build memory, task logs, ADRs, sequence log
 ```
+
+---
+
+## Private Server Runtime
+
+Run the full stack on a private server — no domain, no HTTPS, no public exposure required.
+
+> **Warning:** This app uses actor header shims, not real authentication. Do not expose it publicly until real auth is implemented.
+
+### Why SSH tunnel / port 8080?
+
+The server already runs Uptime Kuma on host port `3001`. Project Intake OS must never bind host port `3001`. The local proxy (Caddy) binds `127.0.0.1:8080` as the single entrypoint.
+
+```
+Host:  3001 → Uptime Kuma    8080 → Project Intake OS proxy
+Docker: web:3001  api:3000  postgres:5432  (internal only)
+```
+
+### Setup
+
+```bash
+cd ~/intake-os
+cp .env.server.example .env.server
+nano .env.server  # change POSTGRES_PASSWORD and DATABASE_URL password
+```
+
+### Build and start
+
+```bash
+npm run server:build
+npm run server:up
+npm run server:ps
+npm run server:health
+```
+
+If Node is not on the server, use Docker directly:
+
+```bash
+docker compose -f docker-compose.server.yml --env-file .env.server build
+docker compose -f docker-compose.server.yml --env-file .env.server up -d
+bash deploy/healthcheck-server.sh
+```
+
+### Seed demo data
+
+```bash
+docker compose -f docker-compose.server.yml --env-file .env.server exec api npm run seed:demo:server
+```
+
+### Runtime smoke test
+
+```bash
+docker compose -f docker-compose.server.yml --env-file .env.server exec \
+  -e API_BASE_URL=http://api:3000 \
+  api npm run smoke:runtime
+```
+
+### Access UI (SSH tunnel)
+
+```bash
+# From your laptop:
+ssh -L 8080:localhost:8080 oreo@SERVER_IP
+# Then open: http://localhost:8080/intakes
+```
+
+### Backup and restore
+
+```bash
+npm run server:backup
+bash deploy/restore-postgres.sh backups/intake_os_YYYYMMDD_HHMMSS.sql
+```
+
+### Optional: Tailscale Serve (private access via tailnet)
+
+```bash
+tailscale serve --https=443 http://127.0.0.1:8080
+```
+
+See `deploy/tailscale-serve-notes.md`.
+
+### Optional: Tailscale Funnel (temporary public demo)
+
+Requires basic auth in Caddy. See `deploy/tailscale-funnel-notes.md`. Turn it off after the demo.
+
+### Known limitations
+
+- No domain — SSH tunnel or Tailscale required.
+- No HTTPS on server itself — Tailscale Serve handles HTTPS if needed.
+- Actor selector is a dev auth shim — no real user authentication.
+- No real AI, Monday, or GitHub integrations — all actions are dry runs.
+
+Full documentation: `docs/deployment/private-server-runtime.md`
 
 ---
 

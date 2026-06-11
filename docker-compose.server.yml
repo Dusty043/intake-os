@@ -1,0 +1,68 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    env_file:
+      - .env.server
+    ports:
+      # Bound to localhost only — maintenance access from server shell.
+      # Not reachable from outside the server.
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - intake_os_postgres_data:/var/lib/postgresql/data
+      - ./backups:/backups
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    restart: unless-stopped
+    env_file:
+      - .env.server
+    depends_on:
+      postgres:
+        condition: service_healthy
+    # No host port binding — API is only accessible through the local proxy.
+    expose:
+      - "3000"
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+      args:
+        # Baked into the Next.js build. The browser calls /api which the proxy
+        # forwards to api:3000. If this value changes, rebuild the web image.
+        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-/api}
+    restart: unless-stopped
+    env_file:
+      - .env.server
+    depends_on:
+      - api
+    # No host port binding — host port 3001 is reserved for Uptime Kuma.
+    expose:
+      - "3001"
+
+  local-proxy:
+    image: caddy:2
+    restart: unless-stopped
+    ports:
+      # Single host entrypoint. Access via SSH tunnel: ssh -L 8080:localhost:8080 user@server
+      - "127.0.0.1:${PROXY_PORT:-8080}:8080"
+    volumes:
+      - ./deploy/Caddyfile.server:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - api
+      - web
+
+volumes:
+  intake_os_postgres_data:
+  caddy_data:
+  caddy_config:

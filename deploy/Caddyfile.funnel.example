@@ -1,0 +1,30 @@
+# Caddyfile for Tailscale Funnel demo mode.
+#
+# Steps before using:
+#   1. Generate a password hash:
+#        docker run --rm caddy:2 caddy hash-password --plaintext 'your-demo-password'
+#   2. Replace REPLACE_WITH_HASHED_PASSWORD below with the output.
+#   3. Copy this file to deploy/Caddyfile.server (backing up the original first).
+#   4. Restart the local-proxy container:
+#        docker compose -f docker-compose.server.yml --env-file .env.server restart local-proxy
+#   5. Enable Funnel:
+#        tailscale funnel --https=443 http://127.0.0.1:8080
+#
+# After the demo, disable Funnel and restore Caddyfile.server:
+#   tailscale funnel reset
+#
+# Do not commit real demo passwords to this file.
+
+:8080 {
+  basicauth {
+    demo REPLACE_WITH_HASHED_PASSWORD
+  }
+
+  handle_path /api/* {
+    reverse_proxy api:3000
+  }
+
+  handle {
+    reverse_proxy web:3001
+  }
+}

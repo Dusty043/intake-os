@@ -227,3 +227,40 @@ Target scope:
 - reviewer notes and immutable generated draft preservation
 - human-reviewed project package
 - approval gates continue to own authorization
+
+### TASK-0012 — Private server runtime deployment
+
+Status: implemented.
+
+Purpose:
+
+```text
+Make Project Intake OS run cleanly on a private server without a domain, HTTPS, or public
+internet exposure. Server-first baseline: Docker Compose, local proxy, seed, smoke, backup.
+```
+
+Completed:
+
+- `Dockerfile.api` — production API image, prisma migrate deploy on startup
+- `Dockerfile.web` — Next.js image with NEXT_PUBLIC_API_BASE_URL baked in at build time
+- `docker-compose.server.yml` — postgres, api, web, local-proxy (Caddy on 127.0.0.1:8080)
+- `.env.server.example`
+- `deploy/` — Caddyfile, deploy/healthcheck/backup/restore scripts, Tailscale notes
+- `server:*` npm scripts and `seed:demo:server` for container use
+- `.gitignore` updated for .env.server, backups/, *.sql, *.dump, apps/web/.next/
+- `docs/deployment/private-server-runtime.md`
+
+Key constraints:
+- Host port 3001 reserved for Uptime Kuma — web container uses `expose:` only
+- Local proxy binds 127.0.0.1:8080
+- NEXT_PUBLIC_API_BASE_URL=/api (baked into web build; rebuild required if changed)
+- SSH tunnel is default access mode; Tailscale Serve is optional; Funnel is demo-only
+
+Next recommended choices:
+
+```text
+TASK-0013 — Google SSO / internal authentication
+TASK-0013 — Real AI provider adapter
+```
+
+If public demos are needed soon, auth should come before real AI.

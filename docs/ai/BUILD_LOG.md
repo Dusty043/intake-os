@@ -1,5 +1,54 @@
 # Build Log
 
+## 2026-06-11 — TASK-0012 private server runtime deployment
+
+Requested: make the project deployable on a private server without a domain, HTTPS, or public exposure.
+
+Context: server already runs Uptime Kuma on host port 3001. App still uses actor header shims.
+
+Changes made:
+- Added `Dockerfile.api` (root) — production-grade multistage build, `prisma migrate deploy` on startup.
+- Added `Dockerfile.web` (root) — Next.js multistage build, `NEXT_PUBLIC_API_BASE_URL` baked in as ARG.
+- Added `docker-compose.server.yml` — postgres (127.0.0.1:5432), api (expose only), web (expose only, no host port 3001), local-proxy (127.0.0.1:8080 via Caddy).
+- Added `.env.server.example` with documented variables.
+- Added `deploy/Caddyfile.server` — routes /api/* to api:3000, everything else to web:3001.
+- Added `deploy/Caddyfile.funnel.example` — basic auth example for Tailscale Funnel demo mode.
+- Added `deploy/deploy-server.sh`, `healthcheck-server.sh`, `backup-postgres.sh`, `restore-postgres.sh` (all executable).
+- Added `deploy/tailscale-serve-notes.md`, `deploy/tailscale-funnel-notes.md`.
+- Added `server:build`, `server:up`, `server:down`, `server:ps`, `server:logs`, `server:health`, `server:deploy`, `server:backup` scripts to `package.json`.
+- Added `seed:demo:server` script (no `--env-file=.env` for container use where env comes from docker-compose).
+- Updated `.gitignore`: `.env.server`, `backups/`, `*.sql`, `*.dump`, `apps/web/.next/`.
+- Added `docs/deployment/private-server-runtime.md`.
+- Created task log `docs/ai/tasks/TASK-0012-private-server-runtime-deployment.md`.
+- Updated `docs/ai/MEMORY_INDEX.md`, `docs/ai/SEQUENCE_LOG.md`.
+
+Key decisions:
+- Host port 3001 remains reserved for Uptime Kuma. Web container uses `expose:` not `ports:`.
+- Local proxy binds to `127.0.0.1:8080` only — SSH tunnel is default access.
+- NEXT_PUBLIC_API_BASE_URL=/api for proxy mode. Rebuild web image if changed.
+- Tailscale Serve is optional private mode; Funnel is optional temporary demo mode only.
+
+Commands run:
+
+```bash
+npm run check           # pass
+npm run api:build       # pass
+npm run web:build       # pass
+npm run prisma:generate # pass
+npm run demo:mvp        # pass
+npm run demo:analysis   # pass
+npm run demo:analysis-review  # pass
+npm run demo:review-guard     # pass
+npm run demo:reviewed-distribution # pass
+```
+
+Server stack verification (Docker required on server):
+
+```bash
+cp .env.server.example .env.server
+npm run server:build && npm run server:up && npm run server:ps && npm run server:health
+```
+
 ## 2026-06-10 — TASK-0011 end-to-end runtime smoke & seeded demo data
 
 Requested: make the project easy to seed, demo, smoke-test, and pause cleanly.

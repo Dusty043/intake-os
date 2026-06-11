@@ -24,6 +24,11 @@ Generated at: 2026-06-09T14:53:20.716Z
 - `docs/ai/tasks/TASK-0009-api-runtime-dependency-stabilization.md`
 - `docs/ai/tasks/TASK-0010-minimal-nextjs-review-ui.md`
 - `docs/ai/tasks/TASK-0011-end-to-end-runtime-smoke-and-seeded-demo-data.md`
+- `docs/ai/tasks/TASK-0012-private-server-runtime-deployment.md`
+
+## Deployment Docs
+
+- `docs/deployment/private-server-runtime.md`
 
 ## Decisions
 

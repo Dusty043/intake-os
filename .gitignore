@@ -3,7 +3,20 @@ dist/
 .env
 .env.*
 !.env.example
+!.env.server.example
 .DS_Store
 __MACOSX/
 coverage/
 *.log
+
+# Server runtime — never commit
+.env.server
+
+# Postgres backups
+backups/
+*.sql
+*.dump
+
+# Next.js build output
+apps/web/.next/
+apps/web/tsconfig.tsbuildinfo

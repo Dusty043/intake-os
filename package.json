@@ -40,7 +40,16 @@
     "demo:reviewed-distribution": "npm run build:core && node scripts/demo-reviewed-package-distribution-preview.mjs",
     "web:dev": "npm --prefix apps/web run dev",
     "web:build": "npm --prefix apps/web run build",
-    "web:start": "npm --prefix apps/web run start"
+    "web:start": "npm --prefix apps/web run start",
+    "seed:demo:server": "node scripts/seed-demo-data.mjs",
+    "server:build": "docker compose -f docker-compose.server.yml --env-file .env.server build",
+    "server:up": "docker compose -f docker-compose.server.yml --env-file .env.server up -d",
+    "server:down": "docker compose -f docker-compose.server.yml --env-file .env.server down",
+    "server:ps": "docker compose -f docker-compose.server.yml --env-file .env.server ps",
+    "server:logs": "docker compose -f docker-compose.server.yml --env-file .env.server logs -f",
+    "server:health": "bash deploy/healthcheck-server.sh",
+    "server:deploy": "bash deploy/deploy-server.sh",
+    "server:backup": "bash deploy/backup-postgres.sh"
   },
   "engines": {
     "node": ">=22"
