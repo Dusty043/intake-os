@@ -1,7 +1,9 @@
-import { Body, Controller, Get, Headers, Param, Post } from "@nestjs/common";
+import { Body, Controller, Get, Param, Post } from "@nestjs/common";
 import { ApiOperation, ApiTags } from "@nestjs/swagger";
 import { IntakeWorkflowService } from "../../../../../src/application/intake-workflow-service.js";
-import { ApiActorHeaders, actorFromHeaders } from "../../common/actor.js";
+import type { Actor } from "../../../../../src/domain/types.js";
+import { CurrentActor } from "../auth/auth.decorators.js";
+import type { AuthenticatedActor } from "../auth/auth.types.js";
 import { AcceptAnalysisDraftDto } from "./dto/accept-analysis-draft.dto.js";
 import { ApprovalDecisionDto } from "./dto/approval-decision.dto.js";
 import { CompleteDiscoveryDto } from "./dto/complete-discovery.dto.js";
@@ -12,8 +14,11 @@ import { RejectAnalysisDraftDto } from "./dto/reject-analysis-draft.dto.js";
 import { RejectApprovalDto } from "./dto/reject-approval.dto.js";
 import { ReviseAnalysisDraftDto } from "./dto/revise-analysis-draft.dto.js";
 
+function toDomainActor(actor: AuthenticatedActor): Actor {
+  return { id: actor.id, role: actor.role, displayName: actor.name };
+}
+
 @ApiTags("intakes")
-@ApiActorHeaders()
 @Controller("intakes")
 export class IntakeHttpController {
   constructor(private readonly workflowService: IntakeWorkflowService) {}
@@ -32,14 +37,14 @@ export class IntakeHttpController {
 
   @Post()
   @ApiOperation({ summary: "Create a manual project intake" })
-  create(@Body() body: CreateIntakeDto, @Headers() headers: Record<string, string | string[] | undefined>) {
-    return this.workflowService.createIntake(body, actorFromHeaders(headers));
+  create(@Body() body: CreateIntakeDto, @CurrentActor() actor: AuthenticatedActor) {
+    return this.workflowService.createIntake(body, toDomainActor(actor));
   }
 
   @Post(":id/submit")
   @ApiOperation({ summary: "Submit a draft intake for discovery" })
-  submit(@Param("id") id: string, @Headers() headers: Record<string, string | string[] | undefined>) {
-    return this.workflowService.submitIntake(id, actorFromHeaders(headers));
+  submit(@Param("id") id: string, @CurrentActor() actor: AuthenticatedActor) {
+    return this.workflowService.submitIntake(id, toDomainActor(actor));
   }
 
   @Post(":id/discovery")
@@ -47,9 +52,9 @@ export class IntakeHttpController {
   completeDiscovery(
     @Param("id") id: string,
     @Body() body: CompleteDiscoveryDto,
-    @Headers() headers: Record<string, string | string[] | undefined>,
+    @CurrentActor() actor: AuthenticatedActor,
   ) {
-    return this.workflowService.completeDiscovery(id, body, actorFromHeaders(headers));
+    return this.workflowService.completeDiscovery(id, body, toDomainActor(actor));
   }
 
   @Post(":id/analysis-drafts/mock")
@@ -57,9 +62,9 @@ export class IntakeHttpController {
   generateMockAnalysisDraft(
     @Param("id") id: string,
     @Body() body: GenerateMockAnalysisDraftDto,
-    @Headers() headers: Record<string, string | string[] | undefined>,
+    @CurrentActor() actor: AuthenticatedActor,
   ) {
-    return this.workflowService.generateMockAnalysisDraft(id, body, actorFromHeaders(headers));
+    return this.workflowService.generateMockAnalysisDraft(id, body, toDomainActor(actor));
   }
 
   @Post(":id/analysis-drafts/:draftId/accept")
@@ -68,11 +73,11 @@ export class IntakeHttpController {
     @Param("id") id: string,
     @Param("draftId") draftId: string,
     @Body() body: AcceptAnalysisDraftDto,
-    @Headers() headers: Record<string, string | string[] | undefined>,
+    @CurrentActor() actor: AuthenticatedActor,
   ) {
     return this.workflowService.acceptAnalysisDraft(
       { intakeId: id, draftId, reviewerNotes: body.reviewerNotes },
-      actorFromHeaders(headers),
+      toDomainActor(actor),
     );
   }
 
@@ -82,11 +87,11 @@ export class IntakeHttpController {
     @Param("id") id: string,
     @Param("draftId") draftId: string,
     @Body() body: RejectAnalysisDraftDto,
-    @Headers() headers: Record<string, string | string[] | undefined>,
+    @CurrentActor() actor: AuthenticatedActor,
   ) {
     return this.workflowService.rejectAnalysisDraft(
       { intakeId: id, draftId, reason: body.reason },
-      actorFromHeaders(headers),
+      toDomainActor(actor),
     );
   }
 
@@ -96,11 +101,11 @@ export class IntakeHttpController {
     @Param("id") id: string,
     @Param("draftId") draftId: string,
     @Body() body: ReviseAnalysisDraftDto,
-    @Headers() headers: Record<string, string | string[] | undefined>,
+    @CurrentActor() actor: AuthenticatedActor,
   ) {
     return this.workflowService.reviseAnalysisDraft(
       { intakeId: id, draftId, reviewedPackage: body.reviewedPackage as any, reviewerNotes: body.reviewerNotes },
-      actorFromHeaders(headers),
+      toDomainActor(actor),
     );
   }
 
@@ -109,9 +114,9 @@ export class IntakeHttpController {
   approve(
     @Param("id") id: string,
     @Body() body: ApprovalDecisionDto,
-    @Headers() headers: Record<string, string | string[] | undefined>,
+    @CurrentActor() actor: AuthenticatedActor,
   ) {
-    return this.workflowService.recordApproval(id, body, actorFromHeaders(headers));
+    return this.workflowService.recordApproval(id, body, toDomainActor(actor));
   }
 
   @Post(":id/rejections")
@@ -119,9 +124,9 @@ export class IntakeHttpController {
   reject(
     @Param("id") id: string,
     @Body() body: RejectApprovalDto,
-    @Headers() headers: Record<string, string | string[] | undefined>,
+    @CurrentActor() actor: AuthenticatedActor,
   ) {
-    return this.workflowService.rejectApproval(id, actorFromHeaders(headers), body.reason);
+    return this.workflowService.rejectApproval(id, toDomainActor(actor), body.reason);
   }
 
   @Post(":id/provisioning-plan")
@@ -129,15 +134,18 @@ export class IntakeHttpController {
   generateProvisioningPlan(
     @Param("id") id: string,
     @Body() body: GenerateProvisioningPlanDto,
-    @Headers() headers: Record<string, string | string[] | undefined>,
+    @CurrentActor() actor: AuthenticatedActor,
   ) {
-    return this.workflowService.generateProvisioningPlan(id, body, actorFromHeaders(headers));
+    return this.workflowService.generateProvisioningPlan(id, body, toDomainActor(actor));
   }
 
   @Post(":id/provisioning-ready")
   @ApiOperation({ summary: "Mark a valid dry-run plan ready for later human-approved execution" })
-  markReadyForProvisioning(@Param("id") id: string, @Headers() headers: Record<string, string | string[] | undefined>) {
-    return this.workflowService.markReadyForProvisioning(id, actorFromHeaders(headers));
+  markReadyForProvisioning(
+    @Param("id") id: string,
+    @CurrentActor() actor: AuthenticatedActor,
+  ) {
+    return this.workflowService.markReadyForProvisioning(id, toDomainActor(actor));
   }
 
   @Get(":id/audit")

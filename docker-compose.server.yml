@@ -36,9 +36,10 @@ services:
       context: .
       dockerfile: Dockerfile.web
       args:
-        # Baked into the Next.js build. The browser calls /api which the proxy
-        # forwards to api:3000. If this value changes, rebuild the web image.
+        # Baked into the Next.js build at image build time.
+        # If either value changes, rebuild the web image.
         NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-/api}
+        NEXT_PUBLIC_AUTH_MODE: ${NEXT_PUBLIC_AUTH_MODE:-dev_headers}
     restart: unless-stopped
     env_file:
       - .env.server

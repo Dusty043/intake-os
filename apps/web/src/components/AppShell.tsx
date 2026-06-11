@@ -2,7 +2,9 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useAuth } from "./AuthProvider";
 import { ActorSelector } from "./ActorSelector";
+import { UserMenu } from "./UserMenu";
 
 type NavItem = { href: string; label: string; soon?: boolean };
 
@@ -15,6 +17,7 @@ const NAV: NavItem[] = [
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const { authMode } = useAuth();
 
   return (
     <div className="flex h-screen overflow-hidden bg-canvas">
@@ -58,7 +61,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           )}
         </nav>
 
-        <ActorSelector />
+        {authMode === "google" ? <UserMenu /> : <ActorSelector />}
       </aside>
 
       {/* Main canvas */}

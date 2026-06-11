@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import { ActorProvider } from "@/components/ActorProvider";
-import { AppShell } from "@/components/AppShell";
+import { AuthProvider } from "@/components/AuthProvider";
+import { ClientLayout } from "@/components/ClientLayout";
 
 export const metadata: Metadata = {
   title: "Project Intake OS",
@@ -16,9 +16,9 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
-        <ActorProvider>
-          <AppShell>{children}</AppShell>
-        </ActorProvider>
+        <AuthProvider>
+          <ClientLayout>{children}</ClientLayout>
+        </AuthProvider>
       </body>
     </html>
   );

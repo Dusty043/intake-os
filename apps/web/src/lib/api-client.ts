@@ -7,21 +7,23 @@ import type {
 } from "./types";
 
 const BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:3000";
+const AUTH_MODE = process.env.NEXT_PUBLIC_AUTH_MODE ?? "dev_headers";
 
 function actorHeaders(actor: UiActor): Record<string, string> {
-  return {
-    "Content-Type": "application/json",
-    "x-actor-id": actor.id,
-    "x-actor-role": actor.role,
-    "x-actor-name": actor.name,
-  };
+  const base: Record<string, string> = { "Content-Type": "application/json" };
+  if (AUTH_MODE !== "google") {
+    base["x-actor-id"] = actor.id;
+    base["x-actor-role"] = actor.role;
+    base["x-actor-name"] = actor.name;
+  }
+  return base;
 }
 
-async function request<T>(
-  path: string,
-  options: RequestInit,
-): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, options);
+async function request<T>(path: string, options: RequestInit): Promise<T> {
+  const res = await fetch(`${BASE}${path}`, {
+    credentials: "include",
+    ...options,
+  });
   if (!res.ok) {
     let msg = `HTTP ${res.status}`;
     try {
@@ -147,14 +149,11 @@ export async function generateProvisioningPlan(
   });
 }
 
-export async function getAuditTrail(
-  id: string,
-  actor: UiActor,
-): Promise<AuditEvent[]> {
+export async function getAuditTrail(id: string, actor: UiActor): Promise<AuditEvent[]> {
   return request(`/intakes/${id}/audit`, { headers: actorHeaders(actor) });
 }
 
 export async function checkHealth(): Promise<{ status: string }> {
-  const res = await fetch(`${BASE}/health`);
+  const res = await fetch(`${BASE}/health`, { credentials: "include" });
   return res.json() as Promise<{ status: string }>;
 }

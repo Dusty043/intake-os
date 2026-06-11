@@ -1,11 +1,24 @@
 import "reflect-metadata";
+import cookieParser = require("cookie-parser");
 import { ValidationPipe } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 import { AppModule } from "./app.module.js";
 
 async function bootstrap(): Promise<void> {
-  const app = await NestFactory.create(AppModule, { cors: true });
+  const app = await NestFactory.create(AppModule);
+
+  // CORS — allow credentials so session cookies work across origins in dev
+  const webOrigins = (process.env.WEB_ORIGIN ?? "http://localhost:3001,http://localhost:8080")
+    .split(",")
+    .map((o) => o.trim())
+    .filter(Boolean);
+  app.enableCors({
+    origin: webOrigins,
+    credentials: true,
+  });
+
+  app.use(cookieParser());
 
   app.useGlobalPipes(
     new ValidationPipe({

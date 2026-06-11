@@ -9,11 +9,13 @@ RUN npm --prefix apps/web ci
 FROM node:22-slim AS build
 WORKDIR /app
 
-# NEXT_PUBLIC_API_BASE_URL is baked into the Next.js build at build time.
-# For the server/proxy setup, pass /api so the browser calls the API through
-# the local proxy rather than a raw port.
+# NEXT_PUBLIC_* vars are baked into the Next.js build at build time.
+# Rebuild the web image when these change.
 ARG NEXT_PUBLIC_API_BASE_URL
 ENV NEXT_PUBLIC_API_BASE_URL=$NEXT_PUBLIC_API_BASE_URL
+
+ARG NEXT_PUBLIC_AUTH_MODE=dev_headers
+ENV NEXT_PUBLIC_AUTH_MODE=$NEXT_PUBLIC_AUTH_MODE
 
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=deps /app/apps/web/node_modules ./apps/web/node_modules

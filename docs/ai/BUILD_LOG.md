@@ -1,5 +1,36 @@
 # Build Log
 
+## 2026-06-12 — TASK-0013 authenticated internal access & role resolution
+
+Requested: replace the actor-header shim with real authenticated access, add Google OAuth, preserve dev mode.
+
+Context: TASK-0012 deployed the server stack. Auth was next before any downstream integrations or live keys.
+
+Changes made:
+- Added `AuthUser` and `AuthSession` Prisma models (server-side sessions, hashed tokens).
+- Added full NestJS auth module: `role-resolver`, `session.service`, `google-auth.service`, `auth.service`, `auth.guard`, `auth.decorators`, `auth.controller`, `auth.module`.
+- Global `AuthGuard` with dual mode: `dev_headers` (headers) and `google` (session cookie).
+- Health and `/auth/*` routes marked `@Public()`. Bitrix24 webhook also `@Public()`.
+- `@CurrentActor()` decorator replaces header bag in all intake controller methods.
+- `intake.controller.ts` now passes `toDomainActor(actor)` to workflow service.
+- Added `cookie-parser` middleware; CORS updated to allow credentials from `WEB_ORIGIN`.
+- Frontend: `AuthProvider`, `UserMenu`, `AuthGate`, `ClientLayout`, `/login` page.
+- `AppShell` shows `UserMenu` (google mode) or `ActorSelector` (dev mode).
+- `api-client.ts` uses `credentials: include` + conditional actor headers.
+- `NEXT_PUBLIC_AUTH_MODE` build arg wired into `Dockerfile.web` and `docker-compose.server.yml`.
+- Auth env vars added to `.env.example` and `.env.server.example`.
+- New tests: `auth-role-resolution` (11), `auth-session` (8), `auth-actor-resolution`.
+
+Verification:
+- `npm run check` — PASS (73/73)
+- `npm run api:build` — PASS
+- `npm run web:build` — PASS
+- `npm run prisma:generate` — PASS
+- All demos — PASS
+- New auth tests — PASS (19/19)
+
+Next: TASK-0014 — guided AI draft regeneration (now safe with real actor attribution)
+
 ## 2026-06-11 — TASK-0012 private server runtime deployment
 
 Requested: make the project deployable on a private server without a domain, HTTPS, or public exposure.

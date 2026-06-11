@@ -3,7 +3,9 @@ import { ApiOperation, ApiTags } from "@nestjs/swagger";
 import { normalizeBitrix24IntakePayload } from "../../../../../src/application/bitrix24-adapter.js";
 import { IntakeWorkflowService } from "../../../../../src/application/intake-workflow-service.js";
 import { ApiActorHeaders, actorFromHeaders } from "../../common/actor.js";
+import { Public } from "../auth/auth.decorators.js";
 
+@Public()
 @ApiTags("bitrix24")
 @ApiActorHeaders()
 @Controller("integrations/bitrix24")

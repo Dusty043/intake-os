@@ -256,11 +256,38 @@ Key constraints:
 - NEXT_PUBLIC_API_BASE_URL=/api (baked into web build; rebuild required if changed)
 - SSH tunnel is default access mode; Tailscale Serve is optional; Funnel is demo-only
 
-Next recommended choices:
+Next: TASK-0013 — authenticated internal access.
 
-```text
-TASK-0013 — Google SSO / internal authentication
-TASK-0013 — Real AI provider adapter
-```
+---
 
-If public demos are needed soon, auth should come before real AI.
+## TASK-0013 — Authenticated Internal Access & Role Resolution (2026-06-12)
+
+Implemented:
+- `AUTH_MODE=dev_headers|google` env switch
+- Google OAuth/OIDC login flow: `/auth/google/start` → `/auth/google/callback`
+- `AuthUser` and `AuthSession` Prisma models (db push applied on container startup)
+- Server-side sessions: 32-byte random token, SHA-256 hashed before Postgres storage
+- `intake_os_session` HttpOnly cookie (not localStorage)
+- Global `AuthGuard`: dev_headers mode trusts headers, google mode validates session cookie
+- `@Public()` on health and auth endpoints; `@CurrentActor()` on intake routes
+- Role resolver: env-based (AUTH_ADMIN_EMAILS, AUTH_INTAKE_OWNER_EMAILS, etc.)
+- Frontend: `/login` page, `AuthProvider`, `UserMenu`, `AuthGate`, `ClientLayout`
+- Actor selector hidden in google mode; UserMenu shows name/email/role/logout
+- `NEXT_PUBLIC_AUTH_MODE` build arg wired into Dockerfile.web and docker-compose.server.yml
+- All 73 existing tests pass; 19 new auth tests pass
+
+Key design:
+- All existing demos/tests work unchanged in `AUTH_MODE=dev_headers`
+- `toDomainActor()` bridge in intake.controller keeps workflow service interface stable
+- Auth guard is global via `APP_GUARD` in AuthModule — no per-route guard noise
+- Cookie: HttpOnly, SameSite=Lax, Secure configurable (false for SSH tunnel, true for HTTPS)
+
+Files added:
+- `apps/api/src/modules/auth/` (8 files)
+- `apps/web/src/components/AuthProvider.tsx`, `UserMenu.tsx`, `AuthGate.tsx`, `ClientLayout.tsx`
+- `apps/web/src/lib/auth-client.ts`
+- `apps/web/src/app/login/page.tsx`
+- `tests/auth-role-resolution.test.mjs`, `auth-actor-resolution.test.mjs`, `auth-session.test.mjs`
+- `docs/ai/tasks/TASK-0013-authenticated-internal-access.md`
+
+Next: TASK-0014 — guided AI draft regeneration (actor attribution now real)
