@@ -4,10 +4,10 @@ services:
     restart: unless-stopped
     env_file:
       - .env.server
-    ports:
-      # Bound to localhost only — maintenance access from server shell.
-      # Not reachable from outside the server.
-      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    # Internal Docker networking only — no host port binding needed.
+    # The API connects via the Docker service name "postgres:5432".
+    expose:
+      - "5432"
     volumes:
       - intake_os_postgres_data:/var/lib/postgresql/data
       - ./backups:/backups
