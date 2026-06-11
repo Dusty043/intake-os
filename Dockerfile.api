@@ -37,6 +37,6 @@ COPY --from=build /app/scripts ./scripts
 
 EXPOSE 3000
 
-# Run migrations then start the compiled API.
-# Uses prisma migrate deploy (production-safe, no schema drift).
-CMD ["sh", "-c", "npx prisma migrate deploy --schema apps/api/prisma/schema.prisma && node dist/apps/api/src/main.js"]
+# Push schema to database then start the compiled API.
+# Uses db push because no migration files exist — this project uses schema-first dev flow.
+CMD ["sh", "-c", "npx prisma db push --schema apps/api/prisma/schema.prisma && node dist/apps/api/src/main.js"]
