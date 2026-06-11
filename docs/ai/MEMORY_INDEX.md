@@ -25,6 +25,7 @@ Generated at: 2026-06-09T14:53:20.716Z
 - `docs/ai/tasks/TASK-0010-minimal-nextjs-review-ui.md`
 - `docs/ai/tasks/TASK-0011-end-to-end-runtime-smoke-and-seeded-demo-data.md`
 - `docs/ai/tasks/TASK-0012-private-server-runtime-deployment.md`
+- `docs/ai/tasks/TASK-0014-guided-ai-draft-regeneration.md` (planned)
 
 ## Deployment Docs
 
