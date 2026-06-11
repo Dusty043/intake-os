@@ -1,5 +1,31 @@
 # Build Log
 
+## 2026-06-12 — TASK-0014 guided AI draft regeneration
+
+Requested: let `intake_owner` and `devops_lead` steer the mock AI toward a better draft via free-text guidance.
+
+Context: TASK-0013 made actor attribution real, so guidance is now attributable to an authenticated person.
+
+Changes made:
+- `src/domain/permissions.ts` — added `steer_analysis_draft` action; granted to `intake_owner`, `devops_lead`, `admin`.
+- `src/application/errors.ts` — added `ConflictError` (maps to HTTP 409).
+- `src/application/types.ts` — added `RegenerateAnalysisDraftInput` interface; added `analysisDraftRegenerationCount` to `ProjectIntakeRecord`.
+- `src/application/intake-analysis.ts` — added `guidance?: string` to `GenerateMockAnalysisDraftInput`; mock provider visibly incorporates guidance (scope note + story point bias).
+- `src/application/intake-workflow-service.ts` — added `regenerateAnalysisDraft()` with all guards; supersedes prior draft; increments counter; emits `ANALYSIS_DRAFT_REGENERATED` audit event.
+- `apps/api/src/common/application-exception.filter.ts` — mapped `ConflictError` to `ConflictException` (409).
+- `apps/api/src/modules/intake/dto/regenerate-analysis-draft.dto.ts` — new DTO with `@IsString() @MinLength(10) guidance`.
+- `apps/api/src/modules/intake/intake.controller.ts` — added `POST /intakes/:id/analysis-drafts/regenerate`.
+- `tests/guided-draft-regeneration.test.mjs` — 10 new tests (all pass).
+- `scripts/demo-guided-regeneration.mjs` — full v1 → guidance → v2 → guidance → v3 → accept demo.
+- `package.json` — added `demo:guided-regen` npm script.
+
+Verification:
+- `npm run check` — PASS (83/83, including 10 new tests)
+- `npm run api:build` — PASS
+- `npm run demo:guided-regen` — PASS (v1→v2→v3→accept→Gate1 flow confirmed)
+
+Next: TASK-0015 — real AI provider integration (guidance field maps directly onto prompt)
+
 ## 2026-06-12 — TASK-0013 authenticated internal access & role resolution
 
 Requested: replace the actor-header shim with real authenticated access, add Google OAuth, preserve dev mode.

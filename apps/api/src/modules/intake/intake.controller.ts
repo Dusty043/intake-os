@@ -12,6 +12,7 @@ import { GenerateMockAnalysisDraftDto } from "./dto/generate-mock-analysis-draft
 import { GenerateProvisioningPlanDto } from "./dto/generate-provisioning-plan.dto.js";
 import { RejectAnalysisDraftDto } from "./dto/reject-analysis-draft.dto.js";
 import { RejectApprovalDto } from "./dto/reject-approval.dto.js";
+import { RegenerateAnalysisDraftDto } from "./dto/regenerate-analysis-draft.dto.js";
 import { ReviseAnalysisDraftDto } from "./dto/revise-analysis-draft.dto.js";
 
 function toDomainActor(actor: AuthenticatedActor): Actor {
@@ -65,6 +66,20 @@ export class IntakeHttpController {
     @CurrentActor() actor: AuthenticatedActor,
   ) {
     return this.workflowService.generateMockAnalysisDraft(id, body, toDomainActor(actor));
+  }
+
+  @Post(":id/analysis-drafts/regenerate")
+  @ApiOperation({ summary: "Regenerate the current pending AI analysis draft with steering guidance" })
+  regenerateAnalysisDraft(
+    @Param("id") id: string,
+    @Body() body: RegenerateAnalysisDraftDto,
+    @CurrentActor() actor: AuthenticatedActor,
+  ) {
+    return this.workflowService.regenerateAnalysisDraft(
+      id,
+      { guidance: body.guidance, requestedBy: actor.name },
+      toDomainActor(actor),
+    );
   }
 
   @Post(":id/analysis-drafts/:draftId/accept")

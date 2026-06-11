@@ -88,6 +88,7 @@ export interface IntakeAnalysisDraft {
 export interface GenerateMockAnalysisDraftInput {
   sourceInquiryText?: string;
   reviewerContext?: string;
+  guidance?: string;
 }
 
 export interface IntakeAnalysisDraftValidationResult {
@@ -107,12 +108,21 @@ export function buildMockIntakeAnalysisDraft(
   options: BuildMockAnalysisDraftOptions,
 ): IntakeAnalysisDraft {
   const definition = getProjectTypeDefinition(intake.projectType);
+  const guidance = options.input?.guidance;
   const inquiryText = normalizeWhitespace(options.input?.sourceInquiryText || intake.description);
   const title = intake.title.trim();
   const description = intake.description.trim();
-  const combinedText = `${title} ${description} ${inquiryText}`.toLowerCase();
+  const guidanceText = guidance ? normalizeWhitespace(guidance) : "";
+  const combinedText = `${title} ${description} ${inquiryText} ${guidanceText}`.toLowerCase();
   const complexity = inferComplexity(combinedText, intake.projectType);
-  const estimatedStoryPoints = estimateStoryPoints(complexity, intake.projectType, combinedText);
+  let estimatedStoryPoints = estimateStoryPoints(complexity, intake.projectType, combinedText);
+
+  if (guidance) {
+    // Vary story points based on guidance to produce a visibly different draft.
+    const guidanceBias = (guidance.length % 7) - 3;
+    estimatedStoryPoints = Math.max(1, estimatedStoryPoints + guidanceBias);
+  }
+
   const missingInformation = inferMissingInformation(combinedText);
   const recommendedTechStack = inferRecommendedStack(intake.projectType, combinedText);
   const infrastructureRequirements = inferInfrastructureRequirements(intake.projectType, combinedText);
@@ -129,6 +139,7 @@ export function buildMockIntakeAnalysisDraft(
     inquiryText,
     missingInformation,
     reviewerContext: options.input?.reviewerContext,
+    guidance,
   });
 
   return {
@@ -242,6 +253,7 @@ function buildBrief(input: {
   inquiryText: string;
   missingInformation: readonly string[];
   reviewerContext?: string;
+  guidance?: string;
 }): IntakeAnalysisBriefDraft {
   const problemStatement = input.inquiryText
     ? summarize(input.inquiryText, 320)
@@ -254,6 +266,7 @@ function buildBrief(input: {
       "Confirm functional requirements and success criteria.",
       "Produce implementation-ready task breakdown with story point estimates.",
       "Identify infrastructure and downstream provisioning requirements.",
+      ...(input.guidance ? [`Steering guidance applied: ${summarize(input.guidance, 200)}`] : []),
     ],
     deliverables: [
       "Reviewed project brief",

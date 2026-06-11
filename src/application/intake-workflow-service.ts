@@ -3,7 +3,7 @@ import { getProjectTypeDefinition } from "../domain/project-type-registry.js";
 import type { Actor, ApprovalGate, AuditEvent, RequestStatus, WorkflowAction } from "../domain/types.js";
 import { applyWorkflowTransition, isApprovalComplete } from "../domain/workflow.js";
 import { createAuditEvent } from "./audit.js";
-import { NotFoundError, PermissionDeniedError, ValidationError } from "./errors.js";
+import { ConflictError, NotFoundError, PermissionDeniedError, ValidationError } from "./errors.js";
 import { buildMockIntakeAnalysisDraft, validateIntakeAnalysisDraft } from "./intake-analysis.js";
 import { buildDryRunProvisioningPlan, resolveDistributionSource } from "./provisioning-plan.js";
 import type {
@@ -16,6 +16,7 @@ import type {
   ProjectIntakeRecord,
   ProjectIntakeStore,
   RejectAnalysisDraftInput,
+  RegenerateAnalysisDraftInput,
   ReviewedProjectPackage,
   ReviseAnalysisDraftInput,
 } from "./types.js";
@@ -192,6 +193,80 @@ export class IntakeWorkflowService {
         draftOnly: true,
       },
     });
+  }
+
+  async regenerateAnalysisDraft(
+    id: string,
+    input: RegenerateAnalysisDraftInput,
+    actor: Actor,
+  ): Promise<ProjectIntakeRecord> {
+    ensurePermission(actor, "steer_analysis_draft");
+
+    if (!input.guidance || input.guidance.trim().length < 10) {
+      throw new ValidationError("Guidance must be at least 10 characters.");
+    }
+
+    const record = await this.requireIntake(id);
+
+    if (record.status !== "intake_review") {
+      throw new ConflictError(`Regeneration is only allowed when intake is in intake_review status. Current status: ${record.status}.`);
+    }
+
+    const pendingDraft = record.analysisDrafts?.find((d) => d.reviewStatus === "draft");
+    if (!pendingDraft) {
+      throw new ConflictError("No draft in pending_review state. A draft must exist before regeneration.");
+    }
+
+    const regenLimit = 5;
+    const regenCount = record.analysisDraftRegenerationCount ?? 0;
+    if (regenCount >= regenLimit) {
+      throw new ConflictError(`Regeneration limit of ${regenLimit} has been reached for this intake.`);
+    }
+
+    const now = this.clock();
+    const supersededDraft = { ...pendingDraft, reviewStatus: "superseded" as const };
+
+    const newDraft = buildMockIntakeAnalysisDraft(record, {
+      now,
+      actor,
+      idFactory: this.idFactory,
+      input: { guidance: input.guidance },
+    });
+
+    const validation = validateIntakeAnalysisDraft(newDraft);
+    if (!validation.valid) {
+      throw new ValidationError(`Regenerated analysis draft failed validation: ${validation.errors.join(", ")}`);
+    }
+
+    const updatedDrafts = [
+      ...(record.analysisDrafts ?? []).map((d) => (d.id === pendingDraft.id ? supersededDraft : d)),
+      newDraft,
+    ];
+
+    const updatedRecord: ProjectIntakeRecord = {
+      ...record,
+      analysisDrafts: updatedDrafts,
+      latestAnalysisDraft: newDraft,
+      analysisDraftRegenerationCount: regenCount + 1,
+      updatedAt: now,
+    };
+
+    const saved = await this.store.saveIntake(updatedRecord);
+    await this.audit({
+      record: saved,
+      actor,
+      action: "ANALYSIS_DRAFT_REGENERATED",
+      timestamp: now,
+      metadata: {
+        previousDraftId: pendingDraft.id,
+        newDraftId: newDraft.id,
+        guidance: input.guidance.slice(0, 500),
+        regenerationCount: regenCount + 1,
+        requestedBy: input.requestedBy,
+      },
+    });
+
+    return saved;
   }
 
   async acceptAnalysisDraft(input: AcceptAnalysisDraftInput, actor: Actor): Promise<ProjectIntakeRecord> {

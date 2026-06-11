@@ -2,6 +2,7 @@ import {
   ArgumentsHost,
   BadRequestException,
   Catch,
+  ConflictException,
   ExceptionFilter,
   ForbiddenException,
   HttpException,
@@ -9,7 +10,7 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import type { Response } from "express";
-import { NotFoundError, PermissionDeniedError, ValidationError } from "../../../../src/application/errors.js";
+import { ConflictError, NotFoundError, PermissionDeniedError, ValidationError } from "../../../../src/application/errors.js";
 import { InvalidTransitionError, WorkflowGuardError } from "../../../../src/domain/workflow.js";
 
 @Catch(Error)
@@ -44,6 +45,10 @@ function toHttpError(error: Error) {
 
   if (error instanceof PermissionDeniedError) {
     return new ForbiddenException(error.message);
+  }
+
+  if (error instanceof ConflictError) {
+    return new ConflictException(error.message);
   }
 
   if (error instanceof ValidationError || error instanceof InvalidTransitionError || error instanceof WorkflowGuardError) {

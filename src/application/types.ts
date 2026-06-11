@@ -199,9 +199,15 @@ export interface ProjectIntakeRecord extends ProjectRequestSnapshot {
   discovery?: DiscoveryRecord;
   analysisDrafts?: readonly IntakeAnalysisDraft[];
   latestAnalysisDraft?: IntakeAnalysisDraft;
+  analysisDraftRegenerationCount?: number;
   reviewedProjectPackage?: ReviewedProjectPackage;
   provisioningPlan?: ProvisioningPlan;
   externalLinks: readonly ExternalLinkRecord[];
+}
+
+export interface RegenerateAnalysisDraftInput {
+  guidance: string;
+  requestedBy: string;
 }
 
 export interface CreateIntakeInput {

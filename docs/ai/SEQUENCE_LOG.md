@@ -290,4 +290,26 @@ Files added:
 - `tests/auth-role-resolution.test.mjs`, `auth-actor-resolution.test.mjs`, `auth-session.test.mjs`
 - `docs/ai/tasks/TASK-0013-authenticated-internal-access.md`
 
-Next: TASK-0014 — guided AI draft regeneration (actor attribution now real)
+Next: TASK-0014 — guided AI draft regeneration
+
+---
+
+## TASK-0014 — Guided AI Draft Regeneration (2026-06-12)
+
+Implemented:
+- New permission `steer_analysis_draft` — granted to `intake_owner`, `devops_lead`, `admin`
+- `RegenerateAnalysisDraftInput` interface + `analysisDraftRegenerationCount` on `ProjectIntakeRecord`
+- `ConflictError` error class → maps to HTTP 409 in exception filter
+- `regenerateAnalysisDraft()` service method with guards: permission, status, pending draft, regen limit (5)
+- Mock provider incorporates guidance: scope note + deterministic story point bias
+- Audit event `ANALYSIS_DRAFT_REGENERATED` with `guidance` (≤500 chars), `regenerationCount`, `requestedBy`
+- `POST /intakes/:id/analysis-drafts/regenerate` endpoint with `RegenerateAnalysisDraftDto` (@MinLength(10))
+- 10 new tests in `tests/guided-draft-regeneration.test.mjs` — all pass
+- Demo script `scripts/demo-guided-regeneration.mjs` — full v1→v2→v3→accept→Gate1 flow
+
+Verification:
+- `npm run check` — 83/83 pass
+- `npm run api:build` — PASS
+- `npm run demo:guided-regen` — PASS
+
+Next: TASK-0015 — real AI provider integration (guidance field maps directly onto prompt)
