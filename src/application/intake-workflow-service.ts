@@ -470,6 +470,17 @@ export class IntakeWorkflowService {
     return this.transition(id, "reject", actor, { reason });
   }
 
+  async requestChanges(id: string, actor: Actor, reason: string): Promise<ProjectIntakeRecord> {
+    const record = await this.requireIntake(id);
+    if (record.status !== "devops_review") {
+      throw new ValidationError(`Request changes is only available during DevOps review. Current status: ${record.status}.`);
+    }
+    if (!hasPermission(actor.role, "approve_gate_2")) {
+      throw new PermissionDeniedError("approve_gate_2");
+    }
+    return this.transition(id, "request_changes", actor, { reason });
+  }
+
   async generateProvisioningPlan(
     id: string,
     input: GenerateProvisioningPlanInput,

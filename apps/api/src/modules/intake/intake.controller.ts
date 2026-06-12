@@ -13,6 +13,7 @@ import { GenerateProvisioningPlanDto } from "./dto/generate-provisioning-plan.dt
 import { RejectAnalysisDraftDto } from "./dto/reject-analysis-draft.dto.js";
 import { RejectApprovalDto } from "./dto/reject-approval.dto.js";
 import { RegenerateAnalysisDraftDto } from "./dto/regenerate-analysis-draft.dto.js";
+import { RequestChangesDto } from "./dto/request-changes.dto.js";
 import { ReviseAnalysisDraftDto } from "./dto/revise-analysis-draft.dto.js";
 
 function toDomainActor(actor: AuthenticatedActor): Actor {
@@ -142,6 +143,16 @@ export class IntakeHttpController {
     @CurrentActor() actor: AuthenticatedActor,
   ) {
     return this.workflowService.rejectApproval(id, toDomainActor(actor), body.reason);
+  }
+
+  @Post(":id/request-changes")
+  @ApiOperation({ summary: "DevOps requests changes, routing the intake back to intake review" })
+  requestChanges(
+    @Param("id") id: string,
+    @Body() body: RequestChangesDto,
+    @CurrentActor() actor: AuthenticatedActor,
+  ) {
+    return this.workflowService.requestChanges(id, toDomainActor(actor), body.reason);
   }
 
   @Post(":id/provisioning-plan")

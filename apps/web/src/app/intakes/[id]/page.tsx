@@ -18,6 +18,7 @@ import {
   regenerateAnalysisDraft,
   rejectAnalysisDraft,
   rejectGate,
+  requestChanges,
   reviseAnalysisDraft,
   submitIntake,
 } from "@/lib/api-client";
@@ -344,6 +345,51 @@ function AiDraftTab({
                   </li>
                 ))}
               </ul>
+            </div>
+          )}
+
+          {draft.definitionOfDone && (
+            <div className="card p-5 border-l-4 border-emerald-400">
+              <h3 className="text-base font-semibold mb-2 text-brand-text">Definition of Done</h3>
+              <p className="text-sm text-brand-muted leading-relaxed">{draft.definitionOfDone}</p>
+            </div>
+          )}
+
+          {draft.openQuestions && draft.openQuestions.length > 0 && (
+            <div className="card p-5">
+              <h3 className="text-base font-semibold mb-3 text-brand-text">Open Questions</h3>
+              <div className="space-y-3">
+                {draft.openQuestions.map((q, i) => (
+                  <div key={i} className={`rounded-lg px-4 py-3 text-sm ${q.blocking ? "bg-red-50 border border-red-200" : "bg-amber-50 border border-amber-200"}`}>
+                    <div className="flex items-start justify-between gap-2 mb-1">
+                      <p className={`font-medium ${q.blocking ? "text-red-800" : "text-amber-800"}`}>{q.question}</p>
+                      {q.blocking && (
+                        <span className="shrink-0 text-xs bg-red-200 text-red-800 px-2 py-0.5 rounded-full font-semibold">blocks start</span>
+                      )}
+                    </div>
+                    <p className={`text-xs ${q.blocking ? "text-red-600" : "text-amber-600"}`}>Ask: {q.askedOf}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {draft.keyDependencies && draft.keyDependencies.length > 0 && (
+            <div className="card p-5">
+              <h3 className="text-base font-semibold mb-3 text-brand-text">Key Dependencies</h3>
+              <div className="space-y-2">
+                {draft.keyDependencies.map((dep, i) => (
+                  <div key={i} className="flex items-start gap-3 text-sm">
+                    <span className={`shrink-0 mt-0.5 text-xs px-2 py-0.5 rounded-full font-medium ${dep.blocking ? "bg-red-100 text-red-700" : "bg-gray-100 text-gray-500"}`}>
+                      {dep.blocking ? "blocking" : "needed"}
+                    </span>
+                    <div>
+                      <p className="font-medium text-brand-text">{dep.item}</p>
+                      <p className="text-xs text-brand-muted mt-0.5">{dep.reason}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </div>
@@ -690,6 +736,7 @@ function ApprovalsTab({
   const [g2Comment, setG2Comment] = useState("");
   const [g1Reject, setG1Reject] = useState("");
   const [g2Reject, setG2Reject] = useState("");
+  const [g2ReqChanges, setG2ReqChanges] = useState("");
 
   async function run(action: string, payload?: unknown) {
     setBusy(action);
@@ -801,8 +848,15 @@ function ApprovalsTab({
               }} disabled={!!busy || !gate1Done}>
                 Reject
               </button>
+              <button className="btn-secondary" onClick={() => {
+                if (!g2ReqChanges.trim()) { setErr("Reason required to request changes."); return; }
+                void run("request_changes", g2ReqChanges);
+              }} disabled={!!busy || !gate1Done}>
+                {busy === "request_changes" ? "Requesting changes…" : "Request Changes"}
+              </button>
             </div>
-            <input type="text" value={g2Reject} onChange={(e) => setG2Reject(e.target.value)} className="form-input" placeholder="Rejection reason (if rejecting)…" />
+            <input type="text" value={g2Reject} onChange={(e) => setG2Reject(e.target.value)} className="form-input" placeholder="Rejection reason (permanent — archives intake)…" />
+            <input type="text" value={g2ReqChanges} onChange={(e) => setG2ReqChanges(e.target.value)} className="form-input" placeholder="Request changes reason (routes back to intake review)…" />
           </div>
         )}
       </div>
@@ -1033,6 +1087,7 @@ function IntakeDetailContent() {
       case "approve_gate2": updated = await approveGate(iid, actor, payload as string); break;
       case "reject_gate1":  updated = await rejectGate(iid, actor, payload as string); break;
       case "reject_gate2":  updated = await rejectGate(iid, actor, payload as string); break;
+      case "request_changes": updated = await requestChanges(iid, actor, payload as string); break;
       case "gen_plan":      updated = await generateProvisioningPlan(iid, actor); break;
       case "goto_draft":    setTab("AI Draft"); return;
       default: return;

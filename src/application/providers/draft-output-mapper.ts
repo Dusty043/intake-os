@@ -31,6 +31,7 @@ export function mapModelOutputToDraft(
     description: st.description,
     storyPoints: Math.max(1, Math.round(st.storyPoints)),
     acceptanceCriteria: st.acceptanceCriteria,
+    ...(st.dependsOn && st.dependsOn.length > 0 ? { dependsOn: st.dependsOn } : {}),
   }));
 
   return {
@@ -71,5 +72,8 @@ export function mapModelOutputToDraft(
     warnings: output.warnings,
     proposedArchitecture: output.proposedArchitecture,
     implementationSuggestions: output.implementationSuggestions,
+    definitionOfDone: output.definitionOfDone,
+    openQuestions: output.openQuestions,
+    keyDependencies: output.keyDependencies,
   };
 }

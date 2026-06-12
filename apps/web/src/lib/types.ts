@@ -58,6 +58,9 @@ export type IntakeAnalysisDraft = {
   warnings?: string[];
   proposedArchitecture?: string;
   implementationSuggestions?: string[];
+  definitionOfDone?: string;
+  openQuestions?: Array<{ question: string; askedOf: string; blocking: boolean }>;
+  keyDependencies?: Array<{ item: string; reason: string; blocking: boolean }>;
   createdAt?: string;
   generatedAt?: string;
   [key: string]: unknown;

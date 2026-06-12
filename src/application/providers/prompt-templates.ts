@@ -20,6 +20,9 @@ OUTPUT RULES:
 - complexity must be one of: low, medium, high, unknown
 - proposedArchitecture: describe the high-level architecture in 2-4 sentences — key components, layers, and patterns the implementation should follow
 - implementationSuggestions: 3-6 concrete, actionable recommendations for the developers starting the work (e.g. ordering of work, risk mitigations, tooling choices)
+- definitionOfDone: 1-3 sentences describing what "shipped and accepted" looks like for this specific project — observable, testable, not a list of tasks
+- openQuestions: specific questions that MUST be answered by a stakeholder before implementation can start — include who to ask and whether it blocks work
+- keyDependencies: things the dev team must have in hand before writing the first line of code — credentials, access, provisioned infra, decisions — and whether each one blocks start
 
 GUIDANCE HANDLING:
 If reviewer guidance is provided, treat it as reviewer context to inform your analysis.

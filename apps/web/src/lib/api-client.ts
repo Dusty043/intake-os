@@ -138,6 +138,18 @@ export async function approveGate(
   });
 }
 
+export async function requestChanges(
+  id: string,
+  actor: UiActor,
+  reason: string,
+): Promise<ProjectIntakeRecord> {
+  return request(`/intakes/${id}/request-changes`, {
+    method: "POST",
+    headers: actorHeaders(actor),
+    body: JSON.stringify({ reason }),
+  });
+}
+
 export async function rejectGate(
   id: string,
   actor: UiActor,

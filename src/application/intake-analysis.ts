@@ -85,6 +85,9 @@ export interface IntakeAnalysisDraft {
   warnings: readonly string[];
   proposedArchitecture?: string;
   implementationSuggestions?: readonly string[];
+  definitionOfDone?: string;
+  openQuestions?: readonly { question: string; askedOf: string; blocking: boolean }[];
+  keyDependencies?: readonly { item: string; reason: string; blocking: boolean }[];
 }
 
 export interface GenerateMockAnalysisDraftInput {
@@ -168,6 +171,9 @@ export function buildMockIntakeAnalysisDraft(
     warnings: buildWarnings(missingInformation, infrastructureRequirements),
     proposedArchitecture: buildProposedArchitecture(intake.projectType, recommendedTechStack),
     implementationSuggestions: buildImplementationSuggestions(intake.projectType, recommendedTechStack),
+    definitionOfDone: buildDefinitionOfDone(intake.projectType, intake.title),
+    openQuestions: buildOpenQuestions(missingInformation, intake.projectType),
+    keyDependencies: buildKeyDependencies(intake.projectType, recommendedTechStack, combinedText),
   };
 }
 
@@ -520,6 +526,149 @@ function buildWarnings(
   }
 
   return warnings;
+}
+
+function buildDefinitionOfDone(projectType: ProjectType, title: string): string {
+  const byType: Record<ProjectType, string> = {
+    n8n_automation: `The n8n workflow is live, handles the happy path without manual intervention, error branches are wired, and a non-technical stakeholder has confirmed the output matches expectations.`,
+    data_sync_integration: `The sync runs on schedule, processed records match source data, resume-on-failure works after a simulated outage, and a 24-hour run completes with zero unhandled errors.`,
+    internal_dashboard: `The dashboard loads in under 3 seconds, displays accurate data verified against the source, role-based access is enforced, and the primary stakeholder has signed off on the data presented.`,
+    internal_tool: `The tool is deployed, core workflows function end-to-end, at least one real user has completed a task without guidance, and there are no critical bugs in the issue tracker.`,
+    client_portal: `The portal is live with SSO working, at least one client can log in and complete their primary workflow, data isolation between tenants is verified, and the client has accepted the deliverable.`,
+    saas_platform: `All core features are shipped behind feature flags, the platform handles the defined load target without degradation, billing integration is live, and the first paying customer is onboarded.`,
+    api_service: `The API is deployed, all documented endpoints return correct responses, the OpenAPI spec is published, consumer teams can authenticate and make calls, and error responses are consistent.`,
+    ai_workflow_tool: `The AI pipeline runs end-to-end, every AI call is logged with a correlation ID, the human approval gate blocks side effects, and a reviewer has approved at least one real output in staging.`,
+    discovery_research: `An Architecture Decision Record (ADR) is written and reviewed, key assumptions are validated with evidence, and the output contains a concrete recommendation with a go/no-go decision.`,
+    reporting_automation: `The report runs on schedule, output is delivered to the correct channel, a sample report has been reviewed by the stakeholder for accuracy, and re-delivery works after a simulated failure.`,
+  };
+  return byType[projectType].replace("$title", title);
+}
+
+function buildOpenQuestions(
+  missingInformation: readonly string[],
+  projectType: ProjectType,
+): readonly { question: string; askedOf: string; blocking: boolean }[] {
+  const questions: { question: string; askedOf: string; blocking: boolean }[] = [];
+
+  if (missingInformation.includes("deadline/timeline")) {
+    questions.push({
+      question: "What is the target launch date or deadline? Is there a hard external constraint (e.g. client commitment, regulatory date)?",
+      askedOf: "Project requester / stakeholder",
+      blocking: true,
+    });
+  }
+
+  if (missingInformation.includes("target users/stakeholders")) {
+    questions.push({
+      question: "Who are the primary users and what problem does this solve for them day-to-day?",
+      askedOf: "Project requester",
+      blocking: true,
+    });
+  }
+
+  if (missingInformation.includes("data sources")) {
+    questions.push({
+      question: "What data sources does this system read from or write to? Are there existing APIs or databases to integrate with?",
+      askedOf: "Project requester / existing system owner",
+      blocking: true,
+    });
+  }
+
+  if (missingInformation.includes("data sensitivity")) {
+    questions.push({
+      question: "Does this system handle personal, financial, or health data? Are there compliance requirements (HIPAA, PCI, GDPR)?",
+      askedOf: "Legal / compliance team",
+      blocking: true,
+    });
+  }
+
+  const byType: Record<ProjectType, { question: string; askedOf: string; blocking: boolean } | null> = {
+    client_portal: { question: "How many tenants are expected at launch and over 12 months? This determines infra sizing.", askedOf: "Project requester / sales", blocking: false },
+    saas_platform: { question: "What is the pricing model and who controls plan gating? Dev needs this to implement feature flags correctly.", askedOf: "Product / commercial team", blocking: true },
+    n8n_automation: { question: "Who owns the connected credentials (API keys, OAuth) and how are they rotated?", askedOf: "Ops / IT", blocking: true },
+    data_sync_integration: { question: "What is the acceptable lag between source data and synced data? Real-time, near-real-time, or batch?", askedOf: "Project requester", blocking: true },
+    internal_dashboard: { question: "Is there an existing data source (database, API) or does data need to be ingested fresh?", askedOf: "Data / ops team", blocking: true },
+    internal_tool: null,
+    api_service: { question: "Which teams or services are the primary consumers? They need to be involved in API design review.", askedOf: "Engineering leads", blocking: false },
+    ai_workflow_tool: { question: "What is the acceptable AI error rate and who reviews AI outputs before they take effect?", askedOf: "Product / stakeholder", blocking: true },
+    discovery_research: { question: "What is the decision or action this research is unblocking? Success = a decision is made.", askedOf: "Project requester", blocking: true },
+    reporting_automation: { question: "Who receives the reports and in what format? Email, Slack, S3, dashboard widget?", askedOf: "Project requester", blocking: true },
+  };
+
+  const typeQ = byType[projectType];
+  if (typeQ) questions.push(typeQ);
+
+  return questions;
+}
+
+function buildKeyDependencies(
+  projectType: ProjectType,
+  stack: readonly string[],
+  text: string,
+): readonly { item: string; reason: string; blocking: boolean }[] {
+  const deps: { item: string; reason: string; blocking: boolean }[] = [
+    {
+      item: "Access to this project in the intake OS",
+      reason: "Developers need to read the reviewed project package and task breakdown before starting.",
+      blocking: true,
+    },
+  ];
+
+  if (["internal_tool", "internal_dashboard", "client_portal", "saas_platform", "api_service", "ai_workflow_tool", "data_sync_integration", "reporting_automation"].includes(projectType)) {
+    deps.push({
+      item: "Database provisioning (Postgres)",
+      reason: "Schema migrations run at startup — infra must exist before first deploy.",
+      blocking: true,
+    });
+  }
+
+  if (["client_portal", "saas_platform"].includes(projectType)) {
+    deps.push({
+      item: "Google Workspace / SSO credentials for the target environment",
+      reason: "Auth cannot be tested without a real OAuth client ID and secret.",
+      blocking: true,
+    });
+  }
+
+  if (projectType === "n8n_automation") {
+    deps.push({
+      item: "n8n instance access + credentials for all connected services",
+      reason: "Workflow cannot be built or tested without live credentials in the credential store.",
+      blocking: true,
+    });
+  }
+
+  if (projectType === "ai_workflow_tool" || stack.includes("LLM provider")) {
+    deps.push({
+      item: "AI provider API key (OpenAI / Anthropic / Bedrock)",
+      reason: "AI calls fail without a valid key — needed from day one to test the pipeline.",
+      blocking: true,
+    });
+  }
+
+  if (text.includes("github") || ["internal_tool", "saas_platform", "api_service", "client_portal"].includes(projectType)) {
+    deps.push({
+      item: "GitHub repository provisioned via this intake",
+      reason: "Developers need a repo before they can push code. Follow the distribution step in this intake.",
+      blocking: true,
+    });
+  }
+
+  if (projectType === "data_sync_integration") {
+    deps.push({
+      item: "Read access to the source system / API",
+      reason: "The sync worker cannot be tested without being able to pull data from the source.",
+      blocking: true,
+    });
+  }
+
+  deps.push({
+    item: "Local development environment matching the stack",
+    reason: `Stack is ${stack.slice(0, 3).join(", ")}. Dev machines must run these tools before the first PR can be made.`,
+    blocking: false,
+  });
+
+  return deps;
 }
 
 function buildProposedArchitecture(projectType: ProjectType, stack: readonly string[]): string {

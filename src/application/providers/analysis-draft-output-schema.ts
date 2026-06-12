@@ -21,6 +21,7 @@ export interface AnalysisDraftModelOutput {
     description: string;
     storyPoints: number;
     acceptanceCriteria: string[];
+    dependsOn?: string[];
   }>;
   recommendedTechStack: string[];
   infrastructureRequirements: Array<{
@@ -38,6 +39,9 @@ export interface AnalysisDraftModelOutput {
   projectType: string;
   proposedArchitecture: string;
   implementationSuggestions: string[];
+  definitionOfDone: string;
+  openQuestions: Array<{ question: string; askedOf: string; blocking: boolean }>;
+  keyDependencies: Array<{ item: string; reason: string; blocking: boolean }>;
 }
 
 /** JSON Schema object for use with OpenAI structured output and Anthropic tool schemas. */
@@ -63,6 +67,9 @@ export const analysisDraftModelOutputJsonSchema = {
     "projectType",
     "proposedArchitecture",
     "implementationSuggestions",
+    "definitionOfDone",
+    "openQuestions",
+    "keyDependencies",
   ],
   additionalProperties: false,
   properties: {
@@ -92,6 +99,7 @@ export const analysisDraftModelOutputJsonSchema = {
           description: { type: "string" },
           storyPoints: { type: "number" },
           acceptanceCriteria: { type: "array", items: { type: "string" } },
+          dependsOn: { type: "array", items: { type: "string" } },
         },
       },
     },
@@ -119,6 +127,33 @@ export const analysisDraftModelOutputJsonSchema = {
     projectType: { type: "string" },
     proposedArchitecture: { type: "string" },
     implementationSuggestions: { type: "array", items: { type: "string" } },
+    definitionOfDone: { type: "string" },
+    openQuestions: {
+      type: "array",
+      items: {
+        type: "object",
+        required: ["question", "askedOf", "blocking"],
+        additionalProperties: false,
+        properties: {
+          question: { type: "string" },
+          askedOf: { type: "string" },
+          blocking: { type: "boolean" },
+        },
+      },
+    },
+    keyDependencies: {
+      type: "array",
+      items: {
+        type: "object",
+        required: ["item", "reason", "blocking"],
+        additionalProperties: false,
+        properties: {
+          item: { type: "string" },
+          reason: { type: "string" },
+          blocking: { type: "boolean" },
+        },
+      },
+    },
   },
 } as const;
 
@@ -146,6 +181,9 @@ export function validateAnalysisDraftModelOutput(output: unknown): output is Ana
   if (typeof o["confidenceScore"] !== "number") return false;
   if (typeof o["proposedArchitecture"] !== "string") return false;
   if (!Array.isArray(o["implementationSuggestions"])) return false;
+  if (typeof o["definitionOfDone"] !== "string" || !(o["definitionOfDone"] as string).trim()) return false;
+  if (!Array.isArray(o["openQuestions"])) return false;
+  if (!Array.isArray(o["keyDependencies"])) return false;
 
   const subtasks = o["recommendedSubtasks"] as unknown[];
   for (const st of subtasks) {

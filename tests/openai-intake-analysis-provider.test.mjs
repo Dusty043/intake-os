@@ -68,6 +68,9 @@ const validModelOutput = {
   projectType: "api_service",
   proposedArchitecture: "Stateless NestJS REST service backed by PostgreSQL. Redis queue for retry scheduling with exponential backoff. OpenAPI spec generated from decorators.",
   implementationSuggestions: ["Start with the retry queue worker before the HTTP layer.", "Use idempotency keys on all payment retries."],
+  definitionOfDone: "The API is deployed, all documented endpoints return correct responses, and consumer teams can authenticate and make calls without guidance.",
+  openQuestions: [{ question: "Which teams are the primary consumers?", askedOf: "Engineering leads", blocking: false }],
+  keyDependencies: [{ item: "Postgres database provisioned", reason: "Migrations run at startup.", blocking: true }],
 };
 
 function makeStubClient(resolveWith) {
