@@ -326,6 +326,56 @@ function AiDraftTab({
         </div>
       </div>
 
+      {/* Draft iteration history */}
+      {intake.analysisDrafts && intake.analysisDrafts.length > 1 && (
+        <div className="card p-5">
+          <h3 className="text-base font-semibold text-brand-text mb-3">
+            Draft History <span className="text-gray-400 font-normal text-sm">({intake.analysisDrafts.length} iterations)</span>
+          </h3>
+          <div className="space-y-2">
+            {[...intake.analysisDrafts].reverse().map((d, i) => {
+              const isCurrent = d.id === draft.id;
+              const statusColor =
+                d.reviewStatus === "accepted" ? "bg-green-100 text-green-700" :
+                d.reviewStatus === "rejected" ? "bg-red-100 text-red-700" :
+                d.reviewStatus === "superseded" ? "bg-gray-100 text-gray-400" :
+                "bg-violet-100 text-violet-700";
+              const versionNum = intake.analysisDrafts!.length - i;
+              return (
+                <div
+                  key={d.id}
+                  className={`flex items-center justify-between rounded-lg px-4 py-2.5 text-sm ${isCurrent ? "bg-violet-50 border border-violet-200" : "bg-gray-50"}`}
+                >
+                  <div className="flex items-center gap-3">
+                    <span className={`text-xs font-mono font-semibold ${isCurrent ? "text-violet-700" : "text-gray-400"}`}>
+                      v{versionNum}
+                    </span>
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${statusColor}`}>
+                      {d.reviewStatus ?? "draft"}
+                    </span>
+                    {isCurrent && (
+                      <span className="text-xs text-violet-600 font-medium">current</span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-4 text-xs text-gray-400">
+                    {d.estimatedStoryPoints != null && (
+                      <span>{d.estimatedStoryPoints} SP</span>
+                    )}
+                    {d.confidence != null && (
+                      <span>{Math.round(d.confidence * 100)}% conf</span>
+                    )}
+                    {(d.createdAt ?? d.generatedAt) && (
+                      <span className="font-mono">{formatDate(d.createdAt ?? d.generatedAt)}</span>
+                    )}
+                    <span className="font-mono text-gray-300">{d.id.slice(0, 12)}…</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Review actions — only when draft is pending review */}
       {draft.reviewStatus === "draft" && !intake.reviewedProjectPackage && (
         <div className="card p-5">
