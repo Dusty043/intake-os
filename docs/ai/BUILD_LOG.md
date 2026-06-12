@@ -1,5 +1,32 @@
 # Build Log
 
+## 2026-06-12 — TASK-0018 Evaluation Orchestrator
+
+Requested: implement the in-memory evaluation orchestrator. 3-stage pipeline (Stage 1 serial, Stage 2 parallel, Stage 3 serial), clarification blocking, depth upgrade, per-agent provenance/timing, quality status mapping, NestJS DI wiring.
+
+Changes made:
+
+- `src/application/evaluation-orchestrator.ts` — `EvaluationOrchestrator` class with `orchestrate()` method; `ClarificationOutcome`, `EvaluationOrchestrationResult` types; `EvaluationOrchestrationError`, `AgentOutputValidationError`, `MissingEvaluationAgentError` error types.
+- `tests/evaluation-orchestrator.test.mjs` — 45 orchestrator tests: construction, clarification blocking, depth routing, quality gating, provenance, validation, integration.
+- `scripts/demo-evaluation-orchestrator.mjs` — 3-step demo: full pipeline, legacy draft round-trip, clarification_required.
+- `src/index.ts` — added orchestrator export.
+- `package.json` — added `demo:evaluation-orchestrator` script.
+- `apps/api/src/runtime/runtime.module.ts` — registered `EvaluationOrchestrator` as NestJS provider.
+
+Commands run:
+
+```bash
+npm run build      # clean
+npm run api:build  # clean
+npm run web:build  # clean
+npm test           # 352/352 pass (was 307, +45 new tests)
+npm run demo:evaluation-orchestrator  # pass
+npm run demo:analysis    # unchanged
+npm run demo:guided-regen  # unchanged
+```
+
+Follow-up: TASK-0019 — Prisma Persistence for IntakeEvaluation.
+
 ## 2026-06-12 — TASK-0017 Mock Agent Implementations — All 12 Evaluation Agents
 
 Requested: implement all 12 deterministic mock evaluation agents. No real AI calls, no orchestrator, no Prisma changes.

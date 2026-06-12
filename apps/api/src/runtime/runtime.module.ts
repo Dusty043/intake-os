@@ -1,6 +1,8 @@
 import { Global, Logger, Module } from "@nestjs/common";
 import { APP_FILTER } from "@nestjs/core";
+import { EvaluationOrchestrator } from "../../../../src/application/evaluation-orchestrator.js";
 import { IntakeWorkflowService } from "../../../../src/application/intake-workflow-service.js";
+import { createAllMockEvaluationAgents } from "../../../../src/application/agents/mock/index.js";
 import { loadAnalysisProviderConfig } from "../../../../src/application/providers/analysis-provider-config.js";
 import { AnalysisProviderRouter } from "../../../../src/application/providers/analysis-provider-router.js";
 import { ANALYSIS_PROVIDER } from "../ai/provider.token.js";
@@ -35,10 +37,22 @@ const logger = new Logger("RuntimeModule");
         new IntakeWorkflowService({ store, analysisProvider }),
     },
     {
+      provide: EvaluationOrchestrator,
+      useFactory: () => {
+        let _seq = 0;
+        return new EvaluationOrchestrator({
+          agents: createAllMockEvaluationAgents(),
+          idFactory: (prefix: string) =>
+            `${prefix}-${Date.now().toString(36).toUpperCase()}-${String(++_seq).padStart(6, "0")}`,
+          now: () => new Date().toISOString(),
+        });
+      },
+    },
+    {
       provide: APP_FILTER,
       useClass: ApplicationExceptionFilter,
     },
   ],
-  exports: [PrismaService, PROJECT_INTAKE_STORE, IntakeWorkflowService, ANALYSIS_PROVIDER],
+  exports: [PrismaService, PROJECT_INTAKE_STORE, IntakeWorkflowService, ANALYSIS_PROVIDER, EvaluationOrchestrator],
 })
 export class RuntimeModule {}
