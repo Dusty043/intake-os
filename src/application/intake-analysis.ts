@@ -83,6 +83,8 @@ export interface IntakeAnalysisDraft {
   assignmentRecommendation: DeveloperAssignmentRecommendationDraft;
   missingInformation: readonly string[];
   warnings: readonly string[];
+  proposedArchitecture?: string;
+  implementationSuggestions?: readonly string[];
 }
 
 export interface GenerateMockAnalysisDraftInput {
@@ -164,6 +166,8 @@ export function buildMockIntakeAnalysisDraft(
     assignmentRecommendation: buildAssignmentRecommendation(intake.projectType, recommendedTechStack),
     missingInformation,
     warnings: buildWarnings(missingInformation, infrastructureRequirements),
+    proposedArchitecture: buildProposedArchitecture(intake.projectType, recommendedTechStack),
+    implementationSuggestions: buildImplementationSuggestions(intake.projectType, recommendedTechStack),
   };
 }
 
@@ -516,6 +520,74 @@ function buildWarnings(
   }
 
   return warnings;
+}
+
+function buildProposedArchitecture(projectType: ProjectType, stack: readonly string[]): string {
+  const primaryStack = stack.slice(0, 3).join(", ");
+  const archetypeByType: Record<ProjectType, string> = {
+    n8n_automation: "Trigger-based workflow using n8n nodes. HTTP webhook entry point, credential store for external API auth, error-branch handling for retry logic.",
+    data_sync_integration: "Scheduled worker with idempotent sync loop. Source-adapter → transform → upsert pipeline. Checkpoint table for resume-on-failure. Dead-letter queue for unprocessable records.",
+    internal_dashboard: "Server-rendered Next.js frontend backed by a NestJS API. Read-optimised Postgres views for chart queries. Role-based access guard at the API layer.",
+    internal_tool: "Next.js + NestJS monorepo. Domain-driven service layer with Prisma repository pattern. Docker Compose for local dev, container deploy for production.",
+    client_portal: "Multi-tenant Next.js app. Google SSO via NextAuth. Row-level Postgres isolation per tenant. NestJS API with per-request actor context.",
+    saas_platform: "Multi-tier: Next.js frontend, NestJS API, Postgres primary + read replica. Background worker pool for async jobs. Observability stack (logs, metrics, traces).",
+    api_service: "Stateless NestJS REST service. OpenAPI-first with auto-generated client types. Postgres for persistence. Docker image published to container registry.",
+    ai_workflow_tool: "Orchestrator service calling one or more LLM providers via adapter pattern. Structured-output schemas for AI responses. Audit log table for every AI call. Human-in-the-loop approval gate before side effects.",
+    discovery_research: "Research spike producing an Architecture Decision Record (ADR) and feasibility report. No production code in scope. Outputs feed the next intake.",
+    reporting_automation: "Scheduled worker queries Postgres aggregates and renders output (PDF/CSV/email). Delivery adapter is swappable (SMTP, Slack, S3). Retry on transient failure.",
+  };
+  return `${archetypeByType[projectType]} Primary stack: ${primaryStack}.`;
+}
+
+function buildImplementationSuggestions(projectType: ProjectType, stack: readonly string[]): readonly string[] {
+  const common = [
+    "Start with a working skeleton before adding business logic — confirm the deployment pipeline works on day one.",
+    "Write integration tests against the actual data store, not mocks, to catch schema drift early.",
+    "Define environment variables in a .env.example and validate required vars at startup.",
+  ];
+  const byType: Record<ProjectType, readonly string[]> = {
+    n8n_automation: [
+      "Export the n8n workflow JSON to version control so changes are reviewable.",
+      "Use n8n's built-in retry and error-branch nodes rather than custom try/catch logic.",
+    ],
+    data_sync_integration: [
+      "Store a last-synced cursor in the database so the worker can resume after failure.",
+      "Test the sync with a small dataset before enabling full production volume.",
+    ],
+    internal_dashboard: [
+      "Add a slow-query log threshold and review any query over 100 ms before launch.",
+      "Paginate all list endpoints — even internal dashboards grow unexpectedly.",
+    ],
+    internal_tool: [
+      "Seed the local database with realistic fixture data so the UI is testable without production access.",
+      "Add role-check middleware early — retrofitting auth guards is expensive.",
+    ],
+    client_portal: [
+      "Enforce tenant isolation at the database query level, not just the application layer.",
+      "Test SSO with a staging identity provider before pointing at production Google Workspace.",
+    ],
+    saas_platform: [
+      "Instrument distributed tracing from day one — latency regressions are hard to find post-launch.",
+      "Use feature flags for any functionality that should be gated per plan tier.",
+    ],
+    api_service: [
+      "Generate an OpenAPI spec from code (not the reverse) to keep spec and implementation in sync.",
+      "Version the API path from the start (e.g. /v1/) even if v2 is not planned.",
+    ],
+    ai_workflow_tool: [
+      "Log every AI request and response (truncated) with a correlation ID for auditability.",
+      "Design the human approval gate as a blocking async step — never let AI side-effects run before it.",
+    ],
+    discovery_research: [
+      "Timebox the spike to avoid scope creep — the output is a decision, not a prototype.",
+      "Validate key assumptions with a throwaway proof-of-concept before writing the ADR.",
+    ],
+    reporting_automation: [
+      "Preview the rendered report in staging before scheduling production delivery.",
+      "Store a copy of each report output (S3 or DB) for audit and re-delivery.",
+    ],
+  };
+  return [...byType[projectType], ...common];
 }
 
 function summarize(value: string, maxLength: number): string {

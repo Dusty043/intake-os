@@ -36,6 +36,8 @@ export interface AnalysisDraftModelOutput {
   missingInformation: string[];
   warnings: string[];
   projectType: string;
+  proposedArchitecture: string;
+  implementationSuggestions: string[];
 }
 
 /** JSON Schema object for use with OpenAI structured output and Anthropic tool schemas. */
@@ -59,6 +61,8 @@ export const analysisDraftModelOutputJsonSchema = {
     "missingInformation",
     "warnings",
     "projectType",
+    "proposedArchitecture",
+    "implementationSuggestions",
   ],
   additionalProperties: false,
   properties: {
@@ -113,6 +117,8 @@ export const analysisDraftModelOutputJsonSchema = {
     missingInformation: { type: "array", items: { type: "string" } },
     warnings: { type: "array", items: { type: "string" } },
     projectType: { type: "string" },
+    proposedArchitecture: { type: "string" },
+    implementationSuggestions: { type: "array", items: { type: "string" } },
   },
 } as const;
 
@@ -138,6 +144,8 @@ export function validateAnalysisDraftModelOutput(output: unknown): output is Ana
   if (!["low", "medium", "high", "unknown"].includes(o["complexity"] as string)) return false;
   if (typeof o["estimatedStoryPoints"] !== "number" || (o["estimatedStoryPoints"] as number) < 1) return false;
   if (typeof o["confidenceScore"] !== "number") return false;
+  if (typeof o["proposedArchitecture"] !== "string") return false;
+  if (!Array.isArray(o["implementationSuggestions"])) return false;
 
   const subtasks = o["recommendedSubtasks"] as unknown[];
   for (const st of subtasks) {

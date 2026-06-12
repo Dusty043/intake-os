@@ -323,6 +323,29 @@ function AiDraftTab({
               </div>
             </div>
           )}
+
+          {draft.proposedArchitecture && (
+            <div className="card p-5">
+              <h3 className="text-base font-semibold mb-3 text-brand-text">Proposed Architecture</h3>
+              <p className="text-sm text-brand-muted leading-relaxed">{draft.proposedArchitecture}</p>
+            </div>
+          )}
+
+          {draft.implementationSuggestions && draft.implementationSuggestions.length > 0 && (
+            <div className="card p-5">
+              <h3 className="text-base font-semibold mb-3 text-brand-text">Implementation Suggestions</h3>
+              <ul className="space-y-2">
+                {draft.implementationSuggestions.map((s, i) => (
+                  <li key={i} className="flex items-start gap-2 text-sm text-brand-muted">
+                    <span className="shrink-0 mt-0.5 w-5 h-5 bg-violet-100 text-violet-700 rounded-full text-xs flex items-center justify-center font-medium">
+                      {i + 1}
+                    </span>
+                    {s}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
       </div>
 

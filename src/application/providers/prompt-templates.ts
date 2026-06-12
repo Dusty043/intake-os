@@ -18,6 +18,8 @@ OUTPUT RULES:
 - recommendedTechStack must contain at least one item
 - infrastructureRequirements must contain at least one item
 - complexity must be one of: low, medium, high, unknown
+- proposedArchitecture: describe the high-level architecture in 2-4 sentences — key components, layers, and patterns the implementation should follow
+- implementationSuggestions: 3-6 concrete, actionable recommendations for the developers starting the work (e.g. ordering of work, risk mitigations, tooling choices)
 
 GUIDANCE HANDLING:
 If reviewer guidance is provided, treat it as reviewer context to inform your analysis.

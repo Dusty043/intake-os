@@ -69,5 +69,7 @@ export function mapModelOutputToDraft(
     },
     missingInformation: output.missingInformation,
     warnings: output.warnings,
+    proposedArchitecture: output.proposedArchitecture,
+    implementationSuggestions: output.implementationSuggestions,
   };
 }

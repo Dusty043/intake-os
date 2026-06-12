@@ -56,6 +56,8 @@ export type IntakeAnalysisDraft = {
   assignmentRecommendation?: unknown;
   missingInformation?: string[];
   warnings?: string[];
+  proposedArchitecture?: string;
+  implementationSuggestions?: string[];
   createdAt?: string;
   generatedAt?: string;
   [key: string]: unknown;
