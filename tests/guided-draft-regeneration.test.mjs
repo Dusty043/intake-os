@@ -172,12 +172,12 @@ test("regeneration is blocked after limit is reached", async () => {
 
 // ── Test 8: requires a draft in pending state ─────────────────────────────────
 
-test("regeneration requires a draft in pending_review state", async () => {
+test("regeneration is blocked after draft is accepted", async () => {
   const service = createService();
   const withDraft = await createIntakeWithDraft(service);
   const draftId = withDraft.latestAnalysisDraft.id;
 
-  // Accept the draft so there's no pending one
+  // Accept the draft — no further regeneration allowed
   await service.acceptAnalysisDraft({ intakeId: withDraft.id, draftId }, intakeOwner);
 
   await assert.rejects(
@@ -189,6 +189,39 @@ test("regeneration requires a draft in pending_review state", async () => {
       ),
     (err) => err instanceof ConflictError,
   );
+});
+
+// ── Test 8b: reject → regenerate loop ────────────────────────────────────────
+
+test("reviewer can reject a draft then regenerate to loop back to AI", async () => {
+  const service = createService();
+  const withDraft = await createIntakeWithDraft(service);
+  const firstDraftId = withDraft.latestAnalysisDraft.id;
+
+  // Reject the first draft
+  const rejected = await service.rejectAnalysisDraft(
+    { intakeId: withDraft.id, draftId: firstDraftId, reason: "Missing compliance requirements." },
+    intakeOwner,
+  );
+  assert.equal(rejected.latestAnalysisDraft.reviewStatus, "rejected");
+  assert.equal(rejected.status, "intake_review", "intake stays in intake_review after draft rejection");
+
+  // Regenerate after rejection — this must succeed (the loop)
+  const regenerated = await service.regenerateAnalysisDraft(
+    withDraft.id,
+    { guidance: "Include GDPR compliance section and data residency requirements.", requestedBy: intakeOwner.displayName },
+    intakeOwner,
+  );
+
+  assert.equal(regenerated.latestAnalysisDraft.reviewStatus, "draft", "new draft is pending review");
+  assert.notEqual(regenerated.latestAnalysisDraft.id, firstDraftId, "new draft has a different id");
+  assert.equal(regenerated.analysisDraftRegenerationCount, 1);
+
+  // The rejected draft is now superseded in history
+  const oldDraft = regenerated.analysisDrafts.find((d) => d.id === firstDraftId);
+  assert.ok(oldDraft, "first draft is still in history");
+  assert.equal(oldDraft.reviewStatus, "superseded", "rejected draft is superseded after regeneration");
+  assert.equal(regenerated.analysisDrafts.length, 2);
 });
 
 // ── Test 9: audit event is emitted ───────────────────────────────────────────

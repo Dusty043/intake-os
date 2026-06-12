@@ -221,9 +221,11 @@ export class IntakeWorkflowService {
       throw new ConflictError(`Regeneration is only allowed when intake is in intake_review status. Current status: ${record.status}.`);
     }
 
-    const pendingDraft = record.analysisDrafts?.find((d) => d.reviewStatus === "draft");
-    if (!pendingDraft) {
-      throw new ConflictError("No draft in pending_review state. A draft must exist before regeneration.");
+    const currentDraft = record.latestAnalysisDraft;
+    if (!currentDraft || (currentDraft.reviewStatus !== "draft" && currentDraft.reviewStatus !== "rejected")) {
+      throw new ConflictError(
+        "No draft available for regeneration. The current draft must be awaiting review or have been rejected.",
+      );
     }
 
     const regenLimit = 5;
@@ -233,7 +235,7 @@ export class IntakeWorkflowService {
     }
 
     const now = this.clock();
-    const supersededDraft = { ...pendingDraft, reviewStatus: "superseded" as const };
+    const supersededDraft = { ...currentDraft, reviewStatus: "superseded" as const };
 
     const result = await this.analysisProvider.generateDraft(record, {
       actor,
@@ -250,7 +252,7 @@ export class IntakeWorkflowService {
     }
 
     const updatedDrafts = [
-      ...(record.analysisDrafts ?? []).map((d) => (d.id === pendingDraft.id ? supersededDraft : d)),
+      ...(record.analysisDrafts ?? []).map((d) => (d.id === currentDraft.id ? supersededDraft : d)),
       newDraft,
     ];
 
@@ -269,7 +271,7 @@ export class IntakeWorkflowService {
       action: "ANALYSIS_DRAFT_REGENERATED",
       timestamp: now,
       metadata: {
-        previousDraftId: pendingDraft.id,
+        previousDraftId: currentDraft.id,
         newDraftId: newDraft.id,
         guidance: input.guidance.slice(0, 500),
         regenerationCount: regenCount + 1,
