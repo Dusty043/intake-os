@@ -15,6 +15,7 @@ import {
   generateProvisioningPlan,
   getAuditTrail,
   getIntake,
+  regenerateAnalysisDraft,
   rejectAnalysisDraft,
   rejectGate,
   reviseAnalysisDraft,
@@ -197,6 +198,10 @@ function AiDraftTab({
   const [showRevise, setShowRevise] = useState(false);
   const [reviseJson, setReviseJson] = useState("");
   const [reviseErr, setReviseErr] = useState<string | null>(null);
+  const [guidance, setGuidance] = useState("");
+  const regenCount = (intake.analysisDraftRegenerationCount as number) ?? 0;
+  const regenLimit = 5;
+  const regenExhausted = regenCount >= regenLimit;
 
   async function run(action: string, payload?: unknown) {
     setBusy(action);
@@ -321,7 +326,7 @@ function AiDraftTab({
         </div>
       </div>
 
-      {/* Review actions */}
+      {/* Review actions — only when draft is pending review */}
       {draft.reviewStatus === "draft" && !intake.reviewedProjectPackage && (
         <div className="card p-5">
           <h3 className="text-base font-semibold text-brand-text mb-4">Review Actions</h3>
@@ -428,6 +433,55 @@ function AiDraftTab({
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Regeneration loop — shown after rejection or as an alternative steering path */}
+      {(draft.reviewStatus === "draft" || draft.reviewStatus === "rejected") && !intake.reviewedProjectPackage && (
+        <div className="card p-5">
+          {draft.reviewStatus === "rejected" && (
+            <div className="bg-amber-50 border border-amber-200 text-amber-800 rounded-lg px-4 py-3 text-sm mb-4">
+              <strong>Draft rejected.</strong> Provide guidance below to send it back to the AI for a new attempt.
+            </div>
+          )}
+
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-base font-semibold text-brand-text">
+              {draft.reviewStatus === "rejected" ? "Send Back to AI" : "Steer & Regenerate"}
+            </h3>
+            <span className={`text-xs px-2 py-0.5 rounded-full ${regenExhausted ? "bg-red-100 text-red-700" : "bg-gray-100 text-gray-500"}`}>
+              {regenCount} / {regenLimit} regenerations used
+            </span>
+          </div>
+
+          {regenExhausted ? (
+            <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+              Regeneration limit reached. Accept, revise, or reject the entire request.
+            </p>
+          ) : (
+            <div className="space-y-2">
+              <label htmlFor="regen-guidance" className="form-label">
+                Guidance for the AI <span className="text-gray-400">(min 10 characters)</span>
+              </label>
+              <textarea
+                id="regen-guidance"
+                value={guidance}
+                onChange={(e) => setGuidance(e.target.value)}
+                className="form-textarea h-20"
+                placeholder="Describe what the AI should focus on, change, or reconsider…"
+              />
+              <button
+                className="btn-secondary"
+                disabled={!!busy || guidance.trim().length < 10}
+                onClick={() => {
+                  if (guidance.trim().length < 10) { setErr("Guidance must be at least 10 characters."); return; }
+                  void run("regen_draft", guidance.trim());
+                }}
+              >
+                {busy === "regen_draft" ? "Sending back to AI…" : "Send Back to AI"}
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -900,6 +954,7 @@ function IntakeDetailContent() {
       case "mock_draft":    updated = await generateMockAnalysisDraft(iid, actor); break;
       case "accept_draft":  updated = await acceptAnalysisDraft(iid, draft!.id, actor, payload as string); break;
       case "reject_draft":  updated = await rejectAnalysisDraft(iid, draft!.id, actor, payload as string); break;
+      case "regen_draft":   updated = await regenerateAnalysisDraft(iid, actor, payload as string); break;
       case "revise_draft":  updated = await reviseAnalysisDraft(iid, draft!.id, actor, payload as ReviseAnalysisDraftInput); break;
       case "approve_gate1": updated = await approveGate(iid, actor, payload as string); break;
       case "approve_gate2": updated = await approveGate(iid, actor, payload as string); break;

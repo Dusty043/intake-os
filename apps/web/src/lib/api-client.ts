@@ -101,6 +101,18 @@ export async function rejectAnalysisDraft(
   });
 }
 
+export async function regenerateAnalysisDraft(
+  id: string,
+  actor: UiActor,
+  guidance: string,
+): Promise<ProjectIntakeRecord> {
+  return request(`/intakes/${id}/analysis-drafts/regenerate`, {
+    method: "POST",
+    headers: actorHeaders(actor),
+    body: JSON.stringify({ guidance }),
+  });
+}
+
 export async function reviseAnalysisDraft(
   id: string,
   draftId: string,
