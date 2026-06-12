@@ -1,5 +1,27 @@
 # Build Log
 
+## 2026-06-13 — TASK-0014P Intake Review Reject → Regenerate Loop Fix
+
+Requested: sanity check on governance flow; found stuck state at `intake_review` — rejecting an analysis draft left no path to regenerate.
+
+Changes made:
+
+- `src/application/intake-workflow-service.ts` — `regenerateAnalysisDraft` now accepts the current draft when `reviewStatus` is `"draft"` or `"rejected"` (previously only `"draft"`); supersede step and audit metadata updated accordingly.
+- `tests/guided-draft-regeneration.test.mjs` — renamed test 8 to reflect the real blocked case (accepted, not rejected); added test 8b covering the full reject → regenerate loop.
+
+Commands run:
+
+```bash
+npm run build:core   # clean
+npm test             # 380/380 pass (+1 new test)
+```
+
+No state machine changes. No governance boundary changes. Regen limit of 5 still applies. Blocked states (accepted, superseded) unchanged.
+
+Commit: `e6ca087`
+
+Follow-up: TASK-0020 — Wire orchestrator into live intake workflow.
+
 ## 2026-06-12 — TASK-0019 Prisma Persistence for IntakeEvaluation
 
 Requested: add Prisma persistence for `IntakeEvaluation`, `EvaluationSection`, `AgentRun`; extend `ProjectIntakeStore` with 5 evaluation methods; implement in-memory and Prisma-backed stores; add mapper/persistence tests.
