@@ -4,7 +4,9 @@ import type { Actor, ApprovalGate, AuditEvent, RequestStatus, WorkflowAction } f
 import { applyWorkflowTransition, isApprovalComplete } from "../domain/workflow.js";
 import { createAuditEvent } from "./audit.js";
 import { ConflictError, NotFoundError, PermissionDeniedError, ValidationError } from "./errors.js";
-import { buildMockIntakeAnalysisDraft, validateIntakeAnalysisDraft } from "./intake-analysis.js";
+import type { IntakeAnalysisProvider } from "./intake-analysis-provider.js";
+import { validateIntakeAnalysisDraft } from "./intake-analysis.js";
+import { MockIntakeAnalysisProvider } from "./providers/mock-intake-analysis-provider.js";
 import { buildDryRunProvisioningPlan, resolveDistributionSource } from "./provisioning-plan.js";
 import type {
   AcceptAnalysisDraftInput,
@@ -25,17 +27,24 @@ export interface IntakeWorkflowServiceOptions {
   store: ProjectIntakeStore;
   clock?: () => string;
   idFactory?: (prefix: string) => string;
+  analysisProvider?: IntakeAnalysisProvider;
 }
 
 export class IntakeWorkflowService {
   private readonly store: ProjectIntakeStore;
   private readonly clock: () => string;
   private readonly idFactory: (prefix: string) => string;
+  private readonly analysisProvider: IntakeAnalysisProvider;
 
   constructor(options: IntakeWorkflowServiceOptions) {
     this.store = options.store;
     this.clock = options.clock ?? (() => new Date().toISOString());
     this.idFactory = options.idFactory ?? createReadableId;
+    this.analysisProvider = options.analysisProvider ?? new MockIntakeAnalysisProvider();
+  }
+
+  get activeProviderName(): string {
+    return this.analysisProvider.name;
   }
 
   async listIntakes(): Promise<readonly ProjectIntakeRecord[]> {
@@ -142,23 +151,23 @@ export class IntakeWorkflowService {
     let record = await this.requireIntake(id);
     const now = this.clock();
     record = await this.applyTransitionToRecord(record, "generate_evaluation", actor, now, {
-      reason: "Mock AI analysis started.",
-      metadata: {
-        provider: "mock",
-        draftOnly: true,
-      },
+      reason: "AI analysis started.",
+      metadata: { provider: this.analysisProvider.name, draftOnly: true },
     });
 
-    const draft = buildMockIntakeAnalysisDraft(record, {
-      now,
+    const result = await this.analysisProvider.generateDraft(record, {
       actor,
       idFactory: this.idFactory,
-      input,
+      now,
+      sourceInquiryText: input.sourceInquiryText,
+      reviewerContext: input.reviewerContext,
+      mode: "initial_generation",
     });
-    const validation = validateIntakeAnalysisDraft(draft);
 
+    const { draft, metadata } = result;
+    const validation = validateIntakeAnalysisDraft(draft);
     if (!validation.valid) {
-      throw new ValidationError(`Mock analysis draft failed validation: ${validation.errors.join(", ")}`);
+      throw new ValidationError(`Analysis draft failed validation: ${validation.errors.join(", ")}`);
     }
 
     const withDraft: ProjectIntakeRecord = {
@@ -176,8 +185,11 @@ export class IntakeWorkflowService {
       timestamp: now,
       metadata: {
         draftId: draft.id,
-        provider: draft.provider,
-        model: draft.model,
+        aiProvider: metadata.provider,
+        aiModel: metadata.model,
+        aiRequestId: metadata.requestId,
+        aiFinishReason: metadata.finishReason,
+        aiUsage: metadata.usage,
         schemaVersion: draft.schemaVersion,
         confidence: draft.confidence,
         estimatedStoryPoints: draft.estimatedStoryPoints,
@@ -187,11 +199,8 @@ export class IntakeWorkflowService {
     });
 
     return this.applyTransitionToRecord(saved, "success", actor, now, {
-      reason: "Mock AI analysis draft generated for human review.",
-      metadata: {
-        draftId: draft.id,
-        draftOnly: true,
-      },
+      reason: "AI analysis draft generated for human review.",
+      metadata: { draftId: draft.id, draftOnly: true },
     });
   }
 
@@ -226,13 +235,15 @@ export class IntakeWorkflowService {
     const now = this.clock();
     const supersededDraft = { ...pendingDraft, reviewStatus: "superseded" as const };
 
-    const newDraft = buildMockIntakeAnalysisDraft(record, {
-      now,
+    const result = await this.analysisProvider.generateDraft(record, {
       actor,
       idFactory: this.idFactory,
-      input: { guidance: input.guidance },
+      now,
+      guidance: input.guidance,
+      mode: "guided_regeneration",
     });
 
+    const { draft: newDraft, metadata } = result;
     const validation = validateIntakeAnalysisDraft(newDraft);
     if (!validation.valid) {
       throw new ValidationError(`Regenerated analysis draft failed validation: ${validation.errors.join(", ")}`);
@@ -263,6 +274,11 @@ export class IntakeWorkflowService {
         guidance: input.guidance.slice(0, 500),
         regenerationCount: regenCount + 1,
         requestedBy: input.requestedBy,
+        aiProvider: metadata.provider,
+        aiModel: metadata.model,
+        aiRequestId: metadata.requestId,
+        aiFinishReason: metadata.finishReason,
+        aiUsage: metadata.usage,
       },
     });
 

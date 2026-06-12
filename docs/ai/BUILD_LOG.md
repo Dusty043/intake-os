@@ -1,5 +1,84 @@
 # Build Log
 
+## 2026-06-12 — TASK-0017 Mock Agent Implementations — All 12 Evaluation Agents
+
+Requested: implement all 12 deterministic mock evaluation agents. No real AI calls, no orchestrator, no Prisma changes.
+
+Changes made:
+
+- `src/application/agents/mock/mock-agent-helpers.ts` — shared helpers: normalize, containsAny, inferComplexity, estimateStoryPoints, inferTechStack, detectIntegrationPoints, detectDataStores, slugify.
+- 12 mock agent files, one per section kind.
+- `src/application/agents/mock/index.ts` — factory: `createAllMockEvaluationAgents`, `createMockEvaluationAgentsForDepth`, `runMockEvaluationAgentsSequentiallyForTest`.
+- `tests/mock-evaluation-agents.test.mjs` — 49 agent-level tests.
+- `tests/mock-evaluation-agent-factory.test.mjs` — 19 factory + round-trip tests.
+- `src/index.ts` — added mock agents export.
+
+Commands run:
+
+```bash
+npm run build      # clean
+npm run api:build  # clean
+npm run web:build  # clean
+npm test           # 307/307 pass
+npm run demo:analysis  # unchanged
+```
+
+Follow-up: TASK-0018 — Evaluation Orchestrator (3-stage pipeline, NestJS integration).
+
+## 2026-06-12 — TASK-0016 Domain Foundation — Evaluation Aggregate & Agent Contracts
+
+Requested: establish pure domain types for the 12-agent evaluation pipeline (Option A). No behavior change, no Prisma, no API routes, no UI.
+
+Changes made:
+
+- `src/application/intake-evaluation.ts` — 12 `EvaluationSectionKind` values, `EvaluationSection<TContent>` generic, all 12 typed section content interfaces, `IntakeEvaluation` aggregate, `QualityScore` with 6 dimensions + readiness band, depth routing table (`EVALUATION_DEPTH_ROUTING_TABLE`), `validateEvaluationSection`, `validateIntakeEvaluation`, helpers (`getSection`, `assertEvaluationSectionKind`, `qualityBandFromScore`).
+- `src/application/agents/agent-contract.ts` — `AgentRunContext`, `AgentRunOptions`, `AgentOutput<TContent>`, `EvaluationAgent<TContent>` interface.
+- `src/application/evaluation-draft-mapper.ts` — `evaluationToLegacyDraft()` + `legacyDraftToEvaluation()` bidirectional mapper.
+- `tests/intake-evaluation-domain.test.mjs` — 31 tests.
+- `tests/evaluation-agent-contract.test.mjs` — 15 tests.
+- `tests/evaluation-draft-mapper.test.mjs` — 30 tests.
+- `src/index.ts` — added exports for new modules.
+
+Commands run:
+
+```bash
+npm run build      # clean
+npm run api:build  # clean
+npm run web:build  # clean
+npm test           # 205/205 pass
+```
+
+Follow-up: TASK-0017 — 12 mock evaluation agents.
+
+## 2026-06-12 — TASK-0015 AI Provider Router & Real Provider Adapters
+
+Requested: add a real AI provider layer behind the `IntakeAnalysisProvider` interface. `IntakeWorkflowService` should route to OpenAI, Anthropic, Bedrock, or mock based on `AI_PROVIDER` env. No governance changes. No silent fallback.
+
+Changes made:
+
+- `src/application/intake-analysis-provider.ts` — `IntakeAnalysisProvider` interface, options, result, metadata types.
+- `src/application/providers/` — `analysis-draft-output-schema.ts`, `prompt-templates.ts`, `token-cost.ts`, `analysis-provider-config.ts`, `mock-intake-analysis-provider.ts`, `draft-output-mapper.ts`, `openai-intake-analysis-provider.ts`, `anthropic-intake-analysis-provider.ts`, `bedrock-intake-analysis-provider.ts`, `analysis-provider-router.ts`.
+- `apps/api/src/ai/provider.token.ts` — shared `ANALYSIS_PROVIDER` Symbol injection token.
+- `apps/api/src/runtime/runtime.module.ts` — factory for `ANALYSIS_PROVIDER`, injected into `IntakeWorkflowService`.
+- `apps/api/src/modules/health/health.controller.ts` — injects `ANALYSIS_PROVIDER`, `/health` exposes `ai.provider`.
+- `src/index.ts` — exports new provider interface and related types.
+- `.env.example`, `.env.server.example` — AI provider env vars documented.
+- `scripts/smoke-ai-provider.mjs`, `package.json` — `smoke:ai-provider` script.
+- `tests/analysis-provider-config.test.mjs`, `tests/analysis-provider-router.test.mjs`, `tests/mock-intake-analysis-provider.test.mjs`, `tests/openai-intake-analysis-provider.test.mjs`, `tests/anthropic-intake-analysis-provider.test.mjs`, `tests/bedrock-intake-analysis-provider.test.mjs` — 44 new tests.
+
+Commands run:
+
+```bash
+npm run build:core   # passed
+npm test             # 127/127 passed (44 new tests added)
+npm run smoke:ai-provider  # passed (mock provider)
+npm run api:build    # passed
+```
+
+Two TypeScript fixes required:
+- `anthropic-intake-analysis-provider.ts`: cast via `as unknown as Anthropic.Tool["input_schema"]` due to `readonly` tuple.
+- `bedrock-intake-analysis-provider.ts`: cast via `{ json: ... } as ToolInputSchema` due to Smithy `DocumentType` mismatch with `readonly` schema object.
+
 ## 2026-06-12 — TASK-0014 guided AI draft regeneration
 
 Requested: let `intake_owner` and `devops_lead` steer the mock AI toward a better draft via free-text guidance.

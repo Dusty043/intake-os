@@ -1,6 +1,7 @@
 import {
   ArgumentsHost,
   BadRequestException,
+  BadGatewayException,
   Catch,
   ConflictException,
   ExceptionFilter,
@@ -10,7 +11,15 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import type { Response } from "express";
-import { ConflictError, NotFoundError, PermissionDeniedError, ValidationError } from "../../../../src/application/errors.js";
+import {
+  ConfigurationError,
+  ConflictError,
+  NotFoundError,
+  PermissionDeniedError,
+  ProviderInvocationError,
+  ProviderResponseValidationError,
+  ValidationError,
+} from "../../../../src/application/errors.js";
 import { InvalidTransitionError, WorkflowGuardError } from "../../../../src/domain/workflow.js";
 
 @Catch(Error)
@@ -49,6 +58,14 @@ function toHttpError(error: Error) {
 
   if (error instanceof ConflictError) {
     return new ConflictException(error.message);
+  }
+
+  if (error instanceof ConfigurationError) {
+    return new InternalServerErrorException(error.message);
+  }
+
+  if (error instanceof ProviderInvocationError || error instanceof ProviderResponseValidationError) {
+    return new BadGatewayException(error.message);
   }
 
   if (error instanceof ValidationError || error instanceof InvalidTransitionError || error instanceof WorkflowGuardError) {

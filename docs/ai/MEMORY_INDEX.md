@@ -27,6 +27,9 @@ Generated at: 2026-06-09T14:53:20.716Z
 - `docs/ai/tasks/TASK-0012-private-server-runtime-deployment.md`
 - `docs/ai/tasks/TASK-0013-authenticated-internal-access.md`
 - `docs/ai/tasks/TASK-0014-guided-ai-draft-regeneration.md`
+- `docs/ai/tasks/TASK-0015-ai-provider-router-and-adapters.md`
+- `docs/ai/tasks/TASK-0016-domain-foundation-evaluation-aggregate-agent-contracts.md`
+- `docs/ai/tasks/TASK-0017-mock-evaluation-agents.md`
 
 ## Deployment Docs
 

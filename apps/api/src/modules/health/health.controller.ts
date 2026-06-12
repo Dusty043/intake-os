@@ -1,5 +1,7 @@
-import { Controller, Get } from "@nestjs/common";
+import { Controller, Get, Inject } from "@nestjs/common";
 import { ApiOperation, ApiTags } from "@nestjs/swagger";
+import type { IntakeAnalysisProvider } from "../../../../../src/application/intake-analysis-provider.js";
+import { ANALYSIS_PROVIDER } from "../../ai/provider.token.js";
 import { Public } from "../auth/auth.decorators.js";
 import { PrismaService } from "../../prisma/prisma.service.js";
 
@@ -7,14 +9,21 @@ import { PrismaService } from "../../prisma/prisma.service.js";
 @ApiTags("health")
 @Controller("health")
 export class HealthController {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Inject(ANALYSIS_PROVIDER) private readonly analysisProvider: IntakeAnalysisProvider,
+  ) {}
 
   @Get()
   @ApiOperation({ summary: "Liveness check — API is running" })
   health() {
+    const providerName = this.analysisProvider.name;
     return {
       status: "ok",
-      aiLayer: "disabled",
+      ai: {
+        provider: providerName,
+        enabled: providerName !== "mock",
+      },
       liveProvisioning: "disabled",
     };
   }

@@ -4,7 +4,7 @@ import type { ProjectIntakeRecord } from "./types.js";
 
 export const intakeAnalysisDraftSchemaVersion = "intake-analysis-draft.v1" as const;
 
-export const intakeAnalysisProviders = ["mock", "openai", "anthropic", "manual"] as const;
+export const intakeAnalysisProviders = ["mock", "openai", "anthropic", "bedrock", "manual"] as const;
 export type IntakeAnalysisProviderName = (typeof intakeAnalysisProviders)[number];
 
 export const analysisReviewStatuses = ["draft", "accepted", "rejected", "superseded"] as const;

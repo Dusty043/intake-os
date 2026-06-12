@@ -39,6 +39,7 @@
     "demo:review-guard": "npm run build:core && node scripts/demo-reviewed-package-approval-guard.mjs",
     "demo:reviewed-distribution": "npm run build:core && node scripts/demo-reviewed-package-distribution-preview.mjs",
     "demo:guided-regen": "npm run build:core && node scripts/demo-guided-regeneration.mjs",
+    "smoke:ai-provider": "npm run build:core && node scripts/smoke-ai-provider.mjs",
     "web:dev": "npm --prefix apps/web run dev",
     "web:build": "npm --prefix apps/web run build",
     "web:start": "npm --prefix apps/web run start",
@@ -56,6 +57,8 @@
     "node": ">=22"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.104.1",
+    "@aws-sdk/client-bedrock-runtime": "^3.1067.0",
     "@nestjs/common": "^11.0.0",
     "@nestjs/core": "^11.0.0",
     "@nestjs/platform-express": "^11.0.0",
@@ -65,6 +68,7 @@
     "class-validator": "^0.14.0",
     "cookie-parser": "^1.4.7",
     "google-auth-library": "^10.7.0",
+    "openai": "^6.42.0",
     "reflect-metadata": "^0.2.0",
     "rxjs": "^7.8.0"
   },
