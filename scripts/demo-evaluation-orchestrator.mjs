@@ -72,7 +72,7 @@ console.log("\nSections produced (in order):");
 for (const section of evaluation.sections) {
   const lat = section.provenance.latencyMs !== undefined ? `${section.provenance.latencyMs}ms` : "—";
   const conf = section.provenance.confidence !== undefined ? `conf=${section.provenance.confidence}` : "";
-  console.log(`  [${section.kind.padEnd(25)}]  id=${section.id}  latency=${lat}  ${conf}`);
+  console.log(`  [${section.kind.padEnd(25)}]  id=${section.id}  latency=${lat}${conf ? ` | ${conf}` : ""}`);
 }
 
 if (evaluation.qualityScore) {

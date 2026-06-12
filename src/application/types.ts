@@ -249,10 +249,21 @@ export interface ApprovalDecisionInput {
 
 export type { GenerateMockAnalysisDraftInput };
 
+export type { AgentRunRecord, EvaluationPersistenceBundle } from "./evaluation-persistence.js";
+import type { AgentRunRecord, EvaluationPersistenceBundle } from "./evaluation-persistence.js";
+import type { IntakeEvaluation } from "./intake-evaluation.js";
+
 export interface ProjectIntakeStore {
   listIntakes(): Promise<readonly ProjectIntakeRecord[]>;
   getIntake(id: string): Promise<ProjectIntakeRecord | null>;
   saveIntake(record: ProjectIntakeRecord): Promise<ProjectIntakeRecord>;
   listAuditEvents(intakeId: string): Promise<readonly AuditEvent[]>;
   appendAuditEvent(event: AuditEvent): Promise<AuditEvent>;
+
+  saveEvaluation(bundle: EvaluationPersistenceBundle): Promise<void>;
+  getEvaluation(intakeId: string, evaluationId: string): Promise<IntakeEvaluation | undefined>;
+  listEvaluationsForIntake(intakeId: string): Promise<IntakeEvaluation[]>;
+  getLatestEvaluationForIntake(intakeId: string): Promise<IntakeEvaluation | undefined>;
+  listAgentRuns(evaluationId: string): Promise<AgentRunRecord[]>;
+  getEvaluationById?(evaluationId: string): Promise<IntakeEvaluation | undefined>;
 }

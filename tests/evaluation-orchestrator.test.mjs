@@ -72,7 +72,7 @@ function stubAgent(role, content, opts = {}) {
     run: async (_ctx, _opts) => ({
       sectionKind: role,
       content,
-      confidence: opts.confidence ?? 80,
+      confidence: opts.confidence ?? 0.85,
       warnings: opts.warnings ?? [],
       isClarificationBlocking: opts.isClarificationBlocking ?? false,
       ...(opts.usage ? { usage: opts.usage } : {}),
@@ -130,7 +130,7 @@ function stubBlockingClarification() {
         ],
         missingFields: ["businessGoal", "targetUsers"],
       },
-      confidence: 30,
+      confidence: 0.3,
       warnings: ["Intake too thin to evaluate"],
       isClarificationBlocking: true,
     }),
@@ -527,13 +527,13 @@ describe("EvaluationOrchestrator — validation", () => {
     );
   });
 
-  it("rejects agent confidence above 100", async () => {
+  it("rejects agent confidence above 1", async () => {
     const badAgent = {
       role: "intake_brief",
       run: async () => ({
         sectionKind: "intake_brief",
         content: { title: "t", rawSummary: "r", normalizedSummary: "n", statedGoals: [], successCriteria: [], knownConstraints: [] },
-        confidence: 150,
+        confidence: 1.1,
         warnings: [],
       }),
     };
@@ -550,7 +550,7 @@ describe("EvaluationOrchestrator — validation", () => {
       run: async () => ({
         sectionKind: "intake_brief",
         content: null,
-        confidence: 80,
+        confidence: 0.8,
         warnings: [],
       }),
     };

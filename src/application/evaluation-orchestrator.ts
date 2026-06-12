@@ -386,10 +386,10 @@ function validateAgentOutput(kind: EvaluationSectionKind, output: AgentOutput): 
   if (typeof output.confidence !== "number") {
     throw new AgentOutputValidationError(kind, "confidence must be a number");
   }
-  if (output.confidence < 0 || output.confidence > 100) {
+  if (output.confidence < 0 || output.confidence > 1) {
     throw new AgentOutputValidationError(
       kind,
-      `confidence ${output.confidence} is out of range [0, 100]`,
+      `confidence ${output.confidence} is out of range [0, 1]`,
     );
   }
   if (!Array.isArray(output.warnings)) {

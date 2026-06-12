@@ -56,7 +56,7 @@ export class MockCriticQAAgent implements EvaluationAgent<QualityReviewSectionCo
     };
 
     const strengths = buildStrengths(hasArchitecture, hasRisks, hasWorkBreakdown, hasSynthesis);
-    const weaknesses = buildWeaknesses(isBlocking, !hasWorkBreakdown, !hasRisks, sectionCount);
+    const weaknesses = buildWeaknesses(isBlocking, !hasWorkBreakdown, !hasRisks, sectionCount, feasibility, riskSec);
     const requiredRevisions = buildRequiredRevisions(isBlocking, workBreakdown, riskSec);
     const reviewerWarnings = buildReviewerWarnings(isBlocking, riskSec, qualityScore);
 
@@ -150,12 +150,27 @@ function buildStrengths(hasArch: boolean, hasRisks: boolean, hasWb: boolean, has
   return s;
 }
 
-function buildWeaknesses(isBlocking: boolean, noWb: boolean, noRisks: boolean, sectionCount: number): string[] {
+function buildWeaknesses(
+  isBlocking: boolean,
+  noWb: boolean,
+  noRisks: boolean,
+  sectionCount: number,
+  feasibility?: number,
+  riskSec?: RiskSecuritySectionContent,
+): string[] {
   const w: string[] = [];
   if (isBlocking) w.push("Clarification is blocking — critical information is missing");
   if (noWb) w.push("No work breakdown generated — effort estimates are unavailable");
   if (noRisks) w.push("No risks identified — risk coverage is incomplete");
   if (sectionCount < 4) w.push("Few evaluation sections present — evaluation may be incomplete");
+  if (feasibility !== undefined && feasibility < 60) {
+    const highRisks = riskSec?.risks.filter((r) => r.severity === "high") ?? [];
+    const drivers: string[] = [];
+    if (isBlocking) drivers.push("blocking clarification");
+    if (highRisks.length > 0) drivers.push(`${highRisks.length} high-severity risk${highRisks.length > 1 ? "s" : ""}`);
+    const reason = drivers.length > 0 ? ` (${drivers.join(", ")})` : "";
+    w.push(`Feasibility score is low${reason} — review scope, risks, and blocking items before proceeding`);
+  }
   return w;
 }
 

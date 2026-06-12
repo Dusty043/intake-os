@@ -31,6 +31,8 @@ Generated at: 2026-06-09T14:53:20.716Z
 - `docs/ai/tasks/TASK-0016-domain-foundation-evaluation-aggregate-agent-contracts.md`
 - `docs/ai/tasks/TASK-0017-mock-evaluation-agents.md`
 - `docs/ai/tasks/TASK-0018-evaluation-orchestrator.md`
+- `docs/ai/tasks/TASK-0018P-evaluation-orchestrator-patch.md`
+- `docs/ai/tasks/TASK-0019-prisma-evaluation-persistence.md`
 
 ## Deployment Docs
 

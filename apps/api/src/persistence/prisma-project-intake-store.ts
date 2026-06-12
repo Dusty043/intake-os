@@ -2,6 +2,14 @@ import { Injectable } from "@nestjs/common";
 import type { Prisma } from "@prisma/client";
 import type { AuditEvent, RequestStatus, UserRole } from "../../../../src/domain/types.js";
 import type { ProjectIntakeRecord, ProjectIntakeStore } from "../../../../src/application/types.js";
+import type { AgentRunRecord, EvaluationPersistenceBundle } from "../../../../src/application/evaluation-persistence.js";
+import type { IntakeEvaluation } from "../../../../src/application/intake-evaluation.js";
+import {
+  agentRunsFromEvaluation,
+  fromEvaluationRow,
+  fromAgentRunRow,
+} from "../../../../src/application/evaluation-persistence.js";
+import { validateIntakeEvaluation } from "../../../../src/application/intake-evaluation.js";
 import { PrismaService } from "../prisma/prisma.service.js";
 
 @Injectable()
@@ -97,6 +105,123 @@ export class PrismaProjectIntakeStore implements ProjectIntakeStore {
       ...(row.reason ? { reason: row.reason } : {}),
       ...(row.metadata ? { metadata: fromJson<Record<string, unknown>>(row.metadata) } : {}),
     }));
+  }
+
+  async saveEvaluation(bundle: EvaluationPersistenceBundle): Promise<void> {
+    validateIntakeEvaluation(bundle.evaluation);
+    const { evaluation } = bundle;
+    const runs = bundle.agentRuns ?? agentRunsFromEvaluation(evaluation);
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.intakeEvaluation.upsert({
+        where: { id: evaluation.id },
+        create: {
+          id: evaluation.id,
+          intakeId: evaluation.intakeId,
+          depth: evaluation.depth,
+          status: evaluation.status,
+          qualityScore: evaluation.qualityScore ? toJson(evaluation.qualityScore) : undefined,
+          evaluationVersion: evaluation.evaluationVersion,
+          createdAt: new Date(evaluation.createdAt),
+          createdById: evaluation.createdBy.id,
+          createdByName: evaluation.createdBy.displayName,
+          createdByEmail: undefined,
+          createdByRole: evaluation.createdBy.role,
+        },
+        update: {
+          status: evaluation.status,
+          qualityScore: evaluation.qualityScore ? toJson(evaluation.qualityScore) : undefined,
+          evaluationVersion: evaluation.evaluationVersion,
+        },
+      });
+
+      await tx.evaluationSection.deleteMany({ where: { evaluationId: evaluation.id } });
+      for (const section of evaluation.sections) {
+        await tx.evaluationSection.create({
+          data: {
+            id: section.id,
+            evaluationId: section.evaluationId,
+            sectionKind: section.kind,
+            content: toJson(section.content),
+            provenance: toJson(section.provenance),
+            version: section.version,
+            supersededById: section.supersededById,
+            createdAt: new Date(section.provenance.generatedAt),
+          },
+        });
+      }
+
+      await tx.agentRun.deleteMany({ where: { evaluationId: evaluation.id } });
+      for (const run of runs) {
+        await tx.agentRun.create({
+          data: {
+            id: run.id,
+            evaluationId: run.evaluationId,
+            sectionId: run.sectionId,
+            agentRole: run.agentRole,
+            provider: run.provider,
+            model: run.model,
+            inputTokens: run.inputTokens,
+            outputTokens: run.outputTokens,
+            totalTokens: run.totalTokens,
+            latencyMs: run.latencyMs,
+            estimatedCostUsd:
+              run.estimatedCostUsd !== undefined && run.estimatedCostUsd !== null
+                ? run.estimatedCostUsd
+                : undefined,
+            finishReason: run.finishReason,
+            status: run.status,
+            errorMessage: run.errorMessage,
+            startedAt: run.startedAt ? new Date(run.startedAt) : undefined,
+            completedAt: run.completedAt ? new Date(run.completedAt) : undefined,
+            createdAt: new Date(run.createdAt),
+          },
+        });
+      }
+    });
+  }
+
+  async getEvaluation(intakeId: string, evaluationId: string): Promise<IntakeEvaluation | undefined> {
+    const row = await this.prisma.intakeEvaluation.findUnique({
+      where: { id: evaluationId },
+      include: { sections: { orderBy: { createdAt: "asc" } } },
+    });
+    if (!row || row.intakeId !== intakeId) return undefined;
+    return fromEvaluationRow(row);
+  }
+
+  async listEvaluationsForIntake(intakeId: string): Promise<IntakeEvaluation[]> {
+    const rows = await this.prisma.intakeEvaluation.findMany({
+      where: { intakeId },
+      include: { sections: { orderBy: { createdAt: "asc" } } },
+      orderBy: { createdAt: "desc" },
+    });
+    return rows.map(fromEvaluationRow);
+  }
+
+  async getLatestEvaluationForIntake(intakeId: string): Promise<IntakeEvaluation | undefined> {
+    const row = await this.prisma.intakeEvaluation.findFirst({
+      where: { intakeId },
+      include: { sections: { orderBy: { createdAt: "asc" } } },
+      orderBy: { createdAt: "desc" },
+    });
+    return row ? fromEvaluationRow(row) : undefined;
+  }
+
+  async listAgentRuns(evaluationId: string): Promise<AgentRunRecord[]> {
+    const rows = await this.prisma.agentRun.findMany({
+      where: { evaluationId },
+      orderBy: { createdAt: "asc" },
+    });
+    return rows.map(fromAgentRunRow);
+  }
+
+  async getEvaluationById(evaluationId: string): Promise<IntakeEvaluation | undefined> {
+    const row = await this.prisma.intakeEvaluation.findUnique({
+      where: { id: evaluationId },
+      include: { sections: { orderBy: { createdAt: "asc" } } },
+    });
+    return row ? fromEvaluationRow(row) : undefined;
   }
 
   async appendAuditEvent(event: AuditEvent): Promise<AuditEvent> {

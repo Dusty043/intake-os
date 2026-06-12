@@ -1,5 +1,59 @@
 # Build Log
 
+## 2026-06-12 — TASK-0019 Prisma Persistence for IntakeEvaluation
+
+Requested: add Prisma persistence for `IntakeEvaluation`, `EvaluationSection`, `AgentRun`; extend `ProjectIntakeStore` with 5 evaluation methods; implement in-memory and Prisma-backed stores; add mapper/persistence tests.
+
+Changes made:
+
+- `apps/api/prisma/schema.prisma` — added `IntakeEvaluation`, `EvaluationSection`, `AgentRun` models; added `evaluations IntakeEvaluation[]` relation to `ProjectIntake`.
+- `src/application/evaluation-persistence.ts` — new file: `AgentRunRecord`, `EvaluationPersistenceBundle`, `agentRunsFromEvaluation()`, structural row interfaces (`EvaluationPersistenceRow`, `SectionPersistenceRow`, `AgentRunPersistenceRow`), and `fromEvaluationRow()`/`fromSectionRow()`/`fromAgentRunRow()` mapper functions.
+- `src/application/types.ts` — extended `ProjectIntakeStore` with `saveEvaluation`, `getEvaluation`, `listEvaluationsForIntake`, `getLatestEvaluationForIntake`, `listAgentRuns`, `getEvaluationById?`.
+- `src/application/in-memory-store.ts` — implemented all 6 new evaluation store methods; uses `validateIntakeEvaluation` on write/read.
+- `apps/api/src/persistence/prisma-project-intake-store.ts` — implemented `saveEvaluation` (transaction: upsert evaluation, delete+recreate sections and runs), `getEvaluation`, `listEvaluationsForIntake`, `getLatestEvaluationForIntake`, `listAgentRuns`, `getEvaluationById`.
+- `src/index.ts` — added `evaluation-persistence.ts` export.
+- `tests/evaluation-persistence-memory.test.mjs` — 11 in-memory persistence tests.
+- `tests/evaluation-persistence-prisma-mapping.test.mjs` — 16 mapper tests (no DB required).
+
+Commands run:
+
+```bash
+npm run build:core   # clean
+npm run api:build    # clean
+npm run prisma:generate  # clean
+npm test             # 379/379 pass (was 352, +27 new tests)
+npm run demo:evaluation-orchestrator  # pass
+npm run demo:mvp     # pass
+npm run demo:analysis  # pass
+npm run demo:analysis-review  # pass
+npm run demo:review-guard  # pass
+npm run demo:reviewed-distribution  # pass
+npm run demo:guided-regen  # pass
+```
+
+No workflow behavior changed. No API routes added. No UI changes. Existing legacy analysis draft storage untouched.
+
+Follow-up: TASK-0020 — Wire orchestrator into live intake workflow.
+
+## 2026-06-12 — TASK-0018P Evaluation Orchestrator Patch
+
+Requested: normalize agent confidence to 0–1 everywhere, fix demo output spacing, add feasibility weakness in MockCriticQAAgent when score < 60.
+
+Changes made:
+
+- `src/application/evaluation-orchestrator.ts` — changed confidence validation from `> 100` to `> 1`; error message updated to `out of range [0, 1]`.
+- `src/application/agents/agent-contract.ts` — added JSDoc on `confidence`: `Must be in [0, 1]`.
+- `src/application/agents/mock/mock-critic-qa-agent.ts` — `buildWeaknesses` now accepts `feasibility` + `riskSec`; adds weakness when `feasibility < 60` naming high-risk drivers.
+- `tests/evaluation-orchestrator.test.mjs` — renamed "rejects agent confidence above 100" → "above 1", updated confidence values to 0–1 scale.
+- `scripts/demo-evaluation-orchestrator.mjs` — fixed section output line to use `| conf=` separator.
+
+Commands run:
+
+```bash
+npm run check  # 352/352 pass
+npm run demo:evaluation-orchestrator  # pass, spacing fixed, feasibility=51 shown
+```
+
 ## 2026-06-12 — TASK-0018 Evaluation Orchestrator
 
 Requested: implement the in-memory evaluation orchestrator. 3-stage pipeline (Stage 1 serial, Stage 2 parallel, Stage 3 serial), clarification blocking, depth upgrade, per-agent provenance/timing, quality status mapping, NestJS DI wiring.

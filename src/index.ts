@@ -14,6 +14,7 @@ export * from "./application/evaluation-draft-mapper.js";
 export * from "./application/agents/agent-contract.js";
 export * from "./application/agents/mock/index.js";
 export * from "./application/evaluation-orchestrator.js";
+export * from "./application/evaluation-persistence.js";
 export * from "./application/intake-analysis-provider.js";
 export * from "./application/providers/analysis-provider-config.js";
 export * from "./application/providers/analysis-provider-router.js";

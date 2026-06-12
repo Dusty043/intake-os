@@ -84,9 +84,85 @@ model ProjectIntake {
   provisioningPlans   ProvisioningPlan[]
   externalLinks       ExternalLink[]
   auditEvents         AuditEvent[]
+  evaluations         IntakeEvaluation[]
 
   @@index([status, updatedAt])
   @@index([sourceSystem, sourceExternalId])
+}
+
+model IntakeEvaluation {
+  id                String              @id
+  intakeId          String
+  depth             String
+  status            String
+  qualityScore      Json?
+  evaluationVersion Int                 @default(1)
+
+  createdAt         DateTime
+  updatedAt         DateTime            @updatedAt
+
+  createdById       String
+  createdByName     String?
+  createdByEmail    String?
+  createdByRole     String
+
+  sections          EvaluationSection[]
+  agentRuns         AgentRun[]
+
+  intake            ProjectIntake       @relation(fields: [intakeId], references: [id], onDelete: Cascade)
+
+  @@index([intakeId])
+  @@index([status])
+  @@index([depth])
+  @@index([createdAt])
+}
+
+model EvaluationSection {
+  id              String            @id
+  evaluationId    String
+  sectionKind     String
+  content         Json
+  provenance      Json?
+  version         Int               @default(1)
+  supersededById  String?
+  createdAt       DateTime          @default(now())
+
+  evaluation      IntakeEvaluation  @relation(fields: [evaluationId], references: [id], onDelete: Cascade)
+
+  @@index([evaluationId])
+  @@index([sectionKind])
+  @@index([supersededById])
+}
+
+model AgentRun {
+  id                String            @id
+  evaluationId      String
+  sectionId         String?
+  agentRole         String
+  provider          String
+  model             String?
+
+  inputTokens       Int?
+  outputTokens      Int?
+  totalTokens       Int?
+  latencyMs         Int?
+  estimatedCostUsd  Decimal?
+
+  finishReason      String?
+  status            String
+  errorMessage      String?
+
+  startedAt         DateTime?
+  completedAt       DateTime?
+  createdAt         DateTime          @default(now())
+
+  evaluation        IntakeEvaluation  @relation(fields: [evaluationId], references: [id], onDelete: Cascade)
+
+  @@index([evaluationId])
+  @@index([sectionId])
+  @@index([agentRole])
+  @@index([provider])
+  @@index([status])
 }
 
 model DiscoveryRecord {

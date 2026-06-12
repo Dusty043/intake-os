@@ -36,6 +36,7 @@ export interface AgentRunOptions {
 export interface AgentOutput<TContent = EvaluationSectionContent> {
   sectionKind: EvaluationSectionKind;
   content: TContent;
+  /** Agent's confidence in this output. Must be in [0, 1]. */
   confidence: number;
   warnings: string[];
   isClarificationBlocking?: boolean;
