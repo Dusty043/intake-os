@@ -150,15 +150,15 @@ function OverviewTab({
 }: {
   intake: ProjectIntakeRecord;
   audit: AuditEvent[];
-  onAction: (action: string) => Promise<void>;
+  onAction: (action: string, payload?: unknown) => Promise<void>;
 }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
-  async function run(action: string) {
+  async function run(action: string, payload?: unknown) {
     setBusy(action);
     setErr(null);
-    try { await onAction(action); } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
+    try { await onAction(action, payload); } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
     finally { setBusy(null); }
   }
 
