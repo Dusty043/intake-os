@@ -1,5 +1,26 @@
 # Build Log
 
+## 2026-06-16 — TASK-0022: ClarificationPanel Review Fixes + Test Infrastructure
+
+Applied all actionable findings from the `/review` pass on the TASK-0021 diff.
+
+Changes made:
+
+- `apps/web/src/components/ClarificationPanel.tsx` (new) — extracted from `page.tsx`; `QuestionField` sub-component DRYs required/optional rendering; carries all prior fixes (submittingRef, useEffect reset, aria attrs, stable keys).
+- `apps/web/src/components/__tests__/ClarificationPanel.test.tsx` (new) — 10 Vitest tests covering disabled state, aria attributes, blur validation, submit/success/error, double-submit guard, questions-reset, prior clarifications.
+- `apps/web/vitest.config.ts` + `apps/web/vitest.setup.ts` (new) — Vitest + jsdom + @testing-library/jest-dom setup.
+- `apps/web/package.json` — added vitest, @testing-library/react, user-event, jest-dom, jsdom; added `test` and `test:watch` scripts.
+- `apps/web/src/lib/api-client.ts` — `approveGate()` now requires explicit `gate: "gate_1" | "gate_2"` param.
+- `apps/web/src/app/intakes/[id]/page.tsx` — imports `ClarificationPanel`; `handleResubmitPanel` useCallback; gate discriminator fix.
+
+Commands run:
+
+```bash
+npx vitest run     # 10/10 pass
+npm run typecheck  # clean
+git push origin main && git push simple-biz main
+```
+
 ## 2026-06-16 — TASK-0021 Followup: ClarificationPanel Polish + Docs Gap-Fill
 
 Completed remaining TASK-0021 items identified in calibration check.
