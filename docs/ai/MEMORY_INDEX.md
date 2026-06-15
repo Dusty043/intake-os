@@ -37,6 +37,7 @@ Generated at: 2026-06-09T14:53:20.716Z
 - `docs/ai/tasks/TASK-0020-wire-evaluation-orchestrator.md`
 - `docs/ai/tasks/TASK-0021-web-evaluation-review-experience.md`
 - `docs/ai/tasks/TASK-0022-clarification-panel-review-fixes.md`
+- `docs/ai/tasks/TASK-0023-provisioning-and-integrations-plan.md`
 
 ## Deployment Docs
 
