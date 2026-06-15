@@ -313,3 +313,38 @@ Verification:
 - `npm run demo:guided-regen` — PASS
 
 Next: TASK-0015 — real AI provider integration (guidance field maps directly onto prompt)
+
+---
+
+## TASK-0021 — Web Evaluation Review Experience (2026-06-16)
+
+Implemented:
+- `IntakeWorkflowService` read methods: `listEvaluationsForIntake`, `getLatestEvaluationForIntake`, `getEvaluationForIntake`
+- `EvaluationSummaryDto`, `toEvaluationSummaryDto()` in `apps/api/src/modules/intake/dto/evaluation.dto.ts`
+- API routes: `GET /intakes/:id/evaluations`, `GET /intakes/:id/evaluations/latest`, `GET /intakes/:id/evaluations/:evaluationId`
+- `EvaluationSectionKind`, `QualityScore`, `IntakeEvaluation`, `AgentRun`, `EvaluationSummary` types in `apps/web/src/lib/types.ts`
+- `listEvaluationsForIntake`, `getLatestEvaluationForIntake`, `getEvaluation` API client functions
+- `EvaluationSectionCard.tsx` — 12 section-kind renderers + `AgentProvenanceFooter` + `EvaluationSectionTabs`
+- `EvaluationPanel.tsx` — `QualityScoreBadge`, `QualityScoreBreakdown`, `EvaluationRegenerateForm`, `EvaluationEmptyState`
+- "Evaluation" tab added to intake detail page; loads evaluation on page mount and after regen/resubmit
+- `ClarificationPanel` polished: prior answers shown, required/optional grouping, inline validation, submit disabled for empty required, success/error state
+- `tests/evaluation-api-read.test.mjs` — 8 tests; all pass (398/398 total)
+
+Files:
+- `src/application/intake-workflow-service.ts` (3 new read methods)
+- `apps/api/src/modules/intake/dto/evaluation.dto.ts` (new)
+- `apps/api/src/modules/intake/intake.controller.ts` (3 new GET routes)
+- `apps/web/src/lib/types.ts` (evaluation types)
+- `apps/web/src/lib/api-client.ts` (3 new client functions)
+- `apps/web/src/components/EvaluationSectionCard.tsx` (new)
+- `apps/web/src/components/EvaluationPanel.tsx` (new)
+- `apps/web/src/app/intakes/[id]/page.tsx` (Evaluation tab + ClarificationPanel polish)
+- `tests/evaluation-api-read.test.mjs` (new)
+- `docs/ai/tasks/TASK-0021-web-evaluation-review-experience.md` (new)
+
+Verification:
+- `npm run check` — 398/398 pass
+- `npm run api:build` — PASS
+- `npm run web:build` — PASS (required fixing 27+ `!!` casts for `Record<string,unknown>` in JSX)
+
+Next: TASK-0022 — Prisma-backed evaluation persistence (Postgres) or UI hardening

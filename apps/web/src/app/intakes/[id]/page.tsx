@@ -86,45 +86,110 @@ function ActionBtn({
 function ClarificationPanel({
   questions,
   missingFields,
+  priorClarifications,
   busy,
   onResubmit,
 }: {
   questions: PendingClarificationQuestion[];
   missingFields: string[];
+  priorClarifications?: Array<{ question: string; answer: string }>;
   busy: boolean;
-  onResubmit: (answers: Array<{ question: string; answer: string }>) => void;
+  onResubmit: (answers: Array<{ question: string; answer: string }>) => Promise<void>;
 }) {
   const [answers, setAnswers] = React.useState<Record<string, string>>({});
+  const [touched, setTouched] = React.useState<Record<string, boolean>>({});
+  const [resubmitError, setResubmitError] = React.useState<string | null>(null);
+  const [submitted, setSubmitted] = React.useState(false);
 
-  function handleResubmit() {
+  const required = questions.filter((q) => q.required);
+  const optional = questions.filter((q) => !q.required);
+  const canSubmit = required.every((q) => !!answers[q.id]?.trim());
+
+  async function handleResubmit() {
+    const newTouched: Record<string, boolean> = {};
+    for (const q of required) newTouched[q.id] = true;
+    setTouched((prev) => ({ ...prev, ...newTouched }));
+    if (!canSubmit) return;
+    setResubmitError(null);
     const filled = questions
       .filter((q) => answers[q.id]?.trim())
       .map((q) => ({ question: q.question, answer: answers[q.id].trim() }));
-    onResubmit(filled);
+    try {
+      await onResubmit(filled);
+      setSubmitted(true);
+    } catch (e) {
+      setResubmitError(e instanceof Error ? e.message : "Resubmission failed.");
+    }
+  }
+
+  if (submitted) {
+    return (
+      <div className="text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
+        <p className="font-semibold">Resubmitted successfully.</p>
+        <p>Your intake is being re-evaluated. The status will update shortly.</p>
+      </div>
+    );
   }
 
   return (
     <div className="space-y-3">
       <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 leading-relaxed">
         <p className="font-semibold mb-1">Clarification required</p>
-        {missingFields.length > 0 && (
-          <p className="mb-1">Missing: {missingFields.join(", ")}.</p>
-        )}
+        {missingFields.length > 0 && <p className="mb-1">Missing: {missingFields.join(", ")}.</p>}
         <p>Answer the questions below, then resubmit to continue evaluation.</p>
       </div>
-      {questions.length > 0 && (
+
+      {priorClarifications && priorClarifications.length > 0 && (
+        <div className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2.5 space-y-2">
+          <p className="text-xs font-semibold text-gray-600">Previous answers:</p>
+          {priorClarifications.map((pc, i) => (
+            <div key={i}>
+              <p className="text-xs text-gray-500 italic">{pc.question}</p>
+              <p className="text-xs text-brand-text">↳ {pc.answer}</p>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {required.length > 0 && (
         <div className="space-y-3">
-          {questions.map((q) => (
+          {optional.length > 0 && <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Required</p>}
+          {required.map((q) => {
+            const isError = !!touched[q.id] && !answers[q.id]?.trim();
+            return (
+              <div key={q.id}>
+                <label className="block text-xs font-medium text-brand-text mb-1">
+                  {q.question}<span className="text-red-500 ml-1">*</span>
+                </label>
+                {q.reason && <p className="text-xs text-brand-muted mb-1">{q.reason}</p>}
+                <textarea
+                  className={`w-full border rounded-md px-2 py-1.5 text-sm text-brand-text resize-none focus:outline-none focus:ring-1 ${
+                    isError ? "border-red-400 focus:ring-red-400" : "border-gray-200 focus:ring-brand-accent"
+                  }`}
+                  rows={2}
+                  placeholder="Your answer…"
+                  value={answers[q.id] ?? ""}
+                  onChange={(e) => setAnswers((prev) => ({ ...prev, [q.id]: e.target.value }))}
+                  onBlur={() => setTouched((prev) => ({ ...prev, [q.id]: true }))}
+                />
+                {isError && <p className="text-xs text-red-600 mt-0.5">This answer is required.</p>}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {optional.length > 0 && (
+        <div className="space-y-3">
+          {required.length > 0 && <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Optional</p>}
+          {optional.map((q) => (
             <div key={q.id}>
-              <label className="block text-xs font-medium text-brand-text mb-1">
-                {q.question}
-                {q.required && <span className="text-red-500 ml-1">*</span>}
-              </label>
+              <label className="block text-xs font-medium text-brand-text mb-1">{q.question}</label>
               {q.reason && <p className="text-xs text-brand-muted mb-1">{q.reason}</p>}
               <textarea
                 className="w-full border border-gray-200 rounded-md px-2 py-1.5 text-sm text-brand-text resize-none focus:outline-none focus:ring-1 focus:ring-brand-accent"
                 rows={2}
-                placeholder="Your answer…"
+                placeholder="Your answer… (optional)"
                 value={answers[q.id] ?? ""}
                 onChange={(e) => setAnswers((prev) => ({ ...prev, [q.id]: e.target.value }))}
               />
@@ -132,12 +197,19 @@ function ClarificationPanel({
           ))}
         </div>
       )}
+
+      {resubmitError && (
+        <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{resubmitError}</p>
+      )}
+
       <ActionBtn
-        onClick={handleResubmit}
+        onClick={() => { void handleResubmit(); }}
         loading={busy}
         loadingLabel="Resubmitting…"
         label="Resubmit for Evaluation"
         variant="secondary"
+        disabled={!canSubmit}
+        disabledReason={!canSubmit ? "Answer all required questions to resubmit." : undefined}
       />
     </div>
   );
@@ -200,8 +272,17 @@ function OverviewTab({
             <ClarificationPanel
               questions={intake.pendingClarification?.questions ?? []}
               missingFields={intake.pendingClarification?.missingFields ?? []}
+              priorClarifications={intake.priorClarifications}
               busy={busy === "resubmit"}
-              onResubmit={(answers) => { void run("resubmit", answers); }}
+              onResubmit={async (answers) => {
+                setBusy("resubmit");
+                setErr(null);
+                try {
+                  await onAction("resubmit", answers);
+                } finally {
+                  setBusy(null);
+                }
+              }}
             />
           )}
           {["submitted", "intake_review"].includes(s) && !hasDraft && (

@@ -75,6 +75,7 @@ The numbers can be adjusted as the trace becomes more detailed.
 | A-011 | Distributed state blocks reprovision without explicit override | `workflow-state-machine.md`, `distribution-rules.md` | Provisioning guard | TASK-0023 | reprovision guard tests | specified |  |
 | A-012 | Approval records are immutable after completion | `workflow-state-machine.md`, `permissions-and-ownership.md` | Approval model | TASK-0001, TASK-0006, TASK-0022 | `tests/workflow.test.mjs` approval lock assertions | tested | Approval records created by workflow are locked. |
 | A-013 | All state transitions are timestamped and audited | `workflow-state-machine.md` | Audit log | TASK-0001, TASK-0002, TASK-0022 | `tests/workflow.test.mjs` audit event tests; `tests/intake-workflow-service.test.mjs` audit trail tests | tested | Iteration 2 adds an append/list audit store contract and verifies the full MVP audit sequence. |
+| A-014 | Clarification UI shows prior answers, validates required fields, and disables submit until complete | `workflow-state-machine.md` | ClarificationPanel (web) | TASK-0021 | manual UI verification | tested | Grouping, inline validation, prior answers, and success/error state added in TASK-0021. |
 
 ---
 
@@ -94,6 +95,10 @@ The numbers can be adjusted as the trace becomes more detailed.
 | B-010 | Shared context object is used across agents | `ai-orchestration.md` | AI context builder | TASK-0016 | context construction tests | specified |  |
 | B-011 | Section-level regeneration preserves prior versions | `ai-orchestration.md`, `intake-analysis-schema.md` | Evaluation versioning | TASK-0005, TASK-0018 | version preservation tests | in_progress | TASK-0005 stores generated drafts as an array plus latest pointer; accept/reject/supersede behavior remains TASK-0006+. |
 | B-012 | AI usage tracks model, token, regeneration, and cost metadata | `ai-cost-governance.md` | AI usage logging | TASK-0040 | usage record tests | specified |  |
+| B-013 | Evaluation results are readable via API by authorized reviewers | `ai-orchestration.md` | Evaluation read routes | TASK-0021 | `tests/evaluation-api-read.test.mjs` | tested | `GET /intakes/:id/evaluations`, `/latest`, `/:evaluationId` routes implemented. |
+| B-014 | Evaluation UI shows all 12 section kinds with agent provenance | `ai-orchestration.md` | EvaluationSectionCard, EvaluationPanel | TASK-0021 | manual UI verification | tested | `EvaluationPanel` + `EvaluationSectionCard` with 12 renderers deployed. |
+| B-015 | Quality score and readiness band are displayed to reviewers | `ai-orchestration.md` | EvaluationPanel | TASK-0021 | manual UI verification | tested | `QualityScoreBadge` and `QualityScoreBreakdown` components in `EvaluationPanel`. |
+| B-016 | Reviewers can trigger evaluation regeneration from the UI | `ai-orchestration.md` | EvaluationRegenerateForm | TASK-0021 | manual UI verification | tested | `EvaluationRegenerateForm` integrated in Evaluation tab; calls `regenerateAnalysisDraft`. |
 
 ---
 

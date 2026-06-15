@@ -1,5 +1,25 @@
 # Build Log
 
+## 2026-06-16 — TASK-0021 Followup: ClarificationPanel Polish + Docs Gap-Fill
+
+Completed remaining TASK-0021 items identified in calibration check.
+
+Changes made:
+
+- `apps/web/src/app/intakes/[id]/page.tsx` — `ClarificationPanel` polished: required/optional question grouping, prior answers shown, inline per-field validation (touched state), submit disabled until required fields filled, success banner after resubmit, error state if `onResubmit` throws; `onResubmit` prop changed to `Promise<void>` with error propagation.
+- `docs/ai/MEMORY_INDEX.md` — added TASK-0021 task log entry.
+- `docs/ai/SEQUENCE_LOG.md` — added TASK-0021 sequence log entry.
+- `docs/product/requirements-trace.md` — added A-014 (ClarificationPanel polish), B-013–B-016 (evaluation read API + UI requirements).
+
+Commands run:
+
+```bash
+npm run web:build    # clean
+npm run check        # 398/398 pass
+```
+
+---
+
 ## 2026-06-16 — TASK-0021 Web UI: Evaluation Review Experience
 
 Added read-only evaluation API routes and a full Evaluation tab in the intake detail UI.
