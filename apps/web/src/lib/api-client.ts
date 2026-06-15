@@ -1,6 +1,9 @@
 import type {
+  AgentRun,
   AuditEvent,
   CreateIntakeInput,
+  EvaluationSummary,
+  IntakeEvaluation,
   ProjectIntakeRecord,
   ReviseAnalysisDraftInput,
   UiActor,
@@ -192,4 +195,32 @@ export async function getAuditTrail(id: string, actor: UiActor): Promise<AuditEv
 export async function checkHealth(): Promise<{ status: string }> {
   const res = await fetch(`${BASE}/health`, { credentials: "include" });
   return res.json() as Promise<{ status: string }>;
+}
+
+export async function listEvaluationsForIntake(
+  intakeId: string,
+  actor: UiActor,
+): Promise<EvaluationSummary[]> {
+  const result = await request<{ evaluations: EvaluationSummary[] }>(
+    `/intakes/${intakeId}/evaluations`,
+    { headers: actorHeaders(actor) },
+  );
+  return result.evaluations;
+}
+
+export async function getLatestEvaluationForIntake(
+  intakeId: string,
+  actor: UiActor,
+): Promise<{ evaluation: IntakeEvaluation | null; agentRuns: AgentRun[] }> {
+  return request(`/intakes/${intakeId}/evaluations/latest`, { headers: actorHeaders(actor) });
+}
+
+export async function getEvaluation(
+  intakeId: string,
+  evaluationId: string,
+  actor: UiActor,
+): Promise<{ evaluation: IntakeEvaluation; agentRuns: AgentRun[] }> {
+  return request(`/intakes/${intakeId}/evaluations/${evaluationId}`, {
+    headers: actorHeaders(actor),
+  });
 }

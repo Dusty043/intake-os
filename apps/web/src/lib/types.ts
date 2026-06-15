@@ -1,3 +1,115 @@
+// ─── Evaluation types ────────────────────────────────────────────────────────
+
+export type EvaluationDepth = "light" | "standard" | "full";
+
+export type EvaluationSectionKind =
+  | "intake_brief"
+  | "clarification_questions"
+  | "classification"
+  | "architecture"
+  | "low_code_path"
+  | "custom_build"
+  | "risk_security"
+  | "cost_effort"
+  | "work_breakdown"
+  | "distribution_plan"
+  | "synthesis"
+  | "quality_review";
+
+export type IntakeEvaluationStatus =
+  | "generating"
+  | "clarification_required"
+  | "ready_for_review"
+  | "accepted"
+  | "rejected"
+  | "needs_revision"
+  | "not_ready";
+
+export type QualityReadinessBand = "ready" | "usable" | "needs_revision" | "not_ready";
+
+export type QualityScore = {
+  dimensions: {
+    completeness: number;
+    consistency: number;
+    specificity: number;
+    feasibility: number;
+    riskCoverage: number;
+    handoffReadiness: number;
+  };
+  overall: number;
+  readinessBand: QualityReadinessBand;
+};
+
+export type EvaluationSectionProvenance = {
+  provider: "mock" | "openai" | "anthropic" | "bedrock";
+  model?: string;
+  agentRole: EvaluationSectionKind;
+  generatedAt: string;
+  inputTokens?: number;
+  outputTokens?: number;
+  totalTokens?: number;
+  latencyMs?: number;
+  estimatedCostUsd?: number | null;
+  confidence?: number;
+  warnings?: string[];
+};
+
+export type EvaluationSection = {
+  id: string;
+  evaluationId: string;
+  kind: EvaluationSectionKind;
+  content: Record<string, unknown>;
+  version: number;
+  supersededById?: string;
+  provenance: EvaluationSectionProvenance;
+};
+
+export type IntakeEvaluation = {
+  id: string;
+  intakeId: string;
+  depth: EvaluationDepth;
+  sections: EvaluationSection[];
+  qualityScore?: QualityScore;
+  status: IntakeEvaluationStatus;
+  evaluationVersion: number;
+  createdAt: string;
+  createdBy: { id: string; role: string; displayName?: string };
+};
+
+export type AgentRun = {
+  id: string;
+  evaluationId: string;
+  sectionId?: string;
+  agentRole: EvaluationSectionKind;
+  provider: "mock" | "openai" | "anthropic" | "bedrock";
+  model?: string;
+  inputTokens?: number;
+  outputTokens?: number;
+  totalTokens?: number;
+  latencyMs?: number;
+  estimatedCostUsd?: number | null;
+  finishReason?: string;
+  status: "success" | "failed" | "skipped";
+  errorMessage?: string;
+  startedAt?: string;
+  completedAt?: string;
+  createdAt: string;
+};
+
+export type EvaluationSummary = {
+  id: string;
+  intakeId: string;
+  depth: EvaluationDepth;
+  status: IntakeEvaluationStatus;
+  evaluationVersion: number;
+  createdAt: string;
+  createdBy: { id: string; name?: string; role: string };
+  qualityScore?: QualityScore;
+  sectionKinds: EvaluationSectionKind[];
+};
+
+// ─── Actor roles ─────────────────────────────────────────────────────────────
+
 export type ActorRole =
   | "request_creator"
   | "intake_owner"

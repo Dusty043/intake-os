@@ -1,5 +1,32 @@
 # Build Log
 
+## 2026-06-16 — TASK-0021 Web UI: Evaluation Review Experience
+
+Added read-only evaluation API routes and a full Evaluation tab in the intake detail UI.
+
+Changes made:
+
+- `src/application/intake-workflow-service.ts` — `listEvaluationsForIntake`, `getLatestEvaluationForIntake`, `getEvaluationForIntake` service methods.
+- `apps/api/src/modules/intake/dto/evaluation.dto.ts` — new `EvaluationSummaryDto` + mapper.
+- `apps/api/src/modules/intake/intake.controller.ts` — `GET /intakes/:id/evaluations`, `/latest`, `/:evaluationId`.
+- `apps/web/src/lib/types.ts` — `IntakeEvaluation`, `EvaluationSection`, `QualityScore`, `AgentRun`, etc.
+- `apps/web/src/lib/api-client.ts` — `listEvaluationsForIntake`, `getLatestEvaluationForIntake`, `getEvaluation`.
+- `apps/web/src/components/EvaluationPanel.tsx` — new: `EvaluationPanel`, summary card, quality score badge + breakdown, regen form, empty state.
+- `apps/web/src/components/EvaluationSectionCard.tsx` — new: tabbed section browser, 12 section renderers, agent provenance footer.
+- `apps/web/src/app/intakes/[id]/page.tsx` — added "Evaluation" tab, evaluation fetch on load, refresh after generate/regen.
+- `tests/evaluation-api-read.test.mjs` — 8 new service-layer read tests.
+
+Commands run:
+
+```bash
+npm run build:core   # clean
+npm run api:build    # clean
+npm run web:build    # clean
+npm test             # 398/398 pass (8 new)
+```
+
+---
+
 ## 2026-06-15 — TASK-0020 Step 7: Section Regeneration via EvaluationOrchestrator
 
 Wired `regenerateAnalysisDraft` to route through the `EvaluationOrchestrator` when it is injected. Guidance text is passed as `discoveryNotes`. If the orchestrator returns `clarification_required` during regen, a `ConflictError` is thrown (regen halted, state stays `intake_review`). On success, the new evaluation is persisted, the new draft supersedes the previous one, and the audit event `EVALUATION_REGENERATED` is recorded with `evaluationId`, `previousDraftId`, and `newDraftId`.

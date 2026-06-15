@@ -5,6 +5,8 @@ import { applyWorkflowTransition, isApprovalComplete } from "../domain/workflow.
 import { createAuditEvent } from "./audit.js";
 import { evaluationToLegacyDraft } from "./evaluation-draft-mapper.js";
 import { agentRunsFromEvaluation } from "./evaluation-persistence.js";
+import type { AgentRunRecord } from "./evaluation-persistence.js";
+import type { IntakeEvaluation } from "./intake-evaluation.js";
 import type {
   EvaluationOrchestrationOptions,
   EvaluationOrchestrator,
@@ -819,6 +821,31 @@ export class IntakeWorkflowService {
     const saved = await this.store.saveIntake(updated);
     await this.store.appendAuditEvent(result.auditEvent);
     return saved;
+  }
+
+  // ─── Evaluation read methods ─────────────────────────────────────────────
+
+  async listEvaluationsForIntake(intakeId: string): Promise<IntakeEvaluation[]> {
+    return this.store.listEvaluationsForIntake(intakeId);
+  }
+
+  async getLatestEvaluationForIntake(
+    intakeId: string,
+  ): Promise<{ evaluation: IntakeEvaluation | null; agentRuns: AgentRunRecord[] }> {
+    const evaluation = await this.store.getLatestEvaluationForIntake(intakeId);
+    if (!evaluation) return { evaluation: null, agentRuns: [] };
+    const agentRuns = await this.store.listAgentRuns(evaluation.id);
+    return { evaluation, agentRuns };
+  }
+
+  async getEvaluationForIntake(
+    intakeId: string,
+    evaluationId: string,
+  ): Promise<{ evaluation: IntakeEvaluation; agentRuns: AgentRunRecord[] }> {
+    const evaluation = await this.store.getEvaluation(intakeId, evaluationId);
+    if (!evaluation) throw new NotFoundError("Evaluation", evaluationId);
+    const agentRuns = await this.store.listAgentRuns(evaluationId);
+    return { evaluation, agentRuns };
   }
 
   private async audit(input: {

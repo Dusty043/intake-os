@@ -1,4 +1,5 @@
 import { Body, Controller, Get, Param, Post } from "@nestjs/common";
+import { toEvaluationSummaryDto } from "./dto/evaluation.dto.js";
 import { ApiOperation, ApiTags } from "@nestjs/swagger";
 import { IntakeWorkflowService } from "../../../../../src/application/intake-workflow-service.js";
 import type { Actor } from "../../../../../src/domain/types.js";
@@ -188,5 +189,27 @@ export class IntakeHttpController {
   @ApiOperation({ summary: "Read the audit trail for an intake" })
   audit(@Param("id") id: string) {
     return this.workflowService.getAuditTrail(id);
+  }
+
+  @Get(":id/evaluations")
+  @ApiOperation({ summary: "List all evaluations for an intake, newest first" })
+  async listEvaluations(@Param("id") id: string) {
+    const evaluations = await this.workflowService.listEvaluationsForIntake(id);
+    return { evaluations: evaluations.map(toEvaluationSummaryDto) };
+  }
+
+  @Get(":id/evaluations/latest")
+  @ApiOperation({ summary: "Get the latest evaluation for an intake" })
+  async getLatestEvaluation(@Param("id") id: string) {
+    return this.workflowService.getLatestEvaluationForIntake(id);
+  }
+
+  @Get(":id/evaluations/:evaluationId")
+  @ApiOperation({ summary: "Get a specific evaluation by ID" })
+  async getEvaluation(
+    @Param("id") id: string,
+    @Param("evaluationId") evaluationId: string,
+  ) {
+    return this.workflowService.getEvaluationForIntake(id, evaluationId);
   }
 }

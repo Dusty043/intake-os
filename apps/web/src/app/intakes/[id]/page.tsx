@@ -15,6 +15,7 @@ import {
   generateProvisioningPlan,
   getAuditTrail,
   getIntake,
+  getLatestEvaluationForIntake,
   regenerateAnalysisDraft,
   rejectAnalysisDraft,
   rejectGate,
@@ -25,9 +26,10 @@ import {
 } from "@/lib/api-client";
 import { formatDate, formatProjectType } from "@/lib/formatting";
 import { getStatusInfo } from "@/lib/status";
-import type { AuditEvent, PendingClarificationQuestion, ProjectIntakeRecord, ReviseAnalysisDraftInput } from "@/lib/types";
+import type { AgentRun, AuditEvent, IntakeEvaluation, PendingClarificationQuestion, ProjectIntakeRecord, ReviseAnalysisDraftInput } from "@/lib/types";
+import { EvaluationPanel } from "@/components/EvaluationPanel";
 
-const TABS = ["Overview", "AI Draft", "Reviewed Package", "Approvals", "Distribution", "Audit Trail", "Debug"];
+const TABS = ["Overview", "AI Draft", "Evaluation", "Reviewed Package", "Approvals", "Distribution", "Audit Trail", "Debug"];
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -1117,8 +1119,26 @@ function IntakeDetailContent() {
 
   const [intake, setIntake] = useState<ProjectIntakeRecord | null>(null);
   const [audit, setAudit] = useState<AuditEvent[]>([]);
+  const [evaluation, setEvaluation] = useState<IntakeEvaluation | null>(null);
+  const [agentRuns, setAgentRuns] = useState<AgentRun[]>([]);
+  const [evalLoading, setEvalLoading] = useState(false);
+  const [evalError, setEvalError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const loadEvaluation = useCallback(async (intakeId: string) => {
+    setEvalLoading(true);
+    setEvalError(null);
+    try {
+      const result = await getLatestEvaluationForIntake(intakeId, actor);
+      setEvaluation(result.evaluation);
+      setAgentRuns(result.agentRuns ?? []);
+    } catch {
+      setEvalError("Could not load evaluation.");
+    } finally {
+      setEvalLoading(false);
+    }
+  }, [actor]);
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -1128,12 +1148,13 @@ function IntakeDetailContent() {
       const [i, a] = await Promise.all([getIntake(id, actor), getAuditTrail(id, actor)]);
       setIntake(i);
       setAudit(a);
+      void loadEvaluation(id);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load intake.");
     } finally {
       setLoading(false);
     }
-  }, [id, actor]);
+  }, [id, actor, loadEvaluation]);
 
   useEffect(() => { void load(); }, [load]);
 
@@ -1167,6 +1188,9 @@ function IntakeDetailContent() {
     setIntake(updated);
     const freshAudit = await getAuditTrail(iid, actor);
     setAudit(freshAudit);
+    if (["mock_draft", "regen_draft", "resubmit"].includes(action)) {
+      void loadEvaluation(iid);
+    }
   }
 
   if (loading) {
@@ -1239,6 +1263,32 @@ function IntakeDetailContent() {
       )}
       {activeTab === "AI Draft" && (
         <AiDraftTab intake={intake} onAction={handleAction} />
+      )}
+      {activeTab === "Evaluation" && (
+        <EvaluationPanel
+          evaluation={evaluation}
+          agentRuns={agentRuns}
+          loading={evalLoading}
+          error={evalError}
+          canRegenerateAnalysis={
+            ["submitted", "intake_review"].includes(intake.status) &&
+            (intake.analysisDraftRegenerationCount as number ?? 0) < 5
+          }
+          regenerateDisabledReason={
+            !["submitted", "intake_review"].includes(intake.status)
+              ? "Regeneration is only available while the intake is in review."
+              : (intake.analysisDraftRegenerationCount as number ?? 0) >= 5
+              ? "Regeneration limit reached."
+              : undefined
+          }
+          onRegenerateAnalysis={async (guidance) => {
+            const updated = await regenerateAnalysisDraft(intake.id, actor, guidance);
+            setIntake(updated);
+            const freshAudit = await getAuditTrail(intake.id, actor);
+            setAudit(freshAudit);
+            void loadEvaluation(intake.id);
+          }}
+        />
       )}
       {activeTab === "Reviewed Package" && (
         <ReviewedPackageTab intake={intake} />
