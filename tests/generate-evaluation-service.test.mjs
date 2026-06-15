@@ -230,3 +230,65 @@ describe("generateMockAnalysisDraft — routing", () => {
     assert.equal(evaluations.length, 0, "no evaluation should be persisted on legacy path");
   });
 });
+
+// ─── regenerateAnalysisDraft: orchestrator routing ───────────────────────────
+
+describe("regenerateAnalysisDraft — orchestrator routing", () => {
+  it("runs orchestrator regen and supersedes previous draft", async () => {
+    _seq = 0;
+    const orchestrator = makeOrchestrator();
+    const store = new InMemoryProjectIntakeStore();
+    const service = new IntakeWorkflowService({
+      store,
+      clock: () => NOW,
+      idFactory: makeIdFactory(),
+      orchestrator,
+    });
+
+    // Generate initial evaluation to reach intake_review
+    const submitted = await createAndSubmitIntake(service);
+    await service.generateEvaluation(submitted.id, { depth: "standard", provider: "mock" }, intakeOwner);
+
+    // Regenerate with guidance
+    const result = await service.regenerateAnalysisDraft(
+      submitted.id,
+      { guidance: "Focus more on data pipeline requirements and integration points.", requestedBy: "Reviewer" },
+      intakeOwner,
+    );
+
+    assert.equal(result.status, "intake_review", "status must stay intake_review after regen");
+    assert.ok(result.latestAnalysisDraft, "new draft must exist");
+    assert.equal(result.latestAnalysisDraft.reviewStatus, "draft");
+    assert.equal(result.analysisDraftRegenerationCount, 1);
+
+    // Verify old draft superseded
+    const superseded = result.analysisDrafts?.find((d) => d.reviewStatus === "superseded");
+    assert.ok(superseded, "previous draft must be superseded");
+
+    // Two evaluations should be persisted (initial + regen)
+    const evaluations = await store.listEvaluationsForIntake(submitted.id);
+    assert.equal(evaluations.length, 2, "both initial and regen evaluations must be persisted");
+  });
+
+  it("audit trail contains EVALUATION_REGENERATED event", async () => {
+    _seq = 0;
+    const orchestrator = makeOrchestrator();
+    const service = makeServiceWithOrchestrator(orchestrator);
+
+    const submitted = await createAndSubmitIntake(service);
+    await service.generateEvaluation(submitted.id, { depth: "standard", provider: "mock" }, intakeOwner);
+
+    await service.regenerateAnalysisDraft(
+      submitted.id,
+      { guidance: "Emphasize security and compliance requirements for this pipeline.", requestedBy: "Reviewer" },
+      intakeOwner,
+    );
+
+    const audit = await service.getAuditTrail(submitted.id);
+    const regenEvent = audit.find((e) => e.action === "EVALUATION_REGENERATED");
+    assert.ok(regenEvent, "EVALUATION_REGENERATED audit event must exist");
+    assert.ok(regenEvent.metadata?.evaluationId, "must include evaluationId");
+    assert.ok(regenEvent.metadata?.previousDraftId, "must include previousDraftId");
+    assert.ok(regenEvent.metadata?.newDraftId, "must include newDraftId");
+  });
+});

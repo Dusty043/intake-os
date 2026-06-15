@@ -1,7 +1,5 @@
 # TASK-0020 — Wire EvaluationOrchestrator into Live Intake Workflow
 
-## Status: In Progress (Steps 1–6 complete)
-
 ## Goal
 
 Replace the legacy `generateMockAnalysisDraft` path with the `EvaluationOrchestrator` 3-stage pipeline as the default AI evaluation engine. The orchestrator path is gated by an `ANALYSIS_ENGINE=orchestrator` environment variable so the legacy mock path remains available.
@@ -14,7 +12,7 @@ Replace the legacy `generateMockAnalysisDraft` path with the `EvaluationOrchestr
 4. Map evaluation → legacy IntakeAnalysisDraft ✅
 5. Keep old review/approval flow working ✅
 6. Add clarification_required routing ✅
-7. Add section regeneration (deferred — after base path is stable)
+7. Add section regeneration ✅
 
 ## Files Changed
 
@@ -27,6 +25,13 @@ Replace the legacy `generateMockAnalysisDraft` path with the `EvaluationOrchestr
 | `apps/api/src/runtime/runtime.module.ts` | `IntakeWorkflowService` factory now injects `EvaluationOrchestrator` and passes it when `ANALYSIS_ENGINE=orchestrator` |
 | `tests/generate-evaluation-service.test.mjs` | 8 new tests for happy path, clarification_required, guard, and routing |
 
+### Step 7 (section regeneration)
+
+| File | Change |
+|------|--------|
+| `src/application/intake-workflow-service.ts` | `regenerateAnalysisDraft` routes to orchestrator when `this.orchestrator` is set; uses `discoveryNotes: [input.guidance]`, `allowDepthUpgrade: false`; audits as `EVALUATION_REGENERATED` |
+| `tests/generate-evaluation-service.test.mjs` | 2 new tests: regen supersedes previous draft + `EVALUATION_REGENERATED` audit event |
+
 ## Key Design Decisions
 
 - **ANALYSIS_ENGINE flag**: read in `runtime.module.ts` as `process.env["ANALYSIS_ENGINE"] === "orchestrator"`. The service itself accepts `orchestrator?: EvaluationOrchestrator` in options — no env var reads inside the domain layer.
@@ -38,9 +43,7 @@ Replace the legacy `generateMockAnalysisDraft` path with the `EvaluationOrchestr
 
 388/388 pass (8 new tests in `generate-evaluation-service.test.mjs`).
 
-## Remaining Work (Step 7)
-
-Section regeneration via `EvaluationOrchestrator` — deferred until base path is validated on the server. The legacy `regenerateAnalysisDraft` method still uses `analysisProvider` regardless of the ANALYSIS_ENGINE flag.
+## Status: COMPLETE (all 7 steps done)
 
 ## Open Questions
 

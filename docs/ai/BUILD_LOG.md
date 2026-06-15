@@ -1,5 +1,23 @@
 # Build Log
 
+## 2026-06-15 — TASK-0020 Step 7: Section Regeneration via EvaluationOrchestrator
+
+Wired `regenerateAnalysisDraft` to route through the `EvaluationOrchestrator` when it is injected. Guidance text is passed as `discoveryNotes`. If the orchestrator returns `clarification_required` during regen, a `ConflictError` is thrown (regen halted, state stays `intake_review`). On success, the new evaluation is persisted, the new draft supersedes the previous one, and the audit event `EVALUATION_REGENERATED` is recorded with `evaluationId`, `previousDraftId`, and `newDraftId`.
+
+Changes made:
+
+- `src/application/intake-workflow-service.ts` — `regenerateAnalysisDraft` routes to orchestrator path when `this.orchestrator` is set.
+- `tests/generate-evaluation-service.test.mjs` — 2 new tests: regen supersedes previous draft + `EVALUATION_REGENERATED` audit trail event. Total: 10 new tests in this file, 390/390 passing.
+
+Commands run:
+
+```bash
+npm run build:core   # clean
+npm test             # 390/390 pass
+```
+
+---
+
 ## 2026-06-15 — TASK-0020 Wire EvaluationOrchestrator into Live Intake Workflow (Steps 1–6)
 
 Wired the `EvaluationOrchestrator` 3-stage pipeline into `IntakeWorkflowService`. Steps 7 (section regeneration) deferred.

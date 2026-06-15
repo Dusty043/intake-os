@@ -383,6 +383,60 @@ export class IntakeWorkflowService {
     const now = this.clock();
     const supersededDraft = { ...currentDraft, reviewStatus: "superseded" as const };
 
+    if (this.orchestrator) {
+      const orchResult = await this.orchestrator.orchestrate(record, {
+        actor,
+        depth: "standard",
+        provider: "mock",
+        discoveryNotes: [input.guidance],
+        allowDepthUpgrade: false,
+      });
+
+      if (orchResult.kind === "clarification_required") {
+        throw new ConflictError("Re-evaluation halted: clarification required. Provide more complete guidance.");
+      }
+
+      const { evaluation } = orchResult;
+      await this.store.saveEvaluation({ evaluation, agentRuns: agentRunsFromEvaluation(evaluation) });
+
+      const newDraft = evaluationToLegacyDraft(evaluation, { idFactory: this.idFactory, now });
+      const evalValidation = validateIntakeAnalysisDraft(newDraft);
+      if (!evalValidation.valid) {
+        throw new ValidationError(`Regenerated evaluation draft failed validation: ${evalValidation.errors.join(", ")}`);
+      }
+
+      const regenDrafts = [
+        ...(record.analysisDrafts ?? []).map((d) => (d.id === currentDraft.id ? supersededDraft : d)),
+        newDraft,
+      ];
+
+      const regenRecord: ProjectIntakeRecord = {
+        ...record,
+        analysisDrafts: regenDrafts,
+        latestAnalysisDraft: newDraft,
+        analysisDraftRegenerationCount: regenCount + 1,
+        updatedAt: now,
+      };
+
+      const regenSaved = await this.store.saveIntake(regenRecord);
+      await this.audit({
+        record: regenSaved,
+        actor,
+        action: "EVALUATION_REGENERATED",
+        timestamp: now,
+        metadata: {
+          previousDraftId: currentDraft.id,
+          newDraftId: newDraft.id,
+          evaluationId: evaluation.id,
+          guidance: input.guidance.slice(0, 500),
+          regenerationCount: regenCount + 1,
+          requestedBy: input.requestedBy,
+          qualityScore: evaluation.qualityScore?.overall,
+        },
+      });
+      return regenSaved;
+    }
+
     const result = await this.analysisProvider.generateDraft(record, {
       actor,
       idFactory: this.idFactory,
