@@ -50,9 +50,13 @@ export class IntakeHttpController {
   }
 
   @Post(":id/resubmit")
-  @ApiOperation({ summary: "Resubmit an intake that is awaiting clarification" })
-  resubmit(@Param("id") id: string, @CurrentActor() actor: AuthenticatedActor) {
-    return this.workflowService.resubmitIntake(id, toDomainActor(actor));
+  @ApiOperation({ summary: "Resubmit an intake that is awaiting clarification, optionally with answers" })
+  resubmit(
+    @Param("id") id: string,
+    @Body() body: { answers?: Array<{ question: string; answer: string }> },
+    @CurrentActor() actor: AuthenticatedActor,
+  ) {
+    return this.workflowService.resubmitIntake(id, toDomainActor(actor), body.answers);
   }
 
   @Post(":id/discovery")

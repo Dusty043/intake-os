@@ -104,12 +104,28 @@ export class IntakeWorkflowService {
     return this.transition(id, "submit", actor, { reason: "Submitted for discovery." });
   }
 
-  async resubmitIntake(id: string, actor: Actor): Promise<ProjectIntakeRecord> {
-    const record = await this.requireIntake(id);
+  async resubmitIntake(
+    id: string,
+    actor: Actor,
+    answers?: readonly { question: string; answer: string }[],
+  ): Promise<ProjectIntakeRecord> {
+    let record = await this.requireIntake(id);
     if (record.status !== "clarification_required") {
       throw new ValidationError(`Resubmit is only available when intake is in clarification_required status. Current: ${record.status}.`);
     }
-    return this.transition(id, "resubmit", actor, { reason: "Resubmitted after clarification." });
+    if (answers && answers.length > 0) {
+      const withAnswers: ProjectIntakeRecord = {
+        ...record,
+        priorClarifications: answers,
+        pendingClarification: undefined,
+        updatedAt: this.clock(),
+      };
+      record = await this.store.saveIntake(withAnswers);
+    }
+    return this.transition(id, "resubmit", actor, {
+      reason: "Resubmitted after clarification.",
+      metadata: { answerCount: answers?.length ?? 0 },
+    });
   }
 
   async completeDiscovery(id: string, input: CompleteDiscoveryInput, actor: Actor): Promise<ProjectIntakeRecord> {
@@ -185,14 +201,29 @@ export class IntakeWorkflowService {
       provider,
       model: input.model,
       discoveryNotes: record.discovery?.notes ? [record.discovery.notes] : undefined,
+      priorClarifications: record.priorClarifications ? [...record.priorClarifications] : undefined,
       allowDepthUpgrade: input.allowDepthUpgrade ?? true,
     };
 
     const result = await this.orchestrator.orchestrate(record, orchestrationOptions);
 
     if (result.kind === "clarification_required") {
+      const withPending: ProjectIntakeRecord = {
+        ...record,
+        pendingClarification: {
+          questions: result.clarification.questions.map((q) => ({
+            id: q.id,
+            question: q.question,
+            required: q.required,
+            reason: q.reason,
+          })),
+          missingFields: result.clarification.missingFields,
+        },
+        updatedAt: now,
+      };
+      await this.store.saveIntake(withPending);
       await this.audit({
-        record,
+        record: withPending,
         actor,
         action: "EVALUATION_CLARIFICATION_REQUIRED",
         timestamp: now,
@@ -202,7 +233,7 @@ export class IntakeWorkflowService {
           depth,
         },
       });
-      return this.applyTransitionToRecord(record, "clarification_needed", actor, now, {
+      return this.applyTransitionToRecord(withPending, "clarification_needed", actor, now, {
         reason: "Clarification required before evaluation can proceed.",
         metadata: { questionCount: result.clarification.questions.length },
       });
@@ -226,6 +257,8 @@ export class IntakeWorkflowService {
       ...record,
       analysisDrafts: [...(record.analysisDrafts ?? []), draft],
       latestAnalysisDraft: draft,
+      pendingClarification: undefined,
+      priorClarifications: undefined,
       updatedAt: now,
     };
 

@@ -79,7 +79,9 @@ export class MockClarificationQuestionsAgent implements EvaluationAgent<Clarific
     const criticalMissing = missingFields.filter((f) =>
       f === "description" || f === "title" || f === "business_goal",
     );
-    const isBlocking = criticalMissing.length > 0;
+    // Prior clarification answers resolve blocking questions — treat as non-blocking.
+    const hasPriorAnswers = (ctx.priorClarifications?.length ?? 0) > 0;
+    const isBlocking = criticalMissing.length > 0 && !hasPriorAnswers;
 
     const warnings: string[] = [];
     if (isBlocking) warnings.push(`Clarification is blocking: missing ${criticalMissing.join(", ")}.`);

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useCallback, useEffect, useState } from "react";
+import React, { Suspense, useCallback, useEffect, useState } from "react";
 import { useActor } from "@/components/ActorProvider";
 import { DebugJsonPanel } from "@/components/DebugJsonPanel";
 import { ErrorBanner } from "@/components/ErrorBanner";
@@ -25,7 +25,7 @@ import {
 } from "@/lib/api-client";
 import { formatDate, formatProjectType } from "@/lib/formatting";
 import { getStatusInfo } from "@/lib/status";
-import type { AuditEvent, ProjectIntakeRecord, ReviseAnalysisDraftInput } from "@/lib/types";
+import type { AuditEvent, PendingClarificationQuestion, ProjectIntakeRecord, ReviseAnalysisDraftInput } from "@/lib/types";
 
 const TABS = ["Overview", "AI Draft", "Reviewed Package", "Approvals", "Distribution", "Audit Trail", "Debug"];
 
@@ -75,6 +75,68 @@ function ActionBtn({
       {disabled && disabledReason && (
         <p className="text-xs text-gray-400 mt-1">{disabledReason}</p>
       )}
+    </div>
+  );
+}
+
+// ─── Clarification Panel ───────────────────────────────────────────────────
+
+function ClarificationPanel({
+  questions,
+  missingFields,
+  busy,
+  onResubmit,
+}: {
+  questions: PendingClarificationQuestion[];
+  missingFields: string[];
+  busy: boolean;
+  onResubmit: (answers: Array<{ question: string; answer: string }>) => void;
+}) {
+  const [answers, setAnswers] = React.useState<Record<string, string>>({});
+
+  function handleResubmit() {
+    const filled = questions
+      .filter((q) => answers[q.id]?.trim())
+      .map((q) => ({ question: q.question, answer: answers[q.id].trim() }));
+    onResubmit(filled);
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 leading-relaxed">
+        <p className="font-semibold mb-1">Clarification required</p>
+        {missingFields.length > 0 && (
+          <p className="mb-1">Missing: {missingFields.join(", ")}.</p>
+        )}
+        <p>Answer the questions below, then resubmit to continue evaluation.</p>
+      </div>
+      {questions.length > 0 && (
+        <div className="space-y-3">
+          {questions.map((q) => (
+            <div key={q.id}>
+              <label className="block text-xs font-medium text-brand-text mb-1">
+                {q.question}
+                {q.required && <span className="text-red-500 ml-1">*</span>}
+              </label>
+              {q.reason && <p className="text-xs text-brand-muted mb-1">{q.reason}</p>}
+              <textarea
+                className="w-full border border-gray-200 rounded-md px-2 py-1.5 text-sm text-brand-text resize-none focus:outline-none focus:ring-1 focus:ring-brand-accent"
+                rows={2}
+                placeholder="Your answer…"
+                value={answers[q.id] ?? ""}
+                onChange={(e) => setAnswers((prev) => ({ ...prev, [q.id]: e.target.value }))}
+              />
+            </div>
+          ))}
+        </div>
+      )}
+      <ActionBtn
+        onClick={handleResubmit}
+        loading={busy}
+        loadingLabel="Resubmitting…"
+        label="Resubmit for Evaluation"
+        variant="secondary"
+      />
     </div>
   );
 }
@@ -133,13 +195,12 @@ function OverviewTab({
             <ActionBtn onClick={() => { void run("submit"); }} loading={busy === "submit"} loadingLabel="Submitting intake…" label="Submit Intake" />
           )}
           {s === "clarification_required" && (
-            <div className="space-y-3">
-              <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 leading-relaxed">
-                <p className="font-semibold mb-1">Clarification required</p>
-                <p>The AI evaluation could not proceed — the intake description lacks enough detail. Add more context to the description, then resubmit to try again.</p>
-              </div>
-              <ActionBtn onClick={() => { void run("resubmit"); }} loading={busy === "resubmit"} loadingLabel="Resubmitting…" label="Resubmit for Evaluation" variant="secondary" />
-            </div>
+            <ClarificationPanel
+              questions={intake.pendingClarification?.questions ?? []}
+              missingFields={intake.pendingClarification?.missingFields ?? []}
+              busy={busy === "resubmit"}
+              onResubmit={(answers) => { void run("resubmit", answers); }}
+            />
           )}
           {["submitted", "intake_review"].includes(s) && !hasDraft && (
             <ActionBtn onClick={() => { void run("mock_draft"); }} loading={busy === "mock_draft"} loadingLabel="Generating mock AI draft…" label="Generate Mock AI Draft" variant="secondary" />
@@ -1088,7 +1149,7 @@ function IntakeDetailContent() {
     let updated: ProjectIntakeRecord;
     switch (action) {
       case "submit":        updated = await submitIntake(iid, actor); break;
-      case "resubmit":      updated = await resubmitIntake(iid, actor); break;
+      case "resubmit":      updated = await resubmitIntake(iid, actor, payload as Array<{ question: string; answer: string }> | undefined); break;
       case "mock_draft":    updated = await generateMockAnalysisDraft(iid, actor); break;
       case "accept_draft":  updated = await acceptAnalysisDraft(iid, draft!.id, actor, payload as string); break;
       case "reject_draft":  updated = await rejectAnalysisDraft(iid, draft!.id, actor, payload as string); break;

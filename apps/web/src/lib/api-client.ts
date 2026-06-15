@@ -64,11 +64,15 @@ export async function submitIntake(id: string, actor: UiActor): Promise<ProjectI
   });
 }
 
-export async function resubmitIntake(id: string, actor: UiActor): Promise<ProjectIntakeRecord> {
+export async function resubmitIntake(
+  id: string,
+  actor: UiActor,
+  answers?: Array<{ question: string; answer: string }>,
+): Promise<ProjectIntakeRecord> {
   return request(`/intakes/${id}/resubmit`, {
     method: "POST",
     headers: actorHeaders(actor),
-    body: JSON.stringify({}),
+    body: JSON.stringify({ answers }),
   });
 }
 

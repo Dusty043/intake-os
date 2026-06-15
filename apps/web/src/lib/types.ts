@@ -11,6 +11,13 @@ export type UiActor = {
   role: ActorRole;
 };
 
+export type PendingClarificationQuestion = {
+  id: string;
+  question: string;
+  required: boolean;
+  reason?: string;
+};
+
 export type ProjectIntakeRecord = {
   id: string;
   title: string;
@@ -27,6 +34,11 @@ export type ProjectIntakeRecord = {
   provisioningPlan?: ProvisioningPlan;
   approvals?: ApprovalRecord;
   source?: { system?: string; externalId?: string };
+  pendingClarification?: {
+    questions: PendingClarificationQuestion[];
+    missingFields: string[];
+  };
+  priorClarifications?: Array<{ question: string; answer: string }>;
   [key: string]: unknown;
 };
 

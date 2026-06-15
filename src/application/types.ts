@@ -185,6 +185,18 @@ export interface ProvisioningPlan {
   approvedForExecutionBy?: Actor;
 }
 
+export interface PendingClarificationQuestion {
+  id: string;
+  question: string;
+  required: boolean;
+  reason?: string;
+}
+
+export interface PriorClarification {
+  question: string;
+  answer: string;
+}
+
 export interface ProjectIntakeRecord extends ProjectRequestSnapshot {
   id: string;
   title: string;
@@ -203,6 +215,11 @@ export interface ProjectIntakeRecord extends ProjectRequestSnapshot {
   reviewedProjectPackage?: ReviewedProjectPackage;
   provisioningPlan?: ProvisioningPlan;
   externalLinks: readonly ExternalLinkRecord[];
+  pendingClarification?: {
+    questions: readonly PendingClarificationQuestion[];
+    missingFields: readonly string[];
+  };
+  priorClarifications?: readonly PriorClarification[];
 }
 
 export interface RegenerateAnalysisDraftInput {
