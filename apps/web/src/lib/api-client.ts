@@ -144,12 +144,13 @@ export async function reviseAnalysisDraft(
 export async function approveGate(
   id: string,
   actor: UiActor,
+  gate: "gate_1" | "gate_2",
   comment?: string,
 ): Promise<ProjectIntakeRecord> {
   return request(`/intakes/${id}/approvals`, {
     method: "POST",
     headers: actorHeaders(actor),
-    body: JSON.stringify({ comment: comment ?? "" }),
+    body: JSON.stringify({ gate, comment: comment ?? "" }),
   });
 }
 
