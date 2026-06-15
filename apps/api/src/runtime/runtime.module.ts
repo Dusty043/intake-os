@@ -32,9 +32,24 @@ const logger = new Logger("RuntimeModule");
     },
     {
       provide: IntakeWorkflowService,
-      inject: [PROJECT_INTAKE_STORE, ANALYSIS_PROVIDER],
-      useFactory: (store: PrismaProjectIntakeStore, analysisProvider: AnalysisProviderRouter) =>
-        new IntakeWorkflowService({ store, analysisProvider }),
+      inject: [PROJECT_INTAKE_STORE, ANALYSIS_PROVIDER, EvaluationOrchestrator],
+      useFactory: (
+        store: PrismaProjectIntakeStore,
+        analysisProvider: AnalysisProviderRouter,
+        orchestrator: EvaluationOrchestrator,
+      ) => {
+        const useOrchestrator = process.env["ANALYSIS_ENGINE"] === "orchestrator";
+        if (useOrchestrator) {
+          logger.log("Analysis engine: orchestrator");
+        } else {
+          logger.log("Analysis engine: legacy provider");
+        }
+        return new IntakeWorkflowService({
+          store,
+          analysisProvider,
+          orchestrator: useOrchestrator ? orchestrator : undefined,
+        });
+      },
     },
     {
       provide: EvaluationOrchestrator,

@@ -34,6 +34,7 @@ Generated at: 2026-06-09T14:53:20.716Z
 - `docs/ai/tasks/TASK-0018P-evaluation-orchestrator-patch.md`
 - `docs/ai/tasks/TASK-0019-prisma-evaluation-persistence.md`
 - `docs/ai/tasks/TASK-0014P-intake-review-reject-regen-loop.md`
+- `docs/ai/tasks/TASK-0020-wire-evaluation-orchestrator.md`
 
 ## Deployment Docs
 

@@ -3,6 +3,12 @@ import { getProjectTypeDefinition } from "../domain/project-type-registry.js";
 import type { Actor, ApprovalGate, AuditEvent, RequestStatus, WorkflowAction } from "../domain/types.js";
 import { applyWorkflowTransition, isApprovalComplete } from "../domain/workflow.js";
 import { createAuditEvent } from "./audit.js";
+import { evaluationToLegacyDraft } from "./evaluation-draft-mapper.js";
+import { agentRunsFromEvaluation } from "./evaluation-persistence.js";
+import type {
+  EvaluationOrchestrationOptions,
+  EvaluationOrchestrator,
+} from "./evaluation-orchestrator.js";
 import { ConflictError, NotFoundError, PermissionDeniedError, ValidationError } from "./errors.js";
 import type { IntakeAnalysisProvider } from "./intake-analysis-provider.js";
 import { validateIntakeAnalysisDraft } from "./intake-analysis.js";
@@ -13,6 +19,7 @@ import type {
   ApprovalDecisionInput,
   CompleteDiscoveryInput,
   CreateIntakeInput,
+  GenerateEvaluationInput,
   GenerateMockAnalysisDraftInput,
   GenerateProvisioningPlanInput,
   ProjectIntakeRecord,
@@ -28,6 +35,7 @@ export interface IntakeWorkflowServiceOptions {
   clock?: () => string;
   idFactory?: (prefix: string) => string;
   analysisProvider?: IntakeAnalysisProvider;
+  orchestrator?: EvaluationOrchestrator;
 }
 
 export class IntakeWorkflowService {
@@ -35,12 +43,14 @@ export class IntakeWorkflowService {
   private readonly clock: () => string;
   private readonly idFactory: (prefix: string) => string;
   private readonly analysisProvider: IntakeAnalysisProvider;
+  private readonly orchestrator?: EvaluationOrchestrator;
 
   constructor(options: IntakeWorkflowServiceOptions) {
     this.store = options.store;
     this.clock = options.clock ?? (() => new Date().toISOString());
     this.idFactory = options.idFactory ?? createReadableId;
     this.analysisProvider = options.analysisProvider ?? new MockIntakeAnalysisProvider();
+    this.orchestrator = options.orchestrator;
   }
 
   get activeProviderName(): string {
@@ -141,11 +151,106 @@ export class IntakeWorkflowService {
     });
   }
 
+  async generateEvaluation(
+    id: string,
+    input: GenerateEvaluationInput,
+    actor: Actor,
+  ): Promise<ProjectIntakeRecord> {
+    ensurePermission(actor, "generate_evaluation");
+    if (!this.orchestrator) {
+      throw new ValidationError("Evaluation orchestrator is not configured. Set ANALYSIS_ENGINE=orchestrator.");
+    }
+
+    let record = await this.requireIntake(id);
+    const now = this.clock();
+    const depth = input.depth ?? "standard";
+    const provider = input.provider ?? "mock";
+
+    record = await this.applyTransitionToRecord(record, "generate_evaluation", actor, now, {
+      reason: "AI evaluation started.",
+      metadata: { engine: "orchestrator", depth },
+    });
+
+    const orchestrationOptions: EvaluationOrchestrationOptions = {
+      actor,
+      depth,
+      provider,
+      model: input.model,
+      discoveryNotes: record.discovery?.notes ? [record.discovery.notes] : undefined,
+      allowDepthUpgrade: input.allowDepthUpgrade ?? true,
+    };
+
+    const result = await this.orchestrator.orchestrate(record, orchestrationOptions);
+
+    if (result.kind === "clarification_required") {
+      await this.audit({
+        record,
+        actor,
+        action: "EVALUATION_CLARIFICATION_REQUIRED",
+        timestamp: now,
+        metadata: {
+          missingFields: result.clarification.missingFields,
+          questionCount: result.clarification.questions.length,
+          depth,
+        },
+      });
+      return this.applyTransitionToRecord(record, "clarification_needed", actor, now, {
+        reason: "Clarification required before evaluation can proceed.",
+        metadata: { questionCount: result.clarification.questions.length },
+      });
+    }
+
+    // evaluation_ready path
+    const { evaluation } = result;
+
+    await this.store.saveEvaluation({
+      evaluation,
+      agentRuns: agentRunsFromEvaluation(evaluation),
+    });
+
+    const draft = evaluationToLegacyDraft(evaluation, { idFactory: this.idFactory, now });
+    const validation = validateIntakeAnalysisDraft(draft);
+    if (!validation.valid) {
+      throw new ValidationError(`Evaluation draft failed validation: ${validation.errors.join(", ")}`);
+    }
+
+    const withDraft: ProjectIntakeRecord = {
+      ...record,
+      analysisDrafts: [...(record.analysisDrafts ?? []), draft],
+      latestAnalysisDraft: draft,
+      updatedAt: now,
+    };
+
+    const saved = await this.store.saveIntake(withDraft);
+    await this.audit({
+      record: saved,
+      actor,
+      action: "EVALUATION_GENERATED",
+      timestamp: now,
+      metadata: {
+        evaluationId: evaluation.id,
+        draftId: draft.id,
+        depth: evaluation.depth,
+        qualityScore: evaluation.qualityScore?.overall,
+        sectionCount: evaluation.sections.length,
+      },
+    });
+
+    return this.applyTransitionToRecord(saved, "success", actor, now, {
+      reason: "AI evaluation complete, draft ready for human review.",
+      metadata: { evaluationId: evaluation.id, draftId: draft.id },
+    });
+  }
+
   async generateMockAnalysisDraft(
     id: string,
     input: GenerateMockAnalysisDraftInput,
     actor: Actor,
   ): Promise<ProjectIntakeRecord> {
+    if (this.orchestrator) {
+      return this.generateEvaluation(id, { depth: "standard", provider: "mock" }, actor);
+    }
+
     ensurePermission(actor, "generate_evaluation");
 
     let record = await this.requireIntake(id);

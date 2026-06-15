@@ -1,5 +1,50 @@
 # Build Log
 
+## 2026-06-15 — TASK-0020 Wire EvaluationOrchestrator into Live Intake Workflow (Steps 1–6)
+
+Wired the `EvaluationOrchestrator` 3-stage pipeline into `IntakeWorkflowService`. Steps 7 (section regeneration) deferred.
+
+Changes made:
+
+- `src/application/types.ts` — added `GenerateEvaluationInput` interface.
+- `src/application/intake-workflow-service.ts` — added `orchestrator?: EvaluationOrchestrator` to options and class; added `generateEvaluation()` method (transitions `submitted → evaluating → intake_review`, persists `IntakeEvaluation` + `AgentRun` records, maps to legacy `IntakeAnalysisDraft`); `generateMockAnalysisDraft` delegates to `generateEvaluation` when orchestrator is injected (no frontend/controller changes needed).
+- `apps/api/src/runtime/runtime.module.ts` — updated `IntakeWorkflowService` factory to inject `EvaluationOrchestrator` and pass it when `ANALYSIS_ENGINE=orchestrator`.
+- `tests/generate-evaluation-service.test.mjs` — 8 new tests covering happy path, evaluation persistence, audit trail, draft field population, clarification_required routing, guard (no orchestrator), and mock-vs-orchestrator routing.
+
+Commands run:
+
+```bash
+npm run build:core   # clean
+npm run typecheck    # clean
+npm test             # 388/388 pass (8 new)
+```
+
+---
+
+## 2026-06-13 — TASK-0020P Draft Schema Extension: proposedArchitecture + implementationSuggestions
+
+Requested: "more from the generated draft — proposed architecture and implementation suggestions".
+
+Changes made:
+
+- `src/application/providers/analysis-draft-output-schema.ts` — added `proposedArchitecture` (string) and `implementationSuggestions` (string[]) to `AnalysisDraftModelOutput` interface, JSON schema `required` + `properties`, and validator.
+- `src/application/intake-analysis.ts` — added optional fields to `IntakeAnalysisDraft`; added `buildProposedArchitecture()` and `buildImplementationSuggestions()` helpers; mock builder now returns project-type-aware values for both fields.
+- `src/application/providers/draft-output-mapper.ts` — passes the two new fields through to the domain draft.
+- `src/application/providers/prompt-templates.ts` — OUTPUT RULES updated to instruct the AI to populate both fields.
+- `apps/web/src/lib/types.ts` — added optional fields to web `IntakeAnalysisDraft` type.
+- `apps/web/src/app/intakes/[id]/page.tsx` — AiDraftTab now renders "Proposed Architecture" and "Implementation Suggestions" cards after subtasks.
+- `tests/*.test.mjs` — OpenAI, Anthropic, Bedrock fixture objects updated with the two new required fields (380/380 pass).
+
+Commands run:
+
+```bash
+npm run build:core   # clean
+npm test             # 380/380 pass
+git push && ssh deploy: docker compose build + up -d (api + web)
+```
+
+Commit: `42d3d27`. Server redeployed and running.
+
 ## 2026-06-13 — TASK-0014P Intake Review Reject → Regenerate Loop Fix
 
 Requested: sanity check on governance flow; found stuck state at `intake_review` — rejecting an analysis draft left no path to regenerate.

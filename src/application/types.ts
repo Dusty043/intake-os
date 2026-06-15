@@ -242,6 +242,13 @@ export interface GenerateProvisioningPlanInput {
   intakeRecordUrl?: string;
 }
 
+export interface GenerateEvaluationInput {
+  depth?: EvaluationDepth;
+  provider?: "mock" | "openai" | "anthropic" | "bedrock";
+  model?: string;
+  allowDepthUpgrade?: boolean;
+}
+
 export interface ApprovalDecisionInput {
   gate?: ApprovalGate;
   comment?: string;
