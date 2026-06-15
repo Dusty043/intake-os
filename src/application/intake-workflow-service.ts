@@ -104,6 +104,14 @@ export class IntakeWorkflowService {
     return this.transition(id, "submit", actor, { reason: "Submitted for discovery." });
   }
 
+  async resubmitIntake(id: string, actor: Actor): Promise<ProjectIntakeRecord> {
+    const record = await this.requireIntake(id);
+    if (record.status !== "clarification_required") {
+      throw new ValidationError(`Resubmit is only available when intake is in clarification_required status. Current: ${record.status}.`);
+    }
+    return this.transition(id, "resubmit", actor, { reason: "Resubmitted after clarification." });
+  }
+
   async completeDiscovery(id: string, input: CompleteDiscoveryInput, actor: Actor): Promise<ProjectIntakeRecord> {
     ensurePermission(actor, "generate_evaluation");
     ensureNonEmpty(input.problemStatement, "problemStatement");

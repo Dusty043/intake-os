@@ -49,6 +49,12 @@ export class IntakeHttpController {
     return this.workflowService.submitIntake(id, toDomainActor(actor));
   }
 
+  @Post(":id/resubmit")
+  @ApiOperation({ summary: "Resubmit an intake that is awaiting clarification" })
+  resubmit(@Param("id") id: string, @CurrentActor() actor: AuthenticatedActor) {
+    return this.workflowService.resubmitIntake(id, toDomainActor(actor));
+  }
+
   @Post(":id/discovery")
   @ApiOperation({ summary: "Complete no-AI discovery and move the intake to Gate 1 review" })
   completeDiscovery(

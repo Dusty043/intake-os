@@ -64,6 +64,14 @@ export async function submitIntake(id: string, actor: UiActor): Promise<ProjectI
   });
 }
 
+export async function resubmitIntake(id: string, actor: UiActor): Promise<ProjectIntakeRecord> {
+  return request(`/intakes/${id}/resubmit`, {
+    method: "POST",
+    headers: actorHeaders(actor),
+    body: JSON.stringify({}),
+  });
+}
+
 export async function generateMockAnalysisDraft(
   id: string,
   actor: UiActor,
