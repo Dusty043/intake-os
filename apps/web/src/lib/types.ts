@@ -264,6 +264,7 @@ export type ProvisioningTargetResult = {
   externalUrl?: string;
   errorMessage?: string;
   attemptCount: number;
+  retryable: boolean;
   completedAt?: string;
 };
 
@@ -272,6 +273,8 @@ export type ProvisioningRun = {
   intakeId: string;
   planId: string;
   status: "executing" | "completed" | "failed" | "partial_success";
+  kind: "initial" | "retry";
+  retryOfRunId?: string;
   triggeredById: string;
   triggeredByRole: string;
   triggeredByName?: string;

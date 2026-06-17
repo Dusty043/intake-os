@@ -8,6 +8,7 @@ export interface ProvisioningContext {
   runId: string;
   actor: Actor;
   reviewedPackage: ReviewedProjectPackage;
+  isRetry: boolean;
 }
 
 export interface ProvisioningExecutor {

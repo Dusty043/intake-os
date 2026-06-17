@@ -24,6 +24,7 @@ import {
   rejectGate,
   requestChanges,
   resubmitIntake,
+  retryProvisioningRun,
   reviseAnalysisDraft,
   submitIntake,
 } from "@/lib/api-client";
@@ -906,12 +907,30 @@ function RunStatusBadge({ status }: { status: string }) {
   return <StatusBadge label={s.label} variant={s.variant} />;
 }
 
-function ProvisioningRunPanel({ run }: { run: ProvisioningRun }) {
+function ProvisioningRunPanel({
+  run,
+  canRetry,
+  onRetry,
+  retrying,
+}: {
+  run: ProvisioningRun;
+  canRetry?: boolean;
+  onRetry?: () => void;
+  retrying?: boolean;
+}) {
+  const hasRetryableFailures = run.targets.some((t) => t.status === "failed" && t.retryable);
+  const showRetryBtn = canRetry && hasRetryableFailures && (run.status === "failed" || run.status === "partial_success");
+
   return (
     <div className="card p-5 space-y-3">
       <div className="flex items-center justify-between">
         <div>
-          <span className="font-mono text-xs text-gray-400">{run.id}</span>
+          <div className="flex items-center gap-2">
+            <span className="font-mono text-xs text-gray-400">{run.id}</span>
+            {run.kind === "retry" && (
+              <span className="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">Retry</span>
+            )}
+          </div>
           <p className="text-xs text-brand-muted mt-0.5">
             Triggered by {run.triggeredByName ?? run.triggeredById} ({run.triggeredByRole})
             {run.startedAt && <> at {formatDate(run.startedAt)}</>}
@@ -947,6 +966,21 @@ function ProvisioningRunPanel({ run }: { run: ProvisioningRun }) {
           ))}
         </div>
       )}
+
+      {showRetryBtn && onRetry && (
+        <div className="border-t border-gray-100 pt-3 flex items-center gap-3">
+          <button
+            className="btn-secondary text-sm"
+            onClick={onRetry}
+            disabled={retrying}
+          >
+            {retrying ? "Retrying…" : "Retry Failed Targets"}
+          </button>
+          <span className="text-xs text-brand-muted">
+            Only failed targets will be re-attempted.
+          </span>
+        </div>
+      )}
     </div>
   );
 }
@@ -965,6 +999,7 @@ function DistributionTab({
   const [err, setErr] = useState<string | null>(null);
   const [runs, setRuns] = useState<ProvisioningRun[] | null>(null);
   const [runsLoading, setRunsLoading] = useState(false);
+  const [retryingRunId, setRetryingRunId] = useState<string | null>(null);
 
   const status = intake.status;
   const gate2Done = ["approved", "provisioning", "distributed", "provisioning_failed"].includes(status);
@@ -972,6 +1007,7 @@ function DistributionTab({
   const canExecute = planReady && status === "approved";
   const isExecuting = status === "provisioning";
   const isDistributed = status === "distributed";
+  const canRetryRun = status === "provisioning_failed";
 
   async function doGenPlan() {
     setBusy("gen_plan"); setErr(null);
@@ -1000,6 +1036,17 @@ function DistributionTab({
       onIntakeUpdate(updated);
     } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
     finally { setBusy(null); }
+  }
+
+  async function doRetry(runId: string) {
+    setRetryingRunId(runId); setErr(null);
+    try {
+      const retryRun = await retryProvisioningRun(intake.id, runId, actor);
+      setRuns((prev) => [retryRun, ...(prev ?? [])]);
+      const updated = await import("@/lib/api-client").then(m => m.getIntake(intake.id, actor));
+      onIntakeUpdate(updated);
+    } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
+    finally { setRetryingRunId(null); }
   }
 
   async function loadRuns() {
@@ -1090,7 +1137,7 @@ function DistributionTab({
                   onClick={() => { void doMarkReady(); }}
                   disabled={!!busy}
                 >
-                  {busy === "mark_ready" ? "Marking ready…" : "Approve for Execution"}
+                  {busy === "mark_ready" ? "Marking ready…" : "Mark Plan Ready"}
                 </button>
                 <span className="text-xs text-brand-muted">
                   This marks the plan as ready for execution. You will still confirm before writing to external systems.
@@ -1158,7 +1205,13 @@ function DistributionTab({
           <h3 className="text-base font-semibold text-brand-text">Execution History</h3>
           {runsLoading && <p className="text-sm text-brand-muted">Loading runs…</p>}
           {runs?.map((run) => (
-            <ProvisioningRunPanel key={run.id} run={run} />
+            <ProvisioningRunPanel
+              key={run.id}
+              run={run}
+              canRetry={canRetryRun}
+              onRetry={() => { void doRetry(run.id); }}
+              retrying={retryingRunId === run.id}
+            />
           ))}
         </div>
       ) : null}

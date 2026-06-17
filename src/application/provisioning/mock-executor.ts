@@ -1,7 +1,14 @@
 import type { ProvisioningTargetKind, ProvisioningTargetResult } from "../../domain/provisioning.js";
 import type { ProvisioningContext, ProvisioningExecutor } from "./provisioning-executor.js";
 
-export type MockExecutorMode = "success" | "full_failure" | "monday_fail" | "github_fail";
+export type MockExecutorMode =
+  | "success"
+  | "full_failure"
+  | "monday_fail"
+  | "github_fail"
+  | "github_fail_then_succeed"
+  | "monday_fail_then_succeed"
+  | "both_fail_then_succeed";
 
 function makeResult(
   ctx: ProvisioningContext,
@@ -15,11 +22,14 @@ function makeResult(
     runId: ctx.runId,
     targetKind,
     status: succeeded ? "succeeded" : "failed",
-    idempotencyKey: `${ctx.intakeId}:${ctx.planId}:${targetKind}`,
+    idempotencyKey: ctx.isRetry
+      ? `${ctx.intakeId}:${ctx.planId}:${targetKind}:retry:${ctx.runId}`
+      : `${ctx.intakeId}:${ctx.planId}:${targetKind}`,
     externalId: succeeded ? externalId : undefined,
     externalUrl: succeeded ? externalUrl : undefined,
     errorMessage: succeeded ? undefined : `Mock ${targetKind} failure (mode: executor simulation)`,
     attemptCount: 1,
+    retryable: !succeeded,
     completedAt: new Date().toISOString(),
   };
 }
@@ -30,7 +40,7 @@ export class MockMondayExecutor implements ProvisioningExecutor {
   constructor(private readonly mode: MockExecutorMode = "success") {}
 
   async execute(ctx: ProvisioningContext): Promise<ProvisioningTargetResult> {
-    const succeeded = this.mode !== "full_failure" && this.mode !== "monday_fail";
+    const succeeded = this.shouldSucceed(ctx.isRetry);
     return makeResult(
       ctx,
       "monday_project_item",
@@ -43,6 +53,18 @@ export class MockMondayExecutor implements ProvisioningExecutor {
   canRetry(result: ProvisioningTargetResult): boolean {
     return result.status === "failed";
   }
+
+  private shouldSucceed(isRetry: boolean): boolean {
+    switch (this.mode) {
+      case "success": return true;
+      case "full_failure": return false;
+      case "monday_fail": return false;
+      case "github_fail": return true;
+      case "monday_fail_then_succeed": return isRetry;
+      case "github_fail_then_succeed": return true;
+      case "both_fail_then_succeed": return isRetry;
+    }
+  }
 }
 
 export class MockGithubExecutor implements ProvisioningExecutor {
@@ -51,7 +73,7 @@ export class MockGithubExecutor implements ProvisioningExecutor {
   constructor(private readonly mode: MockExecutorMode = "success") {}
 
   async execute(ctx: ProvisioningContext): Promise<ProvisioningTargetResult> {
-    const succeeded = this.mode !== "full_failure" && this.mode !== "github_fail";
+    const succeeded = this.shouldSucceed(ctx.isRetry);
     const slug = ctx.reviewedPackage.brief.solution
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, "-")
@@ -67,6 +89,18 @@ export class MockGithubExecutor implements ProvisioningExecutor {
 
   canRetry(result: ProvisioningTargetResult): boolean {
     return result.status === "failed";
+  }
+
+  private shouldSucceed(isRetry: boolean): boolean {
+    switch (this.mode) {
+      case "success": return true;
+      case "full_failure": return false;
+      case "monday_fail": return true;
+      case "github_fail": return false;
+      case "github_fail_then_succeed": return isRetry;
+      case "monday_fail_then_succeed": return true;
+      case "both_fail_then_succeed": return isRetry;
+    }
   }
 }
 

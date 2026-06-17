@@ -1,5 +1,33 @@
 # Build Log
 
+## 2026-06-17 — TASK-0023C: Retry Failed Provisioning Targets
+
+Retry mechanism wired end-to-end. New run with `kind: "retry"` that only executes failed+retryable targets.
+
+Changes made:
+
+- `src/domain/provisioning.ts` — `kind`, `retryOfRunId` on `ProvisioningRun`; `retryable` on `ProvisioningTargetResult`
+- `src/application/provisioning/provisioning-executor.ts` — `isRetry: boolean` added to `ProvisioningContext`
+- `src/application/provisioning/mock-executor.ts` — retry-aware modes (`github_fail_then_succeed`, `monday_fail_then_succeed`, `both_fail_then_succeed`); per-run idempotency keys for retry targets
+- `apps/api/prisma/schema.prisma` — `kind`, `retryOfRunId` on `ProvisioningRun`; `retryable` on `ProvisioningTargetResult`
+- Migration: `20260617144700_add_provisioning_retry_fields`
+- `src/application/intake-workflow-service.ts` — `retryFailedProvisioningTargets()` method; `executeDistribution` now sets `kind: "initial"`
+- `apps/api/src/persistence/prisma-project-intake-store.ts` — persist + read `kind`, `retryOfRunId`, `retryable`
+- `apps/api/src/modules/intake/dto/provisioning-run.dto.ts` — new fields in DTO + mapper
+- `apps/api/src/modules/intake/intake.controller.ts` — `POST /intakes/:id/distribution/runs/:runId/retry`
+- `apps/web/src/lib/types.ts` — `kind`, `retryOfRunId` on `ProvisioningRun`; `retryable` on target result
+- `apps/web/src/lib/api-client.ts` — `retryProvisioningRun(id, runId, actor)`
+- `apps/web/src/app/intakes/[id]/page.tsx` — retry button in `ProvisioningRunPanel`; "Approve for Execution" renamed to "Mark Plan Ready"
+- `tests/provisioning-retry.test.mjs` (new) — 11 tests
+
+Commands run:
+
+```bash
+npm run build       # clean
+npm run typecheck   # clean
+npm test            # 418/418 pass
+```
+
 ## 2026-06-17 — TASK-0023B: Provisioning Run UI
 
 Distribution tab now shows execution readiness, governance buttons, and run history.

@@ -236,6 +236,8 @@ model ProvisioningRun {
   intakeId          String
   planId            String
   status            String
+  kind              String                    @default("initial")
+  retryOfRunId      String?
   triggeredById     String
   triggeredByRole   String
   triggeredByName   String?
@@ -259,6 +261,7 @@ model ProvisioningTargetResult {
   externalUrl     String?
   errorMessage    String?
   attemptCount    Int             @default(1)
+  retryable       Boolean         @default(true)
   completedAt     DateTime?
 
   run             ProvisioningRun @relation(fields: [runId], references: [id], onDelete: Cascade)

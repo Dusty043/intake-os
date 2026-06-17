@@ -25,6 +25,9 @@ export const provisioningTargetKinds = [
 
 export type ProvisioningTargetKind = (typeof provisioningTargetKinds)[number];
 
+export const provisioningRunKinds = ["initial", "retry"] as const;
+export type ProvisioningRunKind = (typeof provisioningRunKinds)[number];
+
 export interface ProvisioningTargetResult {
   id: string;
   runId: string;
@@ -35,6 +38,7 @@ export interface ProvisioningTargetResult {
   externalUrl?: string;
   errorMessage?: string;
   attemptCount: number;
+  retryable: boolean;
   completedAt?: string;
 }
 
@@ -43,6 +47,8 @@ export interface ProvisioningRun {
   intakeId: string;
   planId: string;
   status: ProvisioningRunStatus;
+  kind: ProvisioningRunKind;
+  retryOfRunId?: string;
   triggeredById: string;
   triggeredByRole: string;
   triggeredByName?: string;

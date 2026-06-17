@@ -828,6 +828,7 @@ export class IntakeWorkflowService {
       intakeId: id,
       planId,
       status: "executing",
+      kind: "initial",
       triggeredById: actor.id,
       triggeredByRole: actor.role,
       triggeredByName: actor.displayName,
@@ -856,6 +857,7 @@ export class IntakeWorkflowService {
           runId,
           actor,
           reviewedPackage: record.reviewedProjectPackage!,
+          isRetry: false,
         }),
       ),
     );
@@ -899,6 +901,147 @@ export class IntakeWorkflowService {
 
   async listProvisioningRuns(intakeId: string): Promise<ProvisioningRun[]> {
     return this.store.listProvisioningRuns(intakeId);
+  }
+
+  async retryFailedProvisioningTargets(
+    intakeId: string,
+    originalRunId: string,
+    actor: Actor,
+  ): Promise<ProvisioningRun> {
+    const record = await this.requireIntake(intakeId);
+
+    if (record.status !== "provisioning_failed") {
+      throw new ValidationError(
+        `Retry requires provisioning_failed status. Current status: ${record.status}.`,
+      );
+    }
+
+    if (!isApprovalComplete(record, "gate_1")) {
+      throw new ValidationError("Gate 1 approval is not complete.");
+    }
+
+    if (!isApprovalComplete(record, "gate_2")) {
+      throw new ValidationError("Gate 2 approval is not complete.");
+    }
+
+    if (!record.provisioningPlan || record.provisioningPlan.status !== "ready_for_provisioning") {
+      throw new ValidationError("A provisioning plan marked ready_for_provisioning is required.");
+    }
+
+    if (!this.provisioningRegistry || this.provisioningRegistry.size === 0) {
+      throw new ValidationError("No provisioning executors are registered.");
+    }
+
+    const existingRuns = await this.store.listProvisioningRuns(intakeId);
+    if (existingRuns.some((r) => r.status === "executing")) {
+      throw new ConflictError("A provisioning run is already in progress.");
+    }
+
+    const originalRun = await this.store.getProvisioningRun(intakeId, originalRunId);
+    if (!originalRun) {
+      throw new NotFoundError("Provisioning run", originalRunId);
+    }
+
+    if (originalRun.status === "executing") {
+      throw new ConflictError("Cannot retry a run that is still executing.");
+    }
+
+    const retryableTargets = originalRun.targets.filter(
+      (t) => t.status === "failed" && t.retryable,
+    );
+
+    if (retryableTargets.length === 0) {
+      throw new ValidationError("No retryable failed targets found in the specified run.");
+    }
+
+    if (!record.reviewedProjectPackage) {
+      throw new ValidationError("A ReviewedProjectPackage is required before distribution execution.");
+    }
+
+    const now = this.clock();
+    const retryRunId = this.idFactory("run");
+    const planId = record.provisioningPlan.id;
+
+    const retryRun: ProvisioningRun = {
+      id: retryRunId,
+      intakeId,
+      planId,
+      status: "executing",
+      kind: "retry",
+      retryOfRunId: originalRunId,
+      triggeredById: actor.id,
+      triggeredByRole: actor.role,
+      triggeredByName: actor.displayName,
+      startedAt: now,
+      targets: [],
+    };
+
+    await this.store.saveProvisioningRun(retryRun);
+    await this.applyTransitionToRecord(record, "retry", actor, now);
+    await this.audit({
+      record,
+      actor,
+      action: "DISTRIBUTION_RETRY_STARTED",
+      timestamp: now,
+      fromState: "provisioning_failed",
+      toState: "provisioning",
+      metadata: { retryRunId, originalRunId, planId, retryableCount: retryableTargets.length },
+    });
+
+    const retryableKinds = new Set(retryableTargets.map((t) => t.targetKind));
+    const executors = this.provisioningRegistry
+      .getAll()
+      .filter((e) => retryableKinds.has(e.targetKind));
+
+    const targetResults = await Promise.all(
+      executors.map((executor) =>
+        executor.execute({
+          intakeId,
+          planId,
+          runId: retryRunId,
+          actor,
+          reviewedPackage: record.reviewedProjectPackage!,
+          isRetry: true,
+        }),
+      ),
+    );
+
+    const allSucceeded = targetResults.every((t) => t.status === "succeeded");
+    const allFailed = targetResults.every((t) => t.status === "failed");
+    const retryRunStatus = allSucceeded ? "completed" : allFailed ? "failed" : "partial_success";
+
+    const completedNow = this.clock();
+    const completedRetryRun: ProvisioningRun = {
+      ...retryRun,
+      status: retryRunStatus,
+      completedAt: completedNow,
+      targets: targetResults,
+    };
+
+    await this.store.saveProvisioningRun(completedRetryRun);
+
+    const latestRecord = await this.requireIntake(intakeId);
+    const nextAction: WorkflowAction = retryRunStatus === "completed" ? "success" : "failure";
+    await this.applyTransitionToRecord(latestRecord, nextAction, actor, completedNow);
+
+    await this.audit({
+      record: latestRecord,
+      actor,
+      action: retryRunStatus === "completed" ? "DISTRIBUTION_RETRY_COMPLETED" : "DISTRIBUTION_RETRY_FAILED",
+      timestamp: completedNow,
+      fromState: "provisioning",
+      toState: retryRunStatus === "completed" ? "distributed" : "provisioning_failed",
+      metadata: {
+        retryRunId,
+        originalRunId,
+        planId,
+        retryRunStatus,
+        succeeded: targetResults.filter((t) => t.status === "succeeded").length,
+        failed: targetResults.filter((t) => t.status === "failed").length,
+      },
+    });
+
+    return completedRetryRun;
   }
 
   async transition(

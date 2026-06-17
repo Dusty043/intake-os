@@ -223,6 +223,18 @@ export async function listProvisioningRuns(
   return result.runs;
 }
 
+export async function retryProvisioningRun(
+  id: string,
+  runId: string,
+  actor: UiActor,
+): Promise<ProvisioningRun> {
+  return request(`/intakes/${id}/distribution/runs/${runId}/retry`, {
+    method: "POST",
+    headers: actorHeaders(actor),
+    body: JSON.stringify({}),
+  });
+}
+
 export async function getAuditTrail(id: string, actor: UiActor): Promise<AuditEvent[]> {
   return request(`/intakes/${id}/audit`, { headers: actorHeaders(actor) });
 }

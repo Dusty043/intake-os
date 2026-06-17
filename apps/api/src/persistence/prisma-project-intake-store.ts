@@ -261,6 +261,8 @@ export class PrismaProjectIntakeStore implements ProjectIntakeStore {
           intakeId: run.intakeId,
           planId: run.planId,
           status: run.status,
+          kind: run.kind,
+          retryOfRunId: run.retryOfRunId ?? null,
           triggeredById: run.triggeredById,
           triggeredByRole: run.triggeredByRole,
           triggeredByName: run.triggeredByName,
@@ -286,6 +288,7 @@ export class PrismaProjectIntakeStore implements ProjectIntakeStore {
             externalUrl: target.externalUrl,
             errorMessage: target.errorMessage,
             attemptCount: target.attemptCount,
+            retryable: target.retryable,
             completedAt: target.completedAt ? new Date(target.completedAt) : null,
           },
           update: {
@@ -294,6 +297,7 @@ export class PrismaProjectIntakeStore implements ProjectIntakeStore {
             externalUrl: target.externalUrl,
             errorMessage: target.errorMessage,
             attemptCount: target.attemptCount,
+            retryable: target.retryable,
             completedAt: target.completedAt ? new Date(target.completedAt) : null,
           },
         });
@@ -335,6 +339,8 @@ function fromProvisioningRunRow(row: {
   intakeId: string;
   planId: string;
   status: string;
+  kind: string;
+  retryOfRunId: string | null;
   triggeredById: string;
   triggeredByRole: string;
   triggeredByName: string | null;
@@ -350,6 +356,7 @@ function fromProvisioningRunRow(row: {
     externalUrl: string | null;
     errorMessage: string | null;
     attemptCount: number;
+    retryable: boolean;
     completedAt: Date | null;
   }[];
 }): ProvisioningRun {
@@ -358,6 +365,8 @@ function fromProvisioningRunRow(row: {
     intakeId: row.intakeId,
     planId: row.planId,
     status: row.status as ProvisioningRun["status"],
+    kind: (row.kind ?? "initial") as ProvisioningRun["kind"],
+    retryOfRunId: row.retryOfRunId ?? undefined,
     triggeredById: row.triggeredById,
     triggeredByRole: row.triggeredByRole,
     triggeredByName: row.triggeredByName ?? undefined,
@@ -373,6 +382,7 @@ function fromProvisioningRunRow(row: {
       externalUrl: t.externalUrl ?? undefined,
       errorMessage: t.errorMessage ?? undefined,
       attemptCount: t.attemptCount,
+      retryable: t.retryable,
       completedAt: t.completedAt?.toISOString(),
     })),
   };

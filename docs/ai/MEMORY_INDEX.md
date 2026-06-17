@@ -40,6 +40,7 @@ Generated at: 2026-06-09T14:53:20.716Z
 - `docs/ai/tasks/TASK-0023-provisioning-and-integrations-plan.md`
 - `docs/ai/tasks/TASK-0023A-provisioning-execution-foundation.md`
 - `docs/ai/tasks/TASK-0023B-provisioning-run-ui.md`
+- `docs/ai/tasks/TASK-0023C-provisioning-retry.md`
 
 ## Deployment Docs
 

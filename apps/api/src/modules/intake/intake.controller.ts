@@ -203,6 +203,17 @@ export class IntakeHttpController {
     return { runs: runs.map(toProvisioningRunDto) };
   }
 
+  @Post(":id/distribution/runs/:runId/retry")
+  @ApiOperation({ summary: "Retry failed provisioning targets from a previous run" })
+  async retryProvisioningRun(
+    @Param("id") id: string,
+    @Param("runId") runId: string,
+    @CurrentActor() actor: AuthenticatedActor,
+  ) {
+    const run = await this.workflowService.retryFailedProvisioningTargets(id, runId, toDomainActor(actor));
+    return toProvisioningRunDto(run);
+  }
+
   @Get(":id/audit")
   @ApiOperation({ summary: "Read the audit trail for an intake" })
   audit(@Param("id") id: string) {

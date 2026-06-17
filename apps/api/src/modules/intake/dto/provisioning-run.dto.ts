@@ -9,6 +9,7 @@ export class ProvisioningTargetResultDto {
   externalUrl?: string;
   errorMessage?: string;
   attemptCount!: number;
+  retryable!: boolean;
   completedAt?: string;
 }
 
@@ -17,6 +18,8 @@ export class ProvisioningRunDto {
   intakeId!: string;
   planId!: string;
   status!: string;
+  kind!: string;
+  retryOfRunId?: string;
   triggeredById!: string;
   triggeredByRole!: string;
   triggeredByName?: string;
@@ -31,6 +34,8 @@ export function toProvisioningRunDto(run: ProvisioningRun): ProvisioningRunDto {
     intakeId: run.intakeId,
     planId: run.planId,
     status: run.status,
+    kind: run.kind,
+    retryOfRunId: run.retryOfRunId,
     triggeredById: run.triggeredById,
     triggeredByRole: run.triggeredByRole,
     triggeredByName: run.triggeredByName,
@@ -45,6 +50,7 @@ export function toProvisioningRunDto(run: ProvisioningRun): ProvisioningRunDto {
       externalUrl: t.externalUrl,
       errorMessage: t.errorMessage,
       attemptCount: t.attemptCount,
+      retryable: t.retryable,
       completedAt: t.completedAt,
     })),
   };
