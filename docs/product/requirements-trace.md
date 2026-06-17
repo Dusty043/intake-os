@@ -36,10 +36,10 @@ The requirements trace should be updated when:
 
 | Appendix | Area | Requirements | Specified | Implemented | Tested | Open Questions |
 |---|---|---:|---:|---:|---:|---:|
-| A | Workflow State Machine | 13 | 13 | 10 | 10 | 1 |
+| A | Workflow State Machine | 13 | 13 | 11 | 11 | 1 |
 | B | AI Orchestration | 12 | 12 | 2 | 2 | 0 |
 | C | Project Type Registry | 8 | 8 | 8 | 8 | 0 |
-| D | Distribution Rules | 8 | 8 | 3 | 2 | 0 |
+| D | Distribution Rules | 8 | 8 | 5 | 4 | 0 |
 | E | Permissions and Ownership | 8 | 8 | 7 | 7 | 0 |
 | F | Failure and Recovery | 9 | 9 | 0 | 0 | 0 |
 | G | AI Cost Governance | 7 | 7 | 0 | 0 | 0 |
@@ -70,7 +70,7 @@ The numbers can be adjusted as the trace becomes more detailed.
 | A-006 | Gate 1 approval moves request to DevOps Review | `workflow-state-machine.md` | Approval workflow | TASK-0001, TASK-0020 | `tests/workflow.test.mjs` Gate 1 transition tests | tested | Gate 1 approval record creation and lock added in TASK-0001. |
 | A-007 | Gate 2 approval moves request to Approved | `workflow-state-machine.md` | Approval workflow | TASK-0001, TASK-0021 | `tests/workflow.test.mjs` Gate 2 transition tests | tested | Gate 2 blocked until Gate 1 is complete. |
 | A-008 | Approved state allows package generation and provisioning validation | `workflow-state-machine.md`, `distribution-rules.md` | Dry-run provisioning plan service | TASK-0001, TASK-0002, TASK-0023 | `tests/workflow.test.mjs` package validation guard tests; `tests/intake-workflow-service.test.mjs` plan generation tests | tested | Iteration 2 generates and validates dry-run provisioning plans only; live execution remains deferred. |
-| A-009 | Provisioning creates downstream resources and supports retries | `workflow-state-machine.md`, `distribution-rules.md` | Provisioning worker | TASK-0027–TASK-0037 | retry/idempotency tests | specified |  |
+| A-009 | Provisioning creates downstream resources and supports retries | `workflow-state-machine.md`, `distribution-rules.md` | Provisioning worker | TASK-0023A, TASK-0027–TASK-0037 | `tests/provisioning-execution.test.mjs` execution + partial failure tests | tested | TASK-0023A implements execution foundation with mock adapters. Real Monday/GitHub writes deferred to TASK-0023D/E. Retry loop deferred to TASK-0023C. |
 | A-010 | Provisioning failed supports retry, recovery, manual intervention, and archive | `failure-and-recovery.md` | Recovery workflow | TASK-0031, TASK-0037, TASK-0039 | recovery tests | specified |  |
 | A-011 | Distributed state blocks reprovision without explicit override | `workflow-state-machine.md`, `distribution-rules.md` | Provisioning guard | TASK-0023 | reprovision guard tests | specified |  |
 | A-012 | Approval records are immutable after completion | `workflow-state-machine.md`, `permissions-and-ownership.md` | Approval model | TASK-0001, TASK-0006, TASK-0022 | `tests/workflow.test.mjs` approval lock assertions | tested | Approval records created by workflow are locked. |
@@ -126,8 +126,8 @@ The numbers can be adjusted as the trace becomes more detailed.
 | D-003 | Mode B sends project and epics to Monday | `distribution-rules.md` | Monday payload generator | TASK-0024 | Mode B payload tests | specified |  |
 | D-004 | Mode C sends project, epics, stories, subtasks, acceptance criteria, dependencies | `distribution-rules.md` | Monday payload generator | TASK-0024, TASK-0030 | Mode C payload tests | specified |  |
 | D-005 | GitHub only provisioned when custom code or engineering ownership is required | `distribution-rules.md` | GitHub dry-run guard | TASK-0002, TASK-0025, TASK-0033 | `tests/intake-workflow-service.test.mjs` dry-run plan tests | tested | Plan generation resolves project-type GitHub requirement using discovery input before adding GitHub actions. |
-| D-006 | Provisioning stores external IDs | `distribution-rules.md` | External resource model | TASK-0002, TASK-0008, TASK-0027–TASK-0037 | schema review | implemented | Prisma schema includes external links and source external IDs; live resource creation and tests remain deferred. |
-| D-007 | Provisioning retries must not create duplicates | `distribution-rules.md`, `failure-and-recovery.md` | Idempotency service | TASK-0031, TASK-0037 | duplicate-prevention tests | specified |  |
+| D-006 | Provisioning stores external IDs | `distribution-rules.md` | External resource model | TASK-0002, TASK-0008, TASK-0023A | `tests/provisioning-execution.test.mjs` external ID storage test | tested | ProvisioningTargetResult stores externalId and externalUrl per target. Mock executors return mock IDs. Real IDs stored when Monday/GitHub adapters are inserted in TASK-0023D/E. |
+| D-007 | Provisioning retries must not create duplicates | `distribution-rules.md`, `failure-and-recovery.md` | Idempotency service | TASK-0023A, TASK-0031, TASK-0037 | idempotency key uniqueness in schema | implemented | ProvisioningTargetResult has @@unique(idempotencyKey) = intakeId:planId:targetKind. Retry endpoint deferred to TASK-0023C. |
 | D-008 | Provisioning failures support retries, recovery, manual intervention, rollback where practical | `distribution-rules.md`, `failure-and-recovery.md` | Recovery workflow | TASK-0039 | recovery tests | specified |  |
 
 ---
