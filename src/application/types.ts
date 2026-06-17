@@ -276,6 +276,11 @@ export type { GenerateMockAnalysisDraftInput };
 export type { AgentRunRecord, EvaluationPersistenceBundle } from "./evaluation-persistence.js";
 import type { AgentRunRecord, EvaluationPersistenceBundle } from "./evaluation-persistence.js";
 import type { IntakeEvaluation } from "./intake-evaluation.js";
+import type { ProvisioningRun } from "../domain/provisioning.js";
+
+export type { ProvisioningRun } from "../domain/provisioning.js";
+export type { ProvisioningTargetResult } from "../domain/provisioning.js";
+export type { ProvisioningRunStatus, ProvisioningTargetStatus, ProvisioningTargetKind } from "../domain/provisioning.js";
 
 export interface ProjectIntakeStore {
   listIntakes(): Promise<readonly ProjectIntakeRecord[]>;
@@ -290,4 +295,8 @@ export interface ProjectIntakeStore {
   getLatestEvaluationForIntake(intakeId: string): Promise<IntakeEvaluation | undefined>;
   listAgentRuns(evaluationId: string): Promise<AgentRunRecord[]>;
   getEvaluationById?(evaluationId: string): Promise<IntakeEvaluation | undefined>;
+
+  saveProvisioningRun(run: ProvisioningRun): Promise<ProvisioningRun>;
+  listProvisioningRuns(intakeId: string): Promise<ProvisioningRun[]>;
+  getProvisioningRun(intakeId: string, runId: string): Promise<ProvisioningRun | undefined>;
 }

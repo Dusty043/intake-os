@@ -1,7 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import type { Prisma } from "@prisma/client";
 import type { AuditEvent, RequestStatus, UserRole } from "../../../../src/domain/types.js";
-import type { ProjectIntakeRecord, ProjectIntakeStore } from "../../../../src/application/types.js";
+import type { ProjectIntakeRecord, ProjectIntakeStore, ProvisioningRun } from "../../../../src/application/types.js";
 import type { AgentRunRecord, EvaluationPersistenceBundle } from "../../../../src/application/evaluation-persistence.js";
 import type { IntakeEvaluation } from "../../../../src/application/intake-evaluation.js";
 import {
@@ -251,6 +251,75 @@ export class PrismaProjectIntakeStore implements ProjectIntakeStore {
       ...(row.metadata ? { metadata: fromJson<Record<string, unknown>>(row.metadata) } : {}),
     };
   }
+
+  async saveProvisioningRun(run: ProvisioningRun): Promise<ProvisioningRun> {
+    await this.prisma.$transaction(async (tx) => {
+      await tx.provisioningRun.upsert({
+        where: { id: run.id },
+        create: {
+          id: run.id,
+          intakeId: run.intakeId,
+          planId: run.planId,
+          status: run.status,
+          triggeredById: run.triggeredById,
+          triggeredByRole: run.triggeredByRole,
+          triggeredByName: run.triggeredByName,
+          startedAt: new Date(run.startedAt),
+          completedAt: run.completedAt ? new Date(run.completedAt) : null,
+        },
+        update: {
+          status: run.status,
+          completedAt: run.completedAt ? new Date(run.completedAt) : null,
+        },
+      });
+
+      for (const target of run.targets) {
+        await tx.provisioningTargetResult.upsert({
+          where: { idempotencyKey: target.idempotencyKey },
+          create: {
+            id: target.id,
+            runId: target.runId,
+            targetKind: target.targetKind,
+            status: target.status,
+            idempotencyKey: target.idempotencyKey,
+            externalId: target.externalId,
+            externalUrl: target.externalUrl,
+            errorMessage: target.errorMessage,
+            attemptCount: target.attemptCount,
+            completedAt: target.completedAt ? new Date(target.completedAt) : null,
+          },
+          update: {
+            status: target.status,
+            externalId: target.externalId,
+            externalUrl: target.externalUrl,
+            errorMessage: target.errorMessage,
+            attemptCount: target.attemptCount,
+            completedAt: target.completedAt ? new Date(target.completedAt) : null,
+          },
+        });
+      }
+    });
+
+    return run;
+  }
+
+  async listProvisioningRuns(intakeId: string): Promise<ProvisioningRun[]> {
+    const rows = await this.prisma.provisioningRun.findMany({
+      where: { intakeId },
+      include: { targets: true },
+      orderBy: { startedAt: "desc" },
+    });
+    return rows.map(fromProvisioningRunRow);
+  }
+
+  async getProvisioningRun(intakeId: string, runId: string): Promise<ProvisioningRun | undefined> {
+    const row = await this.prisma.provisioningRun.findUnique({
+      where: { id: runId },
+      include: { targets: true },
+    });
+    if (!row || row.intakeId !== intakeId) return undefined;
+    return fromProvisioningRunRow(row);
+  }
 }
 
 function toJson(value: unknown): Prisma.InputJsonValue {
@@ -259,4 +328,52 @@ function toJson(value: unknown): Prisma.InputJsonValue {
 
 function fromJson<T>(value: unknown): T {
   return JSON.parse(JSON.stringify(value)) as T;
+}
+
+function fromProvisioningRunRow(row: {
+  id: string;
+  intakeId: string;
+  planId: string;
+  status: string;
+  triggeredById: string;
+  triggeredByRole: string;
+  triggeredByName: string | null;
+  startedAt: Date;
+  completedAt: Date | null;
+  targets: {
+    id: string;
+    runId: string;
+    targetKind: string;
+    status: string;
+    idempotencyKey: string;
+    externalId: string | null;
+    externalUrl: string | null;
+    errorMessage: string | null;
+    attemptCount: number;
+    completedAt: Date | null;
+  }[];
+}): ProvisioningRun {
+  return {
+    id: row.id,
+    intakeId: row.intakeId,
+    planId: row.planId,
+    status: row.status as ProvisioningRun["status"],
+    triggeredById: row.triggeredById,
+    triggeredByRole: row.triggeredByRole,
+    triggeredByName: row.triggeredByName ?? undefined,
+    startedAt: row.startedAt.toISOString(),
+    completedAt: row.completedAt?.toISOString(),
+    targets: row.targets.map((t) => ({
+      id: t.id,
+      runId: t.runId,
+      targetKind: t.targetKind as ProvisioningRun["targets"][number]["targetKind"],
+      status: t.status as ProvisioningRun["targets"][number]["status"],
+      idempotencyKey: t.idempotencyKey,
+      externalId: t.externalId ?? undefined,
+      externalUrl: t.externalUrl ?? undefined,
+      errorMessage: t.errorMessage ?? undefined,
+      attemptCount: t.attemptCount,
+      completedAt: t.completedAt?.toISOString(),
+    })),
+  };
 }

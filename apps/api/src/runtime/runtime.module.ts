@@ -5,6 +5,9 @@ import { IntakeWorkflowService } from "../../../../src/application/intake-workfl
 import { createAllMockEvaluationAgents } from "../../../../src/application/agents/mock/index.js";
 import { loadAnalysisProviderConfig } from "../../../../src/application/providers/analysis-provider-config.js";
 import { AnalysisProviderRouter } from "../../../../src/application/providers/analysis-provider-router.js";
+import { ProvisioningRegistry } from "../../../../src/application/provisioning/provisioning-executor.js";
+import { createMockRegistry } from "../../../../src/application/provisioning/mock-executor.js";
+import type { MockExecutorMode } from "../../../../src/application/provisioning/mock-executor.js";
 import { ANALYSIS_PROVIDER } from "../ai/provider.token.js";
 import { ApplicationExceptionFilter } from "../common/application-exception.filter.js";
 import { PrismaProjectIntakeStore } from "../persistence/prisma-project-intake-store.js";
@@ -44,10 +47,19 @@ const logger = new Logger("RuntimeModule");
         } else {
           logger.log("Analysis engine: legacy provider");
         }
+
+        const executorMode = (process.env["PROVISIONING_EXECUTOR_MODE"] as MockExecutorMode | undefined) ?? "success";
+        const provisioningRegistry = new ProvisioningRegistry();
+        for (const executor of createMockRegistry(executorMode)) {
+          provisioningRegistry.register(executor);
+        }
+        logger.log(`Provisioning executor: mock (mode=${executorMode})`);
+
         return new IntakeWorkflowService({
           store,
           analysisProvider,
           orchestrator: useOrchestrator ? orchestrator : undefined,
+          provisioningRegistry,
         });
       },
     },

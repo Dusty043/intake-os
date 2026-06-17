@@ -16,6 +16,8 @@ import type { IntakeAnalysisProvider } from "./intake-analysis-provider.js";
 import { validateIntakeAnalysisDraft } from "./intake-analysis.js";
 import { MockIntakeAnalysisProvider } from "./providers/mock-intake-analysis-provider.js";
 import { buildDryRunProvisioningPlan, resolveDistributionSource } from "./provisioning-plan.js";
+import type { ProvisioningRegistry } from "./provisioning/provisioning-executor.js";
+import type { ProvisioningRun } from "../domain/provisioning.js";
 import type {
   AcceptAnalysisDraftInput,
   ApprovalDecisionInput,
@@ -38,6 +40,7 @@ export interface IntakeWorkflowServiceOptions {
   idFactory?: (prefix: string) => string;
   analysisProvider?: IntakeAnalysisProvider;
   orchestrator?: EvaluationOrchestrator;
+  provisioningRegistry?: ProvisioningRegistry;
 }
 
 export class IntakeWorkflowService {
@@ -46,6 +49,7 @@ export class IntakeWorkflowService {
   private readonly idFactory: (prefix: string) => string;
   private readonly analysisProvider: IntakeAnalysisProvider;
   private readonly orchestrator?: EvaluationOrchestrator;
+  private readonly provisioningRegistry?: ProvisioningRegistry;
 
   constructor(options: IntakeWorkflowServiceOptions) {
     this.store = options.store;
@@ -53,6 +57,7 @@ export class IntakeWorkflowService {
     this.idFactory = options.idFactory ?? createReadableId;
     this.analysisProvider = options.analysisProvider ?? new MockIntakeAnalysisProvider();
     this.orchestrator = options.orchestrator;
+    this.provisioningRegistry = options.provisioningRegistry;
   }
 
   get activeProviderName(): string {
@@ -780,6 +785,120 @@ export class IntakeWorkflowService {
     });
 
     return saved;
+  }
+
+  async executeDistribution(id: string, actor: Actor): Promise<ProvisioningRun> {
+    const record = await this.requireIntake(id);
+
+    if (record.status !== "approved") {
+      throw new ValidationError(`Distribution execution requires approved status. Current status: ${record.status}.`);
+    }
+
+    if (!isApprovalComplete(record, "gate_1")) {
+      throw new ValidationError("Gate 1 approval is not complete.");
+    }
+
+    if (!isApprovalComplete(record, "gate_2")) {
+      throw new ValidationError("Gate 2 approval is not complete.");
+    }
+
+    if (!record.provisioningPlan || record.provisioningPlan.status !== "ready_for_provisioning") {
+      throw new ValidationError("A provisioning plan marked ready_for_provisioning is required before execution.");
+    }
+
+    if (!this.provisioningRegistry || this.provisioningRegistry.size === 0) {
+      throw new ValidationError("No provisioning executors are registered.");
+    }
+
+    const existingRuns = await this.store.listProvisioningRuns(id);
+    if (existingRuns.some((r) => r.status === "executing")) {
+      throw new ConflictError("A provisioning run is already in progress.");
+    }
+
+    if (!record.reviewedProjectPackage) {
+      throw new ValidationError("A ReviewedProjectPackage is required before distribution execution.");
+    }
+
+    const now = this.clock();
+    const runId = this.idFactory("run");
+    const planId = record.provisioningPlan.id;
+
+    const run: ProvisioningRun = {
+      id: runId,
+      intakeId: id,
+      planId,
+      status: "executing",
+      triggeredById: actor.id,
+      triggeredByRole: actor.role,
+      triggeredByName: actor.displayName,
+      startedAt: now,
+      targets: [],
+    };
+
+    await this.store.saveProvisioningRun(run);
+    await this.applyTransitionToRecord(record, "start_provisioning", actor, now);
+    await this.audit({
+      record,
+      actor,
+      action: "DISTRIBUTION_EXECUTION_STARTED",
+      timestamp: now,
+      fromState: "approved",
+      toState: "provisioning",
+      metadata: { runId, planId },
+    });
+
+    const executors = this.provisioningRegistry.getAll();
+    const targetResults = await Promise.all(
+      executors.map((executor) =>
+        executor.execute({
+          intakeId: id,
+          planId,
+          runId,
+          actor,
+          reviewedPackage: record.reviewedProjectPackage!,
+        }),
+      ),
+    );
+
+    const allSucceeded = targetResults.every((t) => t.status === "succeeded");
+    const allFailed = targetResults.every((t) => t.status === "failed");
+    const runStatus = allSucceeded ? "completed" : allFailed ? "failed" : "partial_success";
+
+    const completedNow = this.clock();
+    const completedRun: ProvisioningRun = {
+      ...run,
+      status: runStatus,
+      completedAt: completedNow,
+      targets: targetResults,
+    };
+
+    await this.store.saveProvisioningRun(completedRun);
+
+    const latestRecord = await this.requireIntake(id);
+    const nextStatus: WorkflowAction = runStatus === "completed" ? "success" : "failure";
+    await this.applyTransitionToRecord(latestRecord, nextStatus, actor, completedNow);
+
+    await this.audit({
+      record: latestRecord,
+      actor,
+      action: runStatus === "completed" ? "DISTRIBUTION_EXECUTION_COMPLETED" : "DISTRIBUTION_EXECUTION_FAILED",
+      timestamp: completedNow,
+      fromState: "provisioning",
+      toState: runStatus === "completed" ? "distributed" : "provisioning_failed",
+      metadata: {
+        runId,
+        planId,
+        runStatus,
+        succeeded: targetResults.filter((t) => t.status === "succeeded").length,
+        failed: targetResults.filter((t) => t.status === "failed").length,
+      },
+    });
+
+    return completedRun;
+  }
+
+  async listProvisioningRuns(intakeId: string): Promise<ProvisioningRun[]> {
+    return this.store.listProvisioningRuns(intakeId);
   }
 
   async transition(

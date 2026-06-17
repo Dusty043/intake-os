@@ -1,5 +1,5 @@
 import type { AuditEvent } from "../domain/types.js";
-import type { ProjectIntakeRecord, ProjectIntakeStore } from "./types.js";
+import type { ProjectIntakeRecord, ProjectIntakeStore, ProvisioningRun } from "./types.js";
 import type { AgentRunRecord, EvaluationPersistenceBundle } from "./evaluation-persistence.js";
 import type { IntakeEvaluation } from "./intake-evaluation.js";
 import { agentRunsFromEvaluation } from "./evaluation-persistence.js";
@@ -10,6 +10,7 @@ export class InMemoryProjectIntakeStore implements ProjectIntakeStore {
   private readonly auditEvents = new Map<string, AuditEvent[]>();
   private readonly evaluations = new Map<string, IntakeEvaluation>();
   private readonly agentRunsByEvaluationId = new Map<string, AgentRunRecord[]>();
+  private readonly provisioningRuns = new Map<string, ProvisioningRun>();
 
   async listIntakes(): Promise<readonly ProjectIntakeRecord[]> {
     return Array.from(this.intakes.values()).map(cloneRecord);
@@ -74,6 +75,24 @@ export class InMemoryProjectIntakeStore implements ProjectIntakeStore {
     const result = clone<IntakeEvaluation>(ev);
     validateIntakeEvaluation(result);
     return result;
+  }
+
+  async saveProvisioningRun(run: ProvisioningRun): Promise<ProvisioningRun> {
+    const copy = clone<ProvisioningRun>(run);
+    this.provisioningRuns.set(run.id, copy);
+    return clone<ProvisioningRun>(copy);
+  }
+
+  async listProvisioningRuns(intakeId: string): Promise<ProvisioningRun[]> {
+    return Array.from(this.provisioningRuns.values())
+      .filter((r) => r.intakeId === intakeId)
+      .sort((a, b) => b.startedAt.localeCompare(a.startedAt));
+  }
+
+  async getProvisioningRun(intakeId: string, runId: string): Promise<ProvisioningRun | undefined> {
+    const run = this.provisioningRuns.get(runId);
+    if (!run || run.intakeId !== intakeId) return undefined;
+    return clone<ProvisioningRun>(run);
   }
 }
 

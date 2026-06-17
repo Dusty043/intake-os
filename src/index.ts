@@ -22,4 +22,7 @@ export * from "./application/providers/mock-intake-analysis-provider.js";
 export * from "./application/intake-controller.js";
 export * from "./application/intake-workflow-service.js";
 export * from "./application/provisioning-plan.js";
+export * from "./application/provisioning/provisioning-executor.js";
+export * from "./application/provisioning/mock-executor.js";
+export * from "./domain/provisioning.js";
 export * from "./application/types.js";

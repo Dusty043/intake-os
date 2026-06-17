@@ -82,6 +82,7 @@ model ProjectIntake {
   discovery           DiscoveryRecord?
   approvals           ApprovalRecord[]
   provisioningPlans   ProvisioningPlan[]
+  provisioningRuns    ProvisioningRun[]
   externalLinks       ExternalLink[]
   auditEvents         AuditEvent[]
   evaluations         IntakeEvaluation[]
@@ -225,8 +226,45 @@ model ProvisioningPlan {
 
   intake                   ProjectIntake          @relation(fields: [intakeId], references: [id], onDelete: Cascade)
   actions                  ProvisioningPlanAction[]
+  runs                     ProvisioningRun[]
 
   @@index([intakeId, generatedAt])
+}
+
+model ProvisioningRun {
+  id                String                    @id @default(cuid())
+  intakeId          String
+  planId            String
+  status            String
+  triggeredById     String
+  triggeredByRole   String
+  triggeredByName   String?
+  startedAt         DateTime
+  completedAt       DateTime?
+
+  intake            ProjectIntake             @relation(fields: [intakeId], references: [id], onDelete: Cascade)
+  plan              ProvisioningPlan          @relation(fields: [planId], references: [id])
+  targets           ProvisioningTargetResult[]
+
+  @@index([intakeId, startedAt])
+}
+
+model ProvisioningTargetResult {
+  id              String          @id @default(cuid())
+  runId           String
+  targetKind      String
+  status          String
+  idempotencyKey  String          @unique
+  externalId      String?
+  externalUrl     String?
+  errorMessage    String?
+  attemptCount    Int             @default(1)
+  completedAt     DateTime?
+
+  run             ProvisioningRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@index([runId])
+  @@index([idempotencyKey])
 }
 
 model ProvisioningPlanAction {

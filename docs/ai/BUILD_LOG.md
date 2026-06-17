@@ -1,5 +1,34 @@
 # Build Log
 
+## 2026-06-17 — TASK-0023A: Provisioning Execution Foundation
+
+Built the execution slot for distribution without Monday/GitHub writes.
+
+Changes made:
+
+- `src/domain/provisioning.ts` (new) — `ProvisioningRun`, `ProvisioningTargetResult`, status/kind enums
+- `src/application/provisioning/provisioning-executor.ts` (new) — `ProvisioningExecutor` interface + `ProvisioningRegistry`
+- `src/application/provisioning/mock-executor.ts` (new) — `MockMondayExecutor`, `MockGithubExecutor`, `createMockRegistry(mode)` with 4 modes
+- `apps/api/prisma/schema.prisma` — `ProvisioningRun` + `ProvisioningTargetResult` models
+- Migration: `20260617135057_add_provisioning_run`
+- `src/application/types.ts` — added provisioning run store methods + re-exports
+- `src/application/in-memory-store.ts` — implemented `saveProvisioningRun`, `listProvisioningRuns`, `getProvisioningRun`
+- `apps/api/src/persistence/prisma-project-intake-store.ts` — same methods via Prisma
+- `src/application/intake-workflow-service.ts` — `executeDistribution(id, actor)` with 6 guards + full audit; `listProvisioningRuns`; `provisioningRegistry` option
+- `apps/api/src/modules/intake/dto/provisioning-run.dto.ts` (new) — DTOs
+- `apps/api/src/modules/intake/intake.controller.ts` — `POST /intakes/:id/distribution/execute`, `GET /intakes/:id/distribution/runs`
+- `apps/api/src/runtime/runtime.module.ts` — wires mock registry; reads `PROVISIONING_EXECUTOR_MODE`
+- `src/index.ts` — exports new provisioning modules
+- `tests/provisioning-execution.test.mjs` (new) — 9 tests covering success, failure, partial success, all guards
+
+Commands run:
+
+```bash
+npx prisma migrate dev --name add_provisioning_run   # applied
+npm run typecheck   # clean
+npm test            # 407/407 pass (was 398/398)
+```
+
 ## 2026-06-16 — TASK-0022: ClarificationPanel Review Fixes + Test Infrastructure
 
 Applied all actionable findings from the `/review` pass on the TASK-0021 diff.

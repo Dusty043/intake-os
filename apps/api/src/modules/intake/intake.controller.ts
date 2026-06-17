@@ -1,5 +1,6 @@
 import { Body, Controller, Get, Param, Post } from "@nestjs/common";
 import { toEvaluationSummaryDto } from "./dto/evaluation.dto.js";
+import { toProvisioningRunDto } from "./dto/provisioning-run.dto.js";
 import { ApiOperation, ApiTags } from "@nestjs/swagger";
 import { IntakeWorkflowService } from "../../../../../src/application/intake-workflow-service.js";
 import type { Actor } from "../../../../../src/domain/types.js";
@@ -183,6 +184,23 @@ export class IntakeHttpController {
     @CurrentActor() actor: AuthenticatedActor,
   ) {
     return this.workflowService.markReadyForProvisioning(id, toDomainActor(actor));
+  }
+
+  @Post(":id/distribution/execute")
+  @ApiOperation({ summary: "Execute distribution: run all registered provisioning adapters" })
+  async executeDistribution(
+    @Param("id") id: string,
+    @CurrentActor() actor: AuthenticatedActor,
+  ) {
+    const run = await this.workflowService.executeDistribution(id, toDomainActor(actor));
+    return toProvisioningRunDto(run);
+  }
+
+  @Get(":id/distribution/runs")
+  @ApiOperation({ summary: "List provisioning runs for an intake, newest first" })
+  async listProvisioningRuns(@Param("id") id: string) {
+    const runs = await this.workflowService.listProvisioningRuns(id);
+    return { runs: runs.map(toProvisioningRunDto) };
   }
 
   @Get(":id/audit")
