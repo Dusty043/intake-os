@@ -5,6 +5,7 @@ import type {
   EvaluationSummary,
   IntakeEvaluation,
   ProjectIntakeRecord,
+  ProvisioningRun,
   ReviseAnalysisDraftInput,
   UiActor,
 } from "./types";
@@ -187,6 +188,39 @@ export async function generateProvisioningPlan(
     headers: actorHeaders(actor),
     body: JSON.stringify({}),
   });
+}
+
+export async function markReadyForProvisioning(
+  id: string,
+  actor: UiActor,
+): Promise<ProjectIntakeRecord> {
+  return request(`/intakes/${id}/provisioning-ready`, {
+    method: "POST",
+    headers: actorHeaders(actor),
+    body: JSON.stringify({}),
+  });
+}
+
+export async function executeDistribution(
+  id: string,
+  actor: UiActor,
+): Promise<ProvisioningRun> {
+  return request(`/intakes/${id}/distribution/execute`, {
+    method: "POST",
+    headers: actorHeaders(actor),
+    body: JSON.stringify({}),
+  });
+}
+
+export async function listProvisioningRuns(
+  id: string,
+  actor: UiActor,
+): Promise<ProvisioningRun[]> {
+  const result = await request<{ runs: ProvisioningRun[] }>(
+    `/intakes/${id}/distribution/runs`,
+    { headers: actorHeaders(actor) },
+  );
+  return result.runs;
 }
 
 export async function getAuditTrail(id: string, actor: UiActor): Promise<AuditEvent[]> {

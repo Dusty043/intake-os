@@ -1,5 +1,22 @@
 # Build Log
 
+## 2026-06-17 — TASK-0023B: Provisioning Run UI
+
+Distribution tab now shows execution readiness, governance buttons, and run history.
+
+Changes made:
+
+- `apps/web/src/lib/api-client.ts` — added `markReadyForProvisioning`, `executeDistribution`, `listProvisioningRuns`
+- `apps/web/src/lib/types.ts` — added `ProvisioningRun`, `ProvisioningTargetResult` types
+- `apps/web/src/app/intakes/[id]/page.tsx` — rewrote `DistributionTab`: status banners, "Approve for Execution" + "Execute Distribution" governance buttons, run history panel with per-target status + external links
+
+Commands run:
+
+```bash
+npm run typecheck   # clean
+npm test            # 407/407 pass
+```
+
 ## 2026-06-17 — TASK-0023A: Provisioning Execution Foundation
 
 Built the execution slot for distribution without Monday/GitHub writes.

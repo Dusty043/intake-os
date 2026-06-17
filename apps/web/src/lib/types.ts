@@ -255,6 +255,31 @@ export type ProvisioningPlanAction = {
   [key: string]: unknown;
 };
 
+export type ProvisioningTargetResult = {
+  id: string;
+  targetKind: string;
+  status: "pending" | "succeeded" | "failed" | "skipped";
+  idempotencyKey: string;
+  externalId?: string;
+  externalUrl?: string;
+  errorMessage?: string;
+  attemptCount: number;
+  completedAt?: string;
+};
+
+export type ProvisioningRun = {
+  id: string;
+  intakeId: string;
+  planId: string;
+  status: "executing" | "completed" | "failed" | "partial_success";
+  triggeredById: string;
+  triggeredByRole: string;
+  triggeredByName?: string;
+  startedAt: string;
+  completedAt?: string;
+  targets: ProvisioningTargetResult[];
+};
+
 export type AuditEvent = {
   id?: string;
   requestId?: string;
