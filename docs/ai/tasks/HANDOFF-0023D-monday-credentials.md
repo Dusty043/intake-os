@@ -12,8 +12,24 @@ The code architecture for Monday provisioning is fully designed and spec'd. Ever
 else in the app — approval gates, distribution plan, execution framework, retry
 mechanism — is working. The only missing piece is credentials and board configuration.
 
-This document is for whoever has access to Monday: get these five things, drop them
-into `.env.server` on oreochiserver, and the adapter can be implemented and deployed.
+This document is for whoever has access to Monday: answer the open questions below,
+get the five config values, drop them into `.env.server` on oreochiserver, and the
+adapter can be built and deployed.
+
+---
+
+## Open Questions — Need Answers Before Any Code
+
+These must be decided before implementation starts.
+
+| # | Question | Why it matters |
+|---|---|---|
+| Q-M-1 | **Which Monday board** receives new project intake items? | Board ID is hardcoded in config. Wrong board = items land in the wrong place. |
+| Q-M-2 | **Which group within that board** should new items land in? | Groups are the column sections (e.g. "Backlog", "New Requests"). Items go into a specific group on creation. |
+| Q-M-3 | **Which Monday columns map to which intake fields?** | Column IDs must be exact. Wrong ID = silent failure or error at runtime. Need the full column list for the target board. |
+| Q-M-4 | **Should subtasks from the distribution package become Monday subitems?** | Subitems are a separate API call and add complexity. Safe to defer to v2 unless this is a hard requirement now. |
+| Q-M-5 | **Is Monday the only provisioning target for v1, or should GitHub also go live at the same time?** | Affects whether `PROVISIONING_TARGETS=monday` or `PROVISIONING_TARGETS=monday,github` at launch. The two adapters are independent — they can ship at different times. |
+| Q-M-6 | **Service account or personal token?** | A service account token (generated from a dedicated Monday account) is preferred so provisioning doesn't break when someone's personal account changes. Personal token is fine for early testing. |
 
 ---
 
@@ -86,7 +102,7 @@ Then decide which Monday column maps to which intake field. Minimum useful set:
 
 | What to populate | Monday column type | Notes |
 |---|---|---|
-| Project title | `name` (item name) | Set automatically, no column ID needed |
+| Project title | `name` (item name) | Set automatically — no column ID needed |
 | Project type | `status` or `text` | e.g. "Internal Dashboard", "API Service" |
 | Requester | `text` or `person` | Who submitted the request |
 | Story points | `numbers` | Estimated effort |
@@ -144,8 +160,7 @@ PROVISIONING_TARGETS=monday
 
 ## How to Validate the Config
 
-Once the vars are in `.env.server`, before implementing or deploying, run the
-smoke script (which will be written as part of TASK-0023D):
+Once the vars are in `.env.server`, run the smoke script before deploying:
 
 ```bash
 cd /home/oreo/intake-os
@@ -158,7 +173,7 @@ This will verify:
 - Every column ID in `MONDAY_COLUMN_MAP_JSON` exists on the board
 - Token has write permission to create items
 
-Any misconfiguration prints a clear error and prevents startup. Fix before deploying.
+Any misconfiguration prints a clear error. Fix before going to production.
 
 ---
 
@@ -168,31 +183,17 @@ The adapter is a single file: `src/application/provisioning/monday-executor.ts`.
 
 It slots into the existing registry without any workflow changes. The full execution
 path (approve → execute → Monday item created → externalId stored → retry if failed)
-is already wired. The Monday executor is the only missing piece.
+is already wired from TASK-0023A/C. The Monday executor is the only missing piece.
 
 Specifically it will:
 
 1. Call `POST https://api.monday.com/v2` with the `create_item` mutation
-2. Send `Idempotency-Key: intake:{intakeId}:distribution-plan:{planId}:target:monday:item` — this key is stable across retries so Monday never creates a duplicate item
+2. Send `Idempotency-Key: intake:{intakeId}:distribution-plan:{planId}:target:monday:item` — stable across retries so Monday never creates a duplicate item
 3. Return the Monday item's `id` (stored as `externalId`) and `url` (stored as `externalUrl`)
 4. Classify errors as retryable or not — auth/config errors are permanent, rate limits are transient
 5. Inspect `body.errors` even on HTTP 200 (Monday returns app errors this way)
 
-The whole thing is probably 150–200 lines. Once the creds are in `.env.server`, it's
-a two-hour implementation and a PR.
-
----
-
-## Questions to Answer Before Starting
-
-These are in `docs/ai/tasks/TASK-0023-provisioning-and-integrations-plan.md` as
-Q-PROV-001 through Q-PROV-004. Summary:
-
-- [ ] Which board receives new project intake items? (board ID)
-- [ ] Which group within that board? (group ID)
-- [ ] Which columns map to which intake fields? (column mapping JSON)
-- [ ] Should subtasks from the distribution package become Monday subitems? (optional in v1)
-- [ ] Is Monday the only provisioning target for v1, or should GitHub also be enabled at the same time?
+Roughly 150–200 lines. Once the creds are confirmed, two-hour implementation.
 
 ---
 
@@ -203,7 +204,8 @@ The rest of the provisioning arc is working:
 - Distribution plan generation: working
 - Dry-run preview UI: working
 - Execute distribution (mock): working
-- Retry failed targets: working (TASK-0023C, committed `62e3aad`)
+- Retry failed targets: working (TASK-0023C, commit `62e3aad`)
 
-Monday adapter is the first real external write. GitHub adapter (TASK-0023E) follows
-the same pattern but needs a different set of credentials (PAT, org name).
+Monday is the first real external write. GitHub (TASK-0023E, see
+[HANDOFF-0023E-github-credentials.md](./HANDOFF-0023E-github-credentials.md))
+follows the same pattern but needs its own separate credentials.
