@@ -26,3 +26,5 @@ export * from "./application/provisioning/provisioning-executor.js";
 export * from "./application/provisioning/mock-executor.js";
 export * from "./domain/provisioning.js";
 export * from "./application/types.js";
+export * from "./application/notifications/google-chat-notifier.js";
+export * from "./application/notifications/google-chat-config.js";

@@ -8,6 +8,8 @@ import { AnalysisProviderRouter } from "../../../../src/application/providers/an
 import { ProvisioningRegistry } from "../../../../src/application/provisioning/provisioning-executor.js";
 import { createMockRegistry } from "../../../../src/application/provisioning/mock-executor.js";
 import type { MockExecutorMode } from "../../../../src/application/provisioning/mock-executor.js";
+import { GoogleChatNotifier } from "../../../../src/application/notifications/google-chat-notifier.js";
+import { loadGoogleChatConfig } from "../../../../src/application/notifications/google-chat-config.js";
 import { ANALYSIS_PROVIDER } from "../ai/provider.token.js";
 import { ApplicationExceptionFilter } from "../common/application-exception.filter.js";
 import { PrismaProjectIntakeStore } from "../persistence/prisma-project-intake-store.js";
@@ -55,11 +57,20 @@ const logger = new Logger("RuntimeModule");
         }
         logger.log(`Provisioning executor: mock (mode=${executorMode})`);
 
+        const chatConfig = loadGoogleChatConfig();
+        const notifier = new GoogleChatNotifier(chatConfig.webhookUrl, chatConfig.intakeBaseUrl);
+        if (notifier.isEnabled) {
+          logger.log("Google Chat notifications: enabled");
+        } else {
+          logger.log("Google Chat notifications: disabled (GOOGLE_CHAT_WEBHOOK_URL not set)");
+        }
+
         return new IntakeWorkflowService({
           store,
           analysisProvider,
           orchestrator: useOrchestrator ? orchestrator : undefined,
           provisioningRegistry,
+          notifier,
         });
       },
     },

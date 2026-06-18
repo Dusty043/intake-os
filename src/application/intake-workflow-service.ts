@@ -18,6 +18,7 @@ import { MockIntakeAnalysisProvider } from "./providers/mock-intake-analysis-pro
 import { buildDryRunProvisioningPlan, resolveDistributionSource } from "./provisioning-plan.js";
 import type { ProvisioningRegistry } from "./provisioning/provisioning-executor.js";
 import type { ProvisioningRun } from "../domain/provisioning.js";
+import type { GoogleChatNotifier } from "./notifications/google-chat-notifier.js";
 import type {
   AcceptAnalysisDraftInput,
   ApprovalDecisionInput,
@@ -41,6 +42,7 @@ export interface IntakeWorkflowServiceOptions {
   analysisProvider?: IntakeAnalysisProvider;
   orchestrator?: EvaluationOrchestrator;
   provisioningRegistry?: ProvisioningRegistry;
+  notifier?: GoogleChatNotifier;
 }
 
 export class IntakeWorkflowService {
@@ -50,6 +52,7 @@ export class IntakeWorkflowService {
   private readonly analysisProvider: IntakeAnalysisProvider;
   private readonly orchestrator?: EvaluationOrchestrator;
   private readonly provisioningRegistry?: ProvisioningRegistry;
+  private readonly notifier?: GoogleChatNotifier;
 
   constructor(options: IntakeWorkflowServiceOptions) {
     this.store = options.store;
@@ -58,6 +61,7 @@ export class IntakeWorkflowService {
     this.analysisProvider = options.analysisProvider ?? new MockIntakeAnalysisProvider();
     this.orchestrator = options.orchestrator;
     this.provisioningRegistry = options.provisioningRegistry;
+    this.notifier = options.notifier;
   }
 
   get activeProviderName(): string {
@@ -240,10 +244,18 @@ export class IntakeWorkflowService {
           depth,
         },
       });
-      return this.applyTransitionToRecord(withPending, "clarification_needed", actor, now, {
+      const withClarification = await this.applyTransitionToRecord(withPending, "clarification_needed", actor, now, {
         reason: "Clarification required before evaluation can proceed.",
         metadata: { questionCount: result.clarification.questions.length },
       });
+      await this.notifier?.notify({
+        eventType: "clarification_required",
+        intakeId: withClarification.id,
+        title: withClarification.title,
+        requester: withClarification.requester,
+        detail: `${result.clarification.questions.length} question(s) need answers before evaluation.`,
+      });
+      return withClarification;
     }
 
     // evaluation_ready path
@@ -284,10 +296,17 @@ export class IntakeWorkflowService {
       },
     });
 
-    return this.applyTransitionToRecord(saved, "success", actor, now, {
+    const readyForReview = await this.applyTransitionToRecord(saved, "success", actor, now, {
       reason: "AI evaluation complete, draft ready for human review.",
       metadata: { evaluationId: evaluation.id, draftId: draft.id },
     });
+    await this.notifier?.notify({
+      eventType: "intake_review",
+      intakeId: readyForReview.id,
+      title: readyForReview.title,
+      requester: readyForReview.requester,
+    });
+    return readyForReview;
   }
 
   async generateMockAnalysisDraft(
@@ -351,10 +370,17 @@ export class IntakeWorkflowService {
       },
     });
 
-    return this.applyTransitionToRecord(saved, "success", actor, now, {
+    const draftReady = await this.applyTransitionToRecord(saved, "success", actor, now, {
       reason: "AI analysis draft generated for human review.",
       metadata: { draftId: draft.id, draftOnly: true },
     });
+    await this.notifier?.notify({
+      eventType: "intake_review",
+      intakeId: draftReady.id,
+      title: draftReady.title,
+      requester: draftReady.requester,
+    });
+    return draftReady;
   }
 
   async regenerateAnalysisDraft(
@@ -657,7 +683,17 @@ export class IntakeWorkflowService {
       );
     }
 
-    return this.transition(id, "approve", actor, { reason: input.comment ?? `${gate} approved.` });
+    const updated = await this.transition(id, "approve", actor, { reason: input.comment ?? `${gate} approved.` });
+    if (updated.status === "devops_review") {
+      await this.notifier?.notify({
+        eventType: "devops_review",
+        intakeId: updated.id,
+        title: updated.title,
+        requester: updated.requester,
+        detail: "Gate 1 approved. DevOps review now required.",
+      });
+    }
+    return updated;
   }
 
   async rejectApproval(id: string, actor: Actor, reason: string): Promise<ProjectIntakeRecord> {
@@ -896,6 +932,8 @@ export class IntakeWorkflowService {
       },
     });
 
+    await this.notifyProvisioningOutcome(latestRecord, runStatus, targetResults);
+
     return completedRun;
   }
 
@@ -1041,7 +1079,36 @@ export class IntakeWorkflowService {
       },
     });
 
+    await this.notifyProvisioningOutcome(latestRecord, retryRunStatus, targetResults);
+
     return completedRetryRun;
+  }
+
+  private async notifyProvisioningOutcome(
+    record: ProjectIntakeRecord,
+    runStatus: "completed" | "failed" | "partial_success",
+    targetResults: readonly { status: string; targetKind: string }[],
+  ): Promise<void> {
+    if (runStatus === "completed") {
+      await this.notifier?.notify({
+        eventType: "distributed",
+        intakeId: record.id,
+        title: record.title,
+        requester: record.requester,
+      });
+    } else {
+      const failedKinds = targetResults
+        .filter((t) => t.status === "failed")
+        .map((t) => t.targetKind)
+        .join(", ");
+      await this.notifier?.notify({
+        eventType: "provisioning_failed",
+        intakeId: record.id,
+        title: record.title,
+        requester: record.requester,
+        detail: `Failed targets: ${failedKinds}`,
+      });
+    }
   }
 
   async transition(

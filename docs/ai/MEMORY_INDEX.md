@@ -43,6 +43,9 @@ Generated at: 2026-06-09T14:53:20.716Z
 - `docs/ai/tasks/TASK-0023C-provisioning-retry.md`
 - `docs/ai/tasks/TASK-0023D-monday-adapter.md`
 - `docs/ai/tasks/TASK-0023E-github-adapter.md`
+- `docs/ai/tasks/TASK-0024-google-chat-notifications.md`
+- `docs/ai/tasks/TASK-0025-email-intake.md`
+- `docs/ai/tasks/TASK-0026-google-chat-intake.md`
 
 ## Deployment Docs
 

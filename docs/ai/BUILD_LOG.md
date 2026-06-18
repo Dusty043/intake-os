@@ -1,5 +1,33 @@
 # Build Log
 
+## 2026-06-19 — TASK-0024: Google Chat Notifications (Outbound)
+
+Google Chat notifications wired to intake lifecycle events. No-op when `GOOGLE_CHAT_WEBHOOK_URL` is not set.
+
+Changes made:
+
+- `src/application/notifications/google-chat-notifier.ts` (new) — `GoogleChatNotifier` class, fire-and-forget POST to webhook, no-op if URL not configured
+- `src/application/notifications/google-chat-config.ts` (new) — loads `GOOGLE_CHAT_WEBHOOK_URL` and `INTAKE_APP_URL` from env
+- `src/index.ts` — added notifier exports
+- `src/application/intake-workflow-service.ts` — added `notifier?: GoogleChatNotifier` to options; 6 notification hook points: clarification_required, intake_review (×2 paths), devops_review, distributed, provisioning_failed; private `notifyProvisioningOutcome()` helper shared by execute and retry
+- `apps/api/src/runtime/runtime.module.ts` — creates `GoogleChatNotifier` from config, logs enabled/disabled status, passes to `IntakeWorkflowService`
+- `tests/google-chat-notifier.test.mjs` (new) — 9 unit tests
+
+Also written (no code, spec only):
+
+- `docs/ai/tasks/TASK-0025-email-intake.md` — email intake spec via inbound webhook service
+- `docs/ai/tasks/HANDOFF-0025-email-intake.md` — handoff doc with service options and open questions
+- `docs/ai/tasks/TASK-0026-google-chat-intake.md` — Google Chat app slash command spec
+- `docs/ai/tasks/HANDOFF-0026-google-chat-intake.md` — handoff doc with GCP setup steps and open questions
+
+Commands run:
+
+```bash
+npm run typecheck   # clean
+npm run build       # clean
+npm test            # 428/428 pass (9 new notifier tests)
+```
+
 ## 2026-06-17 — TASK-0023C: Retry Failed Provisioning Targets
 
 Retry mechanism wired end-to-end. New run with `kind: "retry"` that only executes failed+retryable targets.

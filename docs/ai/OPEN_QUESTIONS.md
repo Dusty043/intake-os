@@ -8,3 +8,7 @@
 | Q-0004 | Should GitHub repositories be private by default? | DevOps/Admin | open | Likely yes for internal work, but not confirmed. |
 | Q-0005 | Which Monday board/group/column schema should provisioning target? | DevOps/Admin | open | Required before live Monday payload generation. |
 | Q-0006 | Which app framework should wrap the domain core? | Engineering | open | Domain code is framework-neutral for now; likely monolith remains preferred. |
+| Q-0007 | Which inbound email service for TASK-0025? (postmark/cloudmailin/mailgun/sendgrid) | DevOps/Admin | open | Needed before email intake endpoint can be implemented. |
+| Q-0008 | What email address will users send project intakes to? | Admin | open | Required for TASK-0025. E.g. `intake@simple.biz`. |
+| Q-0009 | Does Simple.biz have a Google Cloud project for TASK-0026? | Admin | open | Needed for Google Chat app setup. |
+| Q-0010 | Does Simple.biz have a Google Workspace admin? | Admin | open | Required to install Google Chat app domain-wide (TASK-0026). |
