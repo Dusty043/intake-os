@@ -276,7 +276,7 @@ export type { GenerateMockAnalysisDraftInput };
 export type { AgentRunRecord, EvaluationPersistenceBundle } from "./evaluation-persistence.js";
 import type { AgentRunRecord, EvaluationPersistenceBundle } from "./evaluation-persistence.js";
 import type { IntakeEvaluation } from "./intake-evaluation.js";
-import type { ProvisioningRun } from "../domain/provisioning.js";
+import type { ProvisioningRun, ProvisioningTargetResult } from "../domain/provisioning.js";
 
 export type { ProvisioningRun } from "../domain/provisioning.js";
 export type { ProvisioningTargetResult } from "../domain/provisioning.js";
@@ -299,4 +299,5 @@ export interface ProjectIntakeStore {
   saveProvisioningRun(run: ProvisioningRun): Promise<ProvisioningRun>;
   listProvisioningRuns(intakeId: string): Promise<ProvisioningRun[]>;
   getProvisioningRun(intakeId: string, runId: string): Promise<ProvisioningRun | undefined>;
+  updateProvisioningTargetResult(targetId: string, updates: Partial<ProvisioningTargetResult>): Promise<void>;
 }

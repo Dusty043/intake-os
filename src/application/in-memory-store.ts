@@ -1,5 +1,6 @@
 import type { AuditEvent } from "../domain/types.js";
 import type { ProjectIntakeRecord, ProjectIntakeStore, ProvisioningRun } from "./types.js";
+import type { ProvisioningTargetResult } from "../domain/provisioning.js";
 import type { AgentRunRecord, EvaluationPersistenceBundle } from "./evaluation-persistence.js";
 import type { IntakeEvaluation } from "./intake-evaluation.js";
 import { agentRunsFromEvaluation } from "./evaluation-persistence.js";
@@ -93,6 +94,19 @@ export class InMemoryProjectIntakeStore implements ProjectIntakeStore {
     const run = this.provisioningRuns.get(runId);
     if (!run || run.intakeId !== intakeId) return undefined;
     return clone<ProvisioningRun>(run);
+  }
+
+  async updateProvisioningTargetResult(
+    targetId: string,
+    updates: Partial<ProvisioningTargetResult>,
+  ): Promise<void> {
+    for (const run of this.provisioningRuns.values()) {
+      const idx = run.targets.findIndex((t) => t.id === targetId);
+      if (idx !== -1) {
+        run.targets[idx] = { ...run.targets[idx], ...updates };
+        return;
+      }
+    }
   }
 }
 

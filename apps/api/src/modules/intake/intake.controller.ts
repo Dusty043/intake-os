@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post } from "@nestjs/common";
+import { Body, Controller, Get, Param, Post, HttpCode } from "@nestjs/common";
 import { toEvaluationSummaryDto } from "./dto/evaluation.dto.js";
 import { toProvisioningRunDto } from "./dto/provisioning-run.dto.js";
 import { ApiOperation, ApiTags } from "@nestjs/swagger";
@@ -15,6 +15,7 @@ import { GenerateProvisioningPlanDto } from "./dto/generate-provisioning-plan.dt
 import { RejectAnalysisDraftDto } from "./dto/reject-analysis-draft.dto.js";
 import { RejectApprovalDto } from "./dto/reject-approval.dto.js";
 import { RegenerateAnalysisDraftDto } from "./dto/regenerate-analysis-draft.dto.js";
+import { MarkResolvedDto } from "./dto/mark-resolved.dto.js";
 import { RequestChangesDto } from "./dto/request-changes.dto.js";
 import { ReviseAnalysisDraftDto } from "./dto/revise-analysis-draft.dto.js";
 
@@ -212,6 +213,19 @@ export class IntakeHttpController {
   ) {
     const run = await this.workflowService.retryFailedProvisioningTargets(id, runId, toDomainActor(actor));
     return toProvisioningRunDto(run);
+  }
+
+  @Post(":id/provisioning-targets/:targetId/mark-resolved")
+  @HttpCode(200)
+  @ApiOperation({ summary: "Manually mark a dead-lettered provisioning target as resolved" })
+  async markProvisioningTargetResolved(
+    @Param("id") id: string,
+    @Param("targetId") targetId: string,
+    @Body() dto: MarkResolvedDto,
+    @CurrentActor() actor: AuthenticatedActor,
+  ) {
+    await this.workflowService.markProvisioningTargetResolved(id, targetId, toDomainActor(actor), dto.note);
+    return { ok: true };
   }
 
   @Get(":id/audit")

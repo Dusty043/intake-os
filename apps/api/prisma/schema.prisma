@@ -243,6 +243,7 @@ model ProvisioningRun {
   triggeredByName   String?
   startedAt         DateTime
   completedAt       DateTime?
+  errorSummary      String?
 
   intake            ProjectIntake             @relation(fields: [intakeId], references: [id], onDelete: Cascade)
   plan              ProvisioningPlan          @relation(fields: [planId], references: [id])
@@ -260,14 +261,18 @@ model ProvisioningTargetResult {
   externalId      String?
   externalUrl     String?
   errorMessage    String?
+  errorCategory   String?
   attemptCount    Int             @default(1)
   retryable       Boolean         @default(true)
+  deadLettered    Boolean         @default(false)
+  deadLetteredAt  DateTime?
   completedAt     DateTime?
 
   run             ProvisioningRun @relation(fields: [runId], references: [id], onDelete: Cascade)
 
   @@index([runId])
   @@index([idempotencyKey])
+  @@index([deadLettered])
 }
 
 model ProvisioningPlanAction {

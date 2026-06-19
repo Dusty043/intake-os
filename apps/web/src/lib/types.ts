@@ -263,8 +263,11 @@ export type ProvisioningTargetResult = {
   externalId?: string;
   externalUrl?: string;
   errorMessage?: string;
+  errorCategory?: string;
   attemptCount: number;
   retryable: boolean;
+  deadLettered?: boolean;
+  deadLetteredAt?: string;
   completedAt?: string;
 };
 
@@ -280,6 +283,7 @@ export type ProvisioningRun = {
   triggeredByName?: string;
   startedAt: string;
   completedAt?: string;
+  errorSummary?: string;
   targets: ProvisioningTargetResult[];
 };
 

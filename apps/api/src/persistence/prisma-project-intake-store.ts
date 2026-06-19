@@ -2,6 +2,7 @@ import { Injectable } from "@nestjs/common";
 import type { Prisma } from "@prisma/client";
 import type { AuditEvent, RequestStatus, UserRole } from "../../../../src/domain/types.js";
 import type { ProjectIntakeRecord, ProjectIntakeStore, ProvisioningRun } from "../../../../src/application/types.js";
+import type { ProvisioningTargetResult } from "../../../../src/domain/provisioning.js";
 import type { AgentRunRecord, EvaluationPersistenceBundle } from "../../../../src/application/evaluation-persistence.js";
 import type { IntakeEvaluation } from "../../../../src/application/intake-evaluation.js";
 import {
@@ -268,10 +269,12 @@ export class PrismaProjectIntakeStore implements ProjectIntakeStore {
           triggeredByName: run.triggeredByName,
           startedAt: new Date(run.startedAt),
           completedAt: run.completedAt ? new Date(run.completedAt) : null,
+          errorSummary: run.errorSummary ?? null,
         },
         update: {
           status: run.status,
           completedAt: run.completedAt ? new Date(run.completedAt) : null,
+          errorSummary: run.errorSummary ?? null,
         },
       });
 
@@ -287,8 +290,11 @@ export class PrismaProjectIntakeStore implements ProjectIntakeStore {
             externalId: target.externalId,
             externalUrl: target.externalUrl,
             errorMessage: target.errorMessage,
+            errorCategory: target.errorCategory ?? null,
             attemptCount: target.attemptCount,
             retryable: target.retryable,
+            deadLettered: target.deadLettered ?? false,
+            deadLetteredAt: target.deadLetteredAt ? new Date(target.deadLetteredAt) : null,
             completedAt: target.completedAt ? new Date(target.completedAt) : null,
           },
           update: {
@@ -296,8 +302,11 @@ export class PrismaProjectIntakeStore implements ProjectIntakeStore {
             externalId: target.externalId,
             externalUrl: target.externalUrl,
             errorMessage: target.errorMessage,
+            errorCategory: target.errorCategory ?? null,
             attemptCount: target.attemptCount,
             retryable: target.retryable,
+            deadLettered: target.deadLettered ?? false,
+            deadLetteredAt: target.deadLetteredAt ? new Date(target.deadLetteredAt) : null,
             completedAt: target.completedAt ? new Date(target.completedAt) : null,
           },
         });
@@ -324,6 +333,28 @@ export class PrismaProjectIntakeStore implements ProjectIntakeStore {
     if (!row || row.intakeId !== intakeId) return undefined;
     return fromProvisioningRunRow(row);
   }
+
+  async updateProvisioningTargetResult(
+    targetId: string,
+    updates: Partial<ProvisioningTargetResult>,
+  ): Promise<void> {
+    await this.prisma.provisioningTargetResult.update({
+      where: { id: targetId },
+      data: {
+        ...(updates.status !== undefined && { status: updates.status }),
+        ...(updates.retryable !== undefined && { retryable: updates.retryable }),
+        ...(updates.deadLettered !== undefined && { deadLettered: updates.deadLettered }),
+        ...(updates.deadLetteredAt !== undefined && {
+          deadLetteredAt: new Date(updates.deadLetteredAt),
+        }),
+        ...(updates.errorCategory !== undefined && { errorCategory: updates.errorCategory }),
+        ...(updates.errorMessage !== undefined && { errorMessage: updates.errorMessage }),
+        ...(updates.completedAt !== undefined && {
+          completedAt: new Date(updates.completedAt),
+        }),
+      },
+    });
+  }
 }
 
 function toJson(value: unknown): Prisma.InputJsonValue {
@@ -346,6 +377,7 @@ function fromProvisioningRunRow(row: {
   triggeredByName: string | null;
   startedAt: Date;
   completedAt: Date | null;
+  errorSummary?: string | null;
   targets: {
     id: string;
     runId: string;
@@ -355,8 +387,11 @@ function fromProvisioningRunRow(row: {
     externalId: string | null;
     externalUrl: string | null;
     errorMessage: string | null;
+    errorCategory?: string | null;
     attemptCount: number;
     retryable: boolean;
+    deadLettered?: boolean;
+    deadLetteredAt?: Date | null;
     completedAt: Date | null;
   }[];
 }): ProvisioningRun {
@@ -372,6 +407,7 @@ function fromProvisioningRunRow(row: {
     triggeredByName: row.triggeredByName ?? undefined,
     startedAt: row.startedAt.toISOString(),
     completedAt: row.completedAt?.toISOString(),
+    errorSummary: row.errorSummary ?? undefined,
     targets: row.targets.map((t) => ({
       id: t.id,
       runId: t.runId,
@@ -381,8 +417,11 @@ function fromProvisioningRunRow(row: {
       externalId: t.externalId ?? undefined,
       externalUrl: t.externalUrl ?? undefined,
       errorMessage: t.errorMessage ?? undefined,
+      errorCategory: t.errorCategory ?? undefined,
       attemptCount: t.attemptCount,
       retryable: t.retryable,
+      deadLettered: t.deadLettered ?? false,
+      deadLetteredAt: t.deadLetteredAt?.toISOString(),
       completedAt: t.completedAt?.toISOString(),
     })),
   };

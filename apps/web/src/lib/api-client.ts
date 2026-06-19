@@ -235,6 +235,19 @@ export async function retryProvisioningRun(
   });
 }
 
+export async function markProvisioningTargetResolved(
+  intakeId: string,
+  targetId: string,
+  actor: UiActor,
+  note?: string,
+): Promise<void> {
+  await request(`/intakes/${intakeId}/provisioning-targets/${targetId}/mark-resolved`, {
+    method: "POST",
+    headers: actorHeaders(actor),
+    body: JSON.stringify(note ? { note } : {}),
+  });
+}
+
 export async function getAuditTrail(id: string, actor: UiActor): Promise<AuditEvent[]> {
   return request(`/intakes/${id}/audit`, { headers: actorHeaders(actor) });
 }

@@ -16,9 +16,11 @@ import type { IntakeAnalysisProvider } from "./intake-analysis-provider.js";
 import { validateIntakeAnalysisDraft } from "./intake-analysis.js";
 import { MockIntakeAnalysisProvider } from "./providers/mock-intake-analysis-provider.js";
 import { buildDryRunProvisioningPlan, resolveDistributionSource } from "./provisioning-plan.js";
-import type { ProvisioningRegistry } from "./provisioning/provisioning-executor.js";
-import type { ProvisioningRun } from "../domain/provisioning.js";
+import type { ProvisioningExecutor, ProvisioningRegistry } from "./provisioning/provisioning-executor.js";
+import type { ProvisioningRun, ProvisioningTargetResult } from "../domain/provisioning.js";
 import type { GoogleChatNotifier } from "./notifications/google-chat-notifier.js";
+import { normalizeProvisioningError } from "../domain/error-categories.js";
+import { calculateBackoffMs, sleep } from "./provisioning/backoff.js";
 import type {
   AcceptAnalysisDraftInput,
   ApprovalDecisionInput,
@@ -64,8 +66,38 @@ export class IntakeWorkflowService {
     this.notifier = options.notifier;
   }
 
+  private static readonly DEAD_LETTER_CEILING = 3;
+  private static readonly AUTO_RETRY_MAX = 3;
+
   get activeProviderName(): string {
     return this.analysisProvider.name;
+  }
+
+  private async executeWithAutoRetry(
+    executor: ProvisioningExecutor,
+    input: Parameters<ProvisioningExecutor["execute"]>[0],
+  ): Promise<ProvisioningTargetResult> {
+    let lastResult: ProvisioningTargetResult | undefined;
+    for (let attempt = 1; attempt <= IntakeWorkflowService.AUTO_RETRY_MAX; attempt++) {
+      const result = await executor.execute({ ...input });
+      if (result.status === "succeeded") return result;
+
+      const normalized = normalizeProvisioningError(result.errorMessage ?? "unknown error");
+      // Annotate the error category but preserve the executor's retryable signal — the
+      // manual retry path depends on it. Auto-retry is determined solely by category.
+      lastResult = {
+        ...result,
+        errorCategory: normalized.category,
+        attemptCount: attempt,
+      };
+
+      const isAutoRetryable = normalized.category === "transient_api_error" || normalized.category === "rate_limit";
+      if (!isAutoRetryable || attempt >= IntakeWorkflowService.AUTO_RETRY_MAX) break;
+
+      const delay = calculateBackoffMs(attempt);
+      await sleep(delay);
+    }
+    return lastResult!;
   }
 
   async listIntakes(): Promise<readonly ProjectIntakeRecord[]> {
@@ -887,7 +919,7 @@ export class IntakeWorkflowService {
     const executors = this.provisioningRegistry.getAll();
     const targetResults = await Promise.all(
       executors.map((executor) =>
-        executor.execute({
+        this.executeWithAutoRetry(executor, {
           intakeId: id,
           planId,
           runId,
@@ -1033,7 +1065,7 @@ export class IntakeWorkflowService {
 
     const targetResults = await Promise.all(
       executors.map((executor) =>
-        executor.execute({
+        this.executeWithAutoRetry(executor, {
           intakeId,
           planId,
           runId: retryRunId,
@@ -1047,6 +1079,28 @@ export class IntakeWorkflowService {
     const allSucceeded = targetResults.every((t) => t.status === "succeeded");
     const allFailed = targetResults.every((t) => t.status === "failed");
     const retryRunStatus = allSucceeded ? "completed" : allFailed ? "failed" : "partial_success";
+
+    // Dead-letter ceiling: promote permanently failed targets if total failures >= ceiling
+    const allRuns = await this.store.listProvisioningRuns(intakeId);
+    const deadLetteredNow = this.clock();
+    for (const result of targetResults) {
+      if (result.status !== "failed") continue;
+      const failCount = allRuns.reduce((n, r) =>
+        n + r.targets.filter((t) => t.targetKind === result.targetKind && t.status === "failed").length, 0
+      ) + 1; // +1 for this retry run (not yet persisted)
+      if (failCount >= IntakeWorkflowService.DEAD_LETTER_CEILING) {
+        result.retryable = false;
+        result.deadLettered = true;
+        result.deadLetteredAt = deadLetteredNow;
+        await this.notifier?.notify({
+          eventType: "provisioning_dead_lettered",
+          intakeId,
+          title: record.title,
+          requester: record.requester,
+          detail: `Target "${result.targetKind}" has failed ${failCount} times and is now dead-lettered. Manual intervention required.`,
+        });
+      }
+    }
 
     const completedNow = this.clock();
     const completedRetryRun: ProvisioningRun = {
@@ -1109,6 +1163,31 @@ export class IntakeWorkflowService {
         detail: `Failed targets: ${failedKinds}`,
       });
     }
+  }
+
+  async markProvisioningTargetResolved(
+    intakeId: string,
+    targetId: string,
+    actor: Actor,
+    note?: string,
+  ): Promise<void> {
+    const record = await this.requireIntake(intakeId);
+    const now = this.clock();
+
+    await this.store.updateProvisioningTargetResult(targetId, {
+      status: "succeeded",
+      retryable: false,
+      deadLettered: false,
+      completedAt: now,
+    });
+
+    await this.audit({
+      record,
+      actor,
+      action: "PROVISIONING_TARGET_MANUALLY_RESOLVED",
+      timestamp: now,
+      metadata: { targetId, note },
+    });
   }
 
   async transition(

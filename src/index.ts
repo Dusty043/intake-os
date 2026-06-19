@@ -28,3 +28,6 @@ export * from "./domain/provisioning.js";
 export * from "./application/types.js";
 export * from "./application/notifications/google-chat-notifier.js";
 export * from "./application/notifications/google-chat-config.js";
+export * from "./auth-config-validator.js";
+export * from "./domain/error-categories.js";
+export * from "./application/provisioning/backoff.js";

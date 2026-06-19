@@ -4,8 +4,15 @@ import { ValidationPipe } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 import { AppModule } from "./app.module.js";
+import { validateAuthConfig } from "../../../src/auth-config-validator.js";
 
 async function bootstrap(): Promise<void> {
+  // Validate auth config before any module initializes — crashes on bad production config
+  const authConfig = validateAuthConfig();
+  console.log(
+    `[Auth] Auth mode: ${authConfig.mode} (NODE_ENV: ${process.env.NODE_ENV ?? "development"})`,
+  );
+
   const app = await NestFactory.create(AppModule);
 
   // CORS — allow credentials so session cookies work across origins in dev

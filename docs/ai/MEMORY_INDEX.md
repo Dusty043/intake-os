@@ -46,6 +46,12 @@ Generated at: 2026-06-09T14:53:20.716Z
 - `docs/ai/tasks/TASK-0024-google-chat-notifications.md`
 - `docs/ai/tasks/TASK-0025-email-intake.md`
 - `docs/ai/tasks/TASK-0026-google-chat-intake.md`
+- `docs/ai/tasks/TASK-0027-auth-hardening.md`
+- `docs/ai/tasks/TASK-0028-failure-and-recovery.md`
+- `docs/ai/tasks/TASK-0029-rate-limiting.md`
+- `docs/ai/tasks/TASK-0030-ai-cost-governance.md`
+- `docs/ai/tasks/TASK-0031-post-distribution-lifecycle.md`
+- `docs/ai/tasks/TASK-0032-input-validation-hardening.md`
 
 ## Deployment Docs
 

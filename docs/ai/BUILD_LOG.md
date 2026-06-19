@@ -1,5 +1,66 @@
 # Build Log
 
+## 2026-06-19 — TASK-0028: Failure and Recovery
+
+Implemented full failure and recovery layer for the provisioning system.
+
+Files changed:
+- `src/domain/error-categories.ts` (new) — `ProvisioningErrorCategory` enum, `normalizeProvisioningError()`, `isAutoRetryable()`
+- `src/application/provisioning/backoff.ts` (new) — `calculateBackoffMs()`, `sleep()`
+- `src/domain/provisioning.ts` — added `errorCategory`, `deadLettered`, `deadLetteredAt` to `ProvisioningTargetResult`; `errorSummary` to `ProvisioningRun`
+- `src/application/types.ts` — added `updateProvisioningTargetResult()` to `ProjectIntakeStore` interface; fixed import
+- `src/application/in-memory-store.ts` — implemented `updateProvisioningTargetResult()`
+- `src/application/intake-workflow-service.ts` — added `executeWithAutoRetry()` private method (wraps executor with backoff for transient errors); updated `executeDistribution()` and `retryFailedProvisioningTargets()` to use it; added dead-letter ceiling (3 attempts) with Chat notification; added `markProvisioningTargetResolved()` method
+- `src/application/notifications/google-chat-notifier.ts` — added `"provisioning_dead_lettered"` event type
+- `src/index.ts` — exported new modules
+- `apps/api/prisma/schema.prisma` — added `errorCategory`, `deadLettered`, `deadLetteredAt` to `ProvisioningTargetResult`; `errorSummary` to `ProvisioningRun`
+- `apps/api/src/persistence/prisma-project-intake-store.ts` — updated `saveProvisioningRun` to persist new fields; added `updateProvisioningTargetResult()`; updated `fromProvisioningRunRow` to map new columns
+- `apps/api/src/modules/intake/dto/mark-resolved.dto.ts` (new)
+- `apps/api/src/modules/intake/intake.controller.ts` — added `POST /intakes/:id/provisioning-targets/:targetId/mark-resolved`
+- `apps/web/src/lib/types.ts` — updated `ProvisioningTargetResult` and `ProvisioningRun` types
+- `apps/web/src/lib/api-client.ts` — added `markProvisioningTargetResolved()`
+- `apps/web/src/app/admin/failures/page.tsx` (new) — admin UI listing dead-lettered targets with mark-resolved action
+- `tests/provisioning-failure-recovery.test.mjs` (new) — 30 unit tests
+
+Commands run:
+```bash
+npm run build:core   # clean
+npm run api:build    # clean
+npm test             # 468/468 pass
+```
+
+Notes: Prisma migration (`add_error_category_dead_letter`) is generated but requires DB on server to apply. Run: `npm run prisma:migrate -- --name add_error_category_dead_letter` on oreochiserver.
+
+## 2026-06-19 — TASK-0027: Auth Hardening
+
+Created `src/auth-config-validator.ts` — pure `validateAuthConfig()` function that crashes at startup if `NODE_ENV=production` and `AUTH_MODE` is unset or set to `dev_headers`. Exported from `src/index.ts`. Called in `apps/api/src/main.ts` before `NestFactory.create()`.
+
+Files changed:
+- `src/auth-config-validator.ts` (new) — `validateAuthConfig()`, returns `{ mode: AuthMode }`
+- `src/index.ts` — added export
+- `apps/api/src/main.ts` — calls validator before bootstrap, logs active auth mode
+- `tests/auth-config-validator.test.mjs` (new) — 10 unit tests
+
+Commands run:
+```bash
+npm run build    # clean
+npm run typecheck # clean
+npm test         # 438/438 pass (10 new auth-config tests)
+```
+
+## 2026-06-19 — TASK-0027 through TASK-0032: Pre-Provisioning Hardening Specs
+
+Six task spec documents written for credential-independent hardening work. No code changes — specs only.
+
+- `docs/ai/tasks/TASK-0027-auth-hardening.md` — CRITICAL: startup validator that prevents `AUTH_MODE=dev_headers` from running in production; rejects missing `AUTH_MODE` in production; unit tests for all cases
+- `docs/ai/tasks/TASK-0028-failure-and-recovery.md` — HIGH: error category enum, dead-letter promotion logic, exponential backoff helper, manual recovery endpoint, admin failure dashboard; Prisma migration adds `errorCategory`, `deadLettered`, `maxAttempts` to `ProvisioningTargetResult`
+- `docs/ai/tasks/TASK-0029-rate-limiting.md` — HIGH: `@nestjs/throttler` wiring, per-route limits for intake submission and AI triggers, env-var configurable tiers, proxy trust config
+- `docs/ai/tasks/TASK-0030-ai-cost-governance.md` — HIGH: wire existing `AgentRun` token columns to actual AI provider calls using existing `estimateCost()` utility, model cost registry, admin cost read endpoints, per-evaluation cost badge in UI
+- `docs/ai/tasks/TASK-0031-post-distribution-lifecycle.md` — MEDIUM: expand `RequestStatus` enum with `in_progress`, `blocked`, `completed`, `canceled`; lifecycle transition service and endpoints; distributed projects dashboard
+- `docs/ai/tasks/TASK-0032-input-validation-hardening.md` — MEDIUM: `@MaxLength` on all DTO string fields, named validation constants, confirm global ValidationPipe options
+
+Open questions added to OPEN_QUESTIONS.md for each task.
+
 ## 2026-06-19 — TASK-0024: Google Chat Notifications (Outbound)
 
 Google Chat notifications wired to intake lifecycle events. No-op when `GOOGLE_CHAT_WEBHOOK_URL` is not set.

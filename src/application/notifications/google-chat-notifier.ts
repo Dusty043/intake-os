@@ -3,6 +3,7 @@ export type ChatEventType =
   | "intake_review"
   | "devops_review"
   | "provisioning_failed"
+  | "provisioning_dead_lettered"
   | "distributed";
 
 export interface ChatNotificationPayload {
@@ -18,6 +19,7 @@ const EVENT_LABELS: Record<ChatEventType, string> = {
   intake_review: "Intake Review — Gate 1 Needed",
   devops_review: "DevOps Review — Gate 2 Needed",
   provisioning_failed: "Provisioning Failed",
+  provisioning_dead_lettered: "Provisioning Dead-Lettered — Manual Action Required",
   distributed: "Distributed",
 };
 
@@ -26,6 +28,7 @@ const EVENT_ICONS: Record<ChatEventType, string> = {
   intake_review: "👀",
   devops_review: "🔧",
   provisioning_failed: "❌",
+  provisioning_dead_lettered: "🚫",
   distributed: "✅",
 };
 
