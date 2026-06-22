@@ -1,4 +1,8 @@
-import { IsIn, IsOptional, IsString, MaxLength } from "class-validator";
+import { IsOptional, IsString, MaxLength } from "class-validator";
+import {
+  MAX_NOTE_LENGTH,
+  MAX_REASON_LENGTH,
+} from "../../../common/validation-constants.js";
 
 export const lifecycleActions = [
   "mark_started",
@@ -14,21 +18,21 @@ export type LifecycleActionParam = (typeof lifecycleActions)[number];
 export class LifecycleTransitionDto {
   @IsOptional()
   @IsString()
-  @MaxLength(1000)
+  @MaxLength(MAX_NOTE_LENGTH)
   note?: string;
 
   @IsOptional()
   @IsString()
-  @MaxLength(1000)
+  @MaxLength(MAX_REASON_LENGTH)
   blockedReason?: string;
 
   @IsOptional()
   @IsString()
-  @MaxLength(1000)
+  @MaxLength(MAX_NOTE_LENGTH)
   completedNote?: string;
 
   @IsOptional()
   @IsString()
-  @MaxLength(1000)
+  @MaxLength(MAX_REASON_LENGTH)
   canceledReason?: string;
 }
