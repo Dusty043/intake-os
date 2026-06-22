@@ -34,10 +34,11 @@ export function validateAuthConfig(): AuthConfig {
     );
   }
 
-  // TODO (Q-AUTH-1): Uncomment when Google OAuth is activated:
-  // if (raw === "google" && !process.env.GOOGLE_CLIENT_ID) {
-  //   throw new Error("[Auth] AUTH_MODE=google requires GOOGLE_CLIENT_ID to be set.");
-  // }
+  if (raw === "google" && !process.env.AUTH_GOOGLE_CLIENT_ID) {
+    throw new Error(
+      "[Auth] AUTH_MODE=google requires AUTH_GOOGLE_CLIENT_ID to be set.",
+    );
+  }
 
   return { mode: raw as AuthMode };
 }

@@ -52,6 +52,7 @@ Generated at: 2026-06-09T14:53:20.716Z
 - `docs/ai/tasks/TASK-0030-ai-cost-governance.md`
 - `docs/ai/tasks/TASK-0031-post-distribution-lifecycle.md`
 - `docs/ai/tasks/TASK-0032-input-validation-hardening.md`
+- `docs/ai/tasks/TASK-0033-google-oauth.md`
 
 ## Deployment Docs
 

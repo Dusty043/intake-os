@@ -1081,3 +1081,34 @@ Follow-up:
 - 528/528 tests pass
 
 **Follow-up:** Run `prisma migrate dev --name add-post-distribution-lifecycle` on oreochiserver
+
+---
+
+## 2026-06-23 — TASK-0032: Input Validation Hardening
+
+**Session:** Continuing from TASK-0031 same session
+
+**Changes:**
+- Created `apps/api/src/common/validation-constants.ts` with 14 named length constants
+- Added `@MaxLength` decorators to all DTO string fields: `CreateIntakeDto`, `RequestChangesDto`, `ApprovalDecisionDto`, `RejectAnalysisDraftDto`, `RegenerateAnalysisDraftDto`, `CompleteDiscoveryDto`, `LifecycleTransitionDto`
+- Replaced magic numbers in `LifecycleTransitionDto` with named constants
+- Changed `forbidNonWhitelisted: false` → `true` in global ValidationPipe
+- Created `tests/input-validation.test.mjs` (34 tests) using `class-validator`'s `validate()` directly
+- 528/528 tests pass (pre-TASK-0033 count)
+
+---
+
+## 2026-06-23 — TASK-0033: Google OAuth Activation
+
+**Session:** New session
+
+**Context:** Full Google OAuth implementation already existed from TASK-0027. This task activated it.
+
+**Changes:**
+- `src/auth-config-validator.ts` — removed TODO hold; now hard-fails at startup when `AUTH_MODE=google` and `AUTH_GOOGLE_CLIENT_ID` is missing; fixed env var name (`GOOGLE_CLIENT_ID` → `AUTH_GOOGLE_CLIENT_ID` to match service)
+- `tests/auth-config-validator.test.mjs` — added `AUTH_GOOGLE_CLIENT_ID` env setup to google-mode success tests; added new test: google mode without client ID throws
+- `tests/google-oauth.test.mjs` — NEW: 23 tests covering URL generation, state token format, role config env parsing, session TTL math, forbidden-user path
+- `docs/ai/tasks/TASK-0033-google-oauth.md` — NEW task log with activation checklist for oreochiserver
+- 582/582 tests pass (54 new tests added across TASK-0032 and TASK-0033)
+
+**Open blocker:** `AUTH_GOOGLE_CLIENT_ID` and `AUTH_GOOGLE_CLIENT_SECRET` still need to be provisioned in Google Cloud Console and added to `.env.server` before `AUTH_MODE=google` can be activated on oreochiserver.

@@ -5,10 +5,12 @@ import { validateAuthConfig } from "../dist/src/index.js";
 describe("auth-config-validator", () => {
   let originalAuthMode;
   let originalNodeEnv;
+  let originalClientId;
 
   beforeEach(() => {
     originalAuthMode = process.env.AUTH_MODE;
     originalNodeEnv = process.env.NODE_ENV;
+    originalClientId = process.env.AUTH_GOOGLE_CLIENT_ID;
   });
 
   afterEach(() => {
@@ -21,6 +23,11 @@ describe("auth-config-validator", () => {
       delete process.env.NODE_ENV;
     } else {
       process.env.NODE_ENV = originalNodeEnv;
+    }
+    if (originalClientId === undefined) {
+      delete process.env.AUTH_GOOGLE_CLIENT_ID;
+    } else {
+      process.env.AUTH_GOOGLE_CLIENT_ID = originalClientId;
     }
   });
 
@@ -42,8 +49,22 @@ describe("auth-config-validator", () => {
     it("accepts google in development", () => {
       process.env.AUTH_MODE = "google";
       process.env.NODE_ENV = "development";
+      process.env.AUTH_GOOGLE_CLIENT_ID = "test-client-id.apps.googleusercontent.com";
       const config = validateAuthConfig();
       assert.equal(config.mode, "google");
+    });
+
+    it("throws when AUTH_MODE=google without AUTH_GOOGLE_CLIENT_ID", () => {
+      process.env.AUTH_MODE = "google";
+      process.env.NODE_ENV = "development";
+      delete process.env.AUTH_GOOGLE_CLIENT_ID;
+      assert.throws(
+        () => validateAuthConfig(),
+        (err) => {
+          assert.ok(err.message.includes("AUTH_GOOGLE_CLIENT_ID"));
+          return true;
+        },
+      );
     });
 
     it("rejects unknown auth mode in development", () => {
@@ -90,6 +111,7 @@ describe("auth-config-validator", () => {
     it("accepts google in production", () => {
       process.env.AUTH_MODE = "google";
       process.env.NODE_ENV = "production";
+      process.env.AUTH_GOOGLE_CLIENT_ID = "test-client-id.apps.googleusercontent.com";
       const config = validateAuthConfig();
       assert.equal(config.mode, "google");
     });

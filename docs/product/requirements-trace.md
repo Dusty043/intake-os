@@ -210,6 +210,7 @@ The numbers can be adjusted as the trace becomes more detailed.
 | GAP-004 | H-002 | GitHub org and repo privacy defaults are not finalized | DevOps/Admin | open | Needed before live GitHub provisioning |
 | GAP-005 | I-004 | Automated post-distribution signals are not confirmed for v1 | DevOps/Admin | open | Manual lifecycle updates are safer for v1 |
 | GAP-006 | Bitrix24 source intake | Live Bitrix24 webhook/auth model is not confirmed | DevOps/Admin | open | Iteration 2 only normalizes sample payloads and creates canonical intakes |
+| GAP-007 | E-001 through E-007 | Google OAuth credentials not yet provisioned — `AUTH_MODE=google` cannot be activated on oreochiserver until `AUTH_GOOGLE_CLIENT_ID` and `AUTH_GOOGLE_CLIENT_SECRET` are obtained from Google Cloud Console | DevOps/Admin | open | Full OAuth implementation exists (TASK-0027/TASK-0033). Activation blocked on credentials. Server currently runs `AUTH_MODE=dev_headers`. |
 
 ---
 
