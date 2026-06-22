@@ -10,6 +10,10 @@ export const requestStatuses = [
   "distributed",
   "provisioning_failed",
   "archived",
+  "in_progress",
+  "blocked",
+  "completed",
+  "canceled",
 ] as const;
 
 export type RequestStatus = (typeof requestStatuses)[number];

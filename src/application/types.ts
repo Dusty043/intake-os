@@ -220,6 +220,17 @@ export interface ProjectIntakeRecord extends ProjectRequestSnapshot {
     missingFields: readonly string[];
   };
   priorClarifications?: readonly PriorClarification[];
+
+  // Post-distribution lifecycle metadata (all optional — only set after distribution)
+  lifecycleNote?: string;
+  blockedReason?: string;
+  blockedAt?: string;
+  unblockedAt?: string;
+  completedAt?: string;
+  completedNote?: string;
+  canceledAt?: string;
+  canceledReason?: string;
+  archivedAt?: string;
 }
 
 export interface RegenerateAnalysisDraftInput {

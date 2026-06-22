@@ -194,8 +194,8 @@ The numbers can be adjusted as the trace becomes more detailed.
 | ID | Requirement | Product Spec | Implementation Area | Related Tasks | Test Coverage | Status | Notes |
 |---|---|---|---|---|---|---|---|
 | I-001 | System avoids deep bidirectional synchronization | `post-distribution-lifecycle.md` | Lifecycle model | TASK-0043 or later | sync-boundary tests | specified |  |
-| I-002 | App tracks high-level statuses: Distributed, In Progress, Blocked, Completed, Archived, Canceled | `post-distribution-lifecycle.md` | Lifecycle status enum | TASK-0043 or later | status tests | specified |  |
-| I-003 | App tracks closure metadata, completion timestamps, downstream links | `post-distribution-lifecycle.md` | Project lifecycle model | TASK-0043 or later | metadata tests | specified |  |
+| I-002 | App tracks high-level statuses: Distributed, In Progress, Blocked, Completed, Archived, Canceled | `post-distribution-lifecycle.md` | Lifecycle status enum | TASK-0031 | `tests/lifecycle-transitions.test.mjs` | implemented | 4 new RequestStatus values added in schema + domain types. Lifecycle dashboard at /distributed. |
+| I-003 | App tracks closure metadata, completion timestamps, downstream links | `post-distribution-lifecycle.md` | Project lifecycle model | TASK-0031 | `tests/lifecycle-transitions.test.mjs` | implemented | blockedAt/completedAt/canceledAt/archivedAt on ProjectIntakeRecord, set by executeLifecycleTransition(). |
 | I-004 | App does not mirror issue-level updates, PRs, every Monday field, or developer activity | `post-distribution-lifecycle.md` | Integration boundary | TASK-0043 or later | no-deep-sync guard tests | specified |  |
 
 ---

@@ -316,3 +316,36 @@ export async function getEvaluation(
     headers: actorHeaders(actor),
   });
 }
+
+export type LifecycleAction =
+  | "mark_started"
+  | "mark_blocked"
+  | "unblock"
+  | "mark_completed"
+  | "mark_canceled"
+  | "archive";
+
+export async function executeLifecycleTransition(
+  intakeId: string,
+  action: LifecycleAction,
+  actor: UiActor,
+  body?: {
+    note?: string;
+    blockedReason?: string;
+    completedNote?: string;
+    canceledReason?: string;
+  },
+): Promise<{ ok: boolean; status: string }> {
+  return request(`/intakes/${intakeId}/lifecycle/${action}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...actorHeaders(actor) },
+    body: JSON.stringify(body ?? {}),
+  });
+}
+
+export async function listDistributedIntakes(actor: UiActor): Promise<ProjectIntakeRecord[]> {
+  const result = await listIntakes(actor);
+  return result.filter((r) =>
+    ["distributed", "in_progress", "blocked", "completed", "canceled"].includes(r.status),
+  );
+}

@@ -151,6 +151,16 @@ export type ProjectIntakeRecord = {
     missingFields: string[];
   };
   priorClarifications?: Array<{ question: string; answer: string }>;
+  lifecycleNote?: string;
+  blockedReason?: string;
+  blockedAt?: string;
+  unblockedAt?: string;
+  completedAt?: string;
+  completedNote?: string;
+  canceledAt?: string;
+  canceledReason?: string;
+  archivedAt?: string;
+  externalLinks?: Array<{ provider: string; externalId: string; url?: string; label?: string; createdAt: string }>;
   [key: string]: unknown;
 };
 

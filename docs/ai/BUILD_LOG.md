@@ -1062,3 +1062,22 @@ Follow-up:
 - Add human-edited reviewed project package separate from the immutable generated draft.
 - Add Next.js review UI after the review contract is stable.
 - Add live provider integration only after compliance/provider decisions are confirmed.
+
+---
+
+## 2026-06-22 — TASK-0031: Post-Distribution Lifecycle
+
+**Session:** Continuing from prior session (TASK-0029 and TASK-0030 already complete)
+
+**Changes:**
+- Added `in_progress`, `blocked`, `completed`, `canceled` to `RequestStatus` Prisma enum + domain types
+- Created `src/domain/lifecycle-transitions.ts` with `validateLifecycleTransition()` pure domain function
+- Added lifecycle metadata fields (`blockedAt`, `completedAt`, etc.) to `ProjectIntakeRecord`
+- Added `executeLifecycleTransition()` to `IntakeWorkflowService`
+- Created `POST /intakes/:id/lifecycle/:action` NestJS endpoint + DTO
+- Added lifecycle functions to web api-client
+- Added 4 new statuses to `apps/web/src/lib/status.ts`
+- Created `/distributed` dashboard page for post-distribution lifecycle management
+- 528/528 tests pass
+
+**Follow-up:** Run `prisma migrate dev --name add-post-distribution-lifecycle` on oreochiserver

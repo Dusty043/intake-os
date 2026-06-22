@@ -2,6 +2,8 @@ import { canApproveGate1, canApproveGate2, canTriggerProvisioning, hasPermission
 import { getProjectTypeDefinition } from "../domain/project-type-registry.js";
 import type { Actor, ApprovalGate, AuditEvent, RequestStatus, WorkflowAction } from "../domain/types.js";
 import { applyWorkflowTransition, isApprovalComplete } from "../domain/workflow.js";
+import type { LifecycleAction } from "../domain/lifecycle-transitions.js";
+import { validateLifecycleTransition } from "../domain/lifecycle-transitions.js";
 import { createAuditEvent } from "./audit.js";
 import { evaluationToLegacyDraft } from "./evaluation-draft-mapper.js";
 import { agentRunsFromEvaluation } from "./evaluation-persistence.js";
@@ -1254,6 +1256,72 @@ export class IntakeWorkflowService {
     if (!evaluation) throw new NotFoundError("Evaluation", evaluationId);
     const agentRuns = await this.store.listAgentRuns(evaluationId);
     return { evaluation, agentRuns };
+  }
+
+  async executeLifecycleTransition(
+    id: string,
+    action: LifecycleAction,
+    actor: Actor,
+    input: {
+      note?: string;
+      blockedReason?: string;
+      completedNote?: string;
+      canceledReason?: string;
+    } = {},
+  ): Promise<ProjectIntakeRecord> {
+    const record = await this.requireIntake(id);
+    const result = validateLifecycleTransition(action, record.status);
+    if (!result.ok) {
+      throw new ValidationError(result.reason);
+    }
+
+    const now = this.clock();
+    const lifecycleMeta: Partial<ProjectIntakeRecord> = {};
+
+    if (action === "mark_started") {
+      if (input.note) lifecycleMeta.lifecycleNote = input.note;
+    } else if (action === "mark_blocked") {
+      lifecycleMeta.blockedAt = now;
+      if (input.blockedReason) lifecycleMeta.blockedReason = input.blockedReason;
+    } else if (action === "unblock") {
+      lifecycleMeta.unblockedAt = now;
+      lifecycleMeta.blockedReason = undefined;
+    } else if (action === "mark_completed") {
+      lifecycleMeta.completedAt = now;
+      if (input.completedNote) lifecycleMeta.completedNote = input.completedNote;
+    } else if (action === "mark_canceled") {
+      lifecycleMeta.canceledAt = now;
+      if (input.canceledReason) lifecycleMeta.canceledReason = input.canceledReason;
+    } else if (action === "archive") {
+      lifecycleMeta.archivedAt = now;
+    }
+
+    const updated: ProjectIntakeRecord = {
+      ...record,
+      ...lifecycleMeta,
+      status: result.toStatus,
+      updatedAt: now,
+    };
+
+    const saved = await this.store.saveIntake(updated);
+
+    await this.audit({
+      record: saved,
+      actor,
+      action,
+      timestamp: now,
+      fromState: record.status,
+      toState: result.toStatus,
+      metadata: input.note
+        ? { note: input.note }
+        : input.blockedReason
+          ? { blockedReason: input.blockedReason }
+          : input.canceledReason
+            ? { canceledReason: input.canceledReason }
+            : undefined,
+    });
+
+    return saved;
   }
 
   private async audit(input: {

@@ -20,6 +20,9 @@ import { RegenerateAnalysisDraftDto } from "./dto/regenerate-analysis-draft.dto.
 import { MarkResolvedDto } from "./dto/mark-resolved.dto.js";
 import { RequestChangesDto } from "./dto/request-changes.dto.js";
 import { ReviseAnalysisDraftDto } from "./dto/revise-analysis-draft.dto.js";
+import { LifecycleTransitionDto, lifecycleActions } from "./dto/lifecycle-transition.dto.js";
+import type { LifecycleAction } from "../../../../../src/domain/lifecycle-transitions.js";
+import { ValidationError } from "../../../../../src/application/errors.js";
 
 const rlConfig = loadRateLimitConfig();
 
@@ -261,5 +264,28 @@ export class IntakeHttpController {
     @Param("evaluationId") evaluationId: string,
   ) {
     return this.workflowService.getEvaluationForIntake(id, evaluationId);
+  }
+
+  @Post(":id/lifecycle/:action")
+  @HttpCode(200)
+  @ApiOperation({ summary: "Execute a post-distribution lifecycle transition" })
+  async executeLifecycleTransition(
+    @Param("id") id: string,
+    @Param("action") action: string,
+    @Body() body: LifecycleTransitionDto,
+    @CurrentActor() actor: AuthenticatedActor,
+  ) {
+    if (!lifecycleActions.includes(action as LifecycleAction)) {
+      throw new ValidationError(
+        `Unknown lifecycle action "${action}". Valid actions: ${lifecycleActions.join(", ")}.`,
+      );
+    }
+    const record = await this.workflowService.executeLifecycleTransition(
+      id,
+      action as LifecycleAction,
+      toDomainActor(actor),
+      body,
+    );
+    return { ok: true, status: record.status };
   }
 }

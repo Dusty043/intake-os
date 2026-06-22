@@ -19,6 +19,10 @@ enum RequestStatus {
   distributed
   provisioning_failed
   archived
+  in_progress
+  blocked
+  completed
+  canceled
 }
 
 enum ProjectType {

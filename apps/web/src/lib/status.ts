@@ -24,6 +24,10 @@ const STATUS_MAP: Record<string, StatusInfo> = {
   distributed:          { label: "Distributed",           variant: "success"  },
   provisioning_failed:  { label: "Failed",                variant: "danger"   },
   archived:             { label: "Archived",              variant: "neutral"  },
+  in_progress:          { label: "In Progress",           variant: "info"     },
+  blocked:              { label: "Blocked",               variant: "warning"  },
+  completed:            { label: "Completed",             variant: "success"  },
+  canceled:             { label: "Canceled",              variant: "neutral"  },
 };
 
 export function getStatusInfo(status: string): StatusInfo {

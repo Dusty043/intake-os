@@ -1,6 +1,6 @@
 # TASK-0031 — Post-Distribution Lifecycle
 
-**Status:** READY — no credentials required  
+**Status:** COMPLETE  
 **Priority:** MEDIUM — needed before the first real provisioned project completes  
 **Estimated effort:** 2–3 hours  
 **Blocked on:** nothing  
@@ -295,6 +295,37 @@ tests/lifecycle-transitions.test.mjs
 
 ---
 
+## Implementation Summary (2026-06-22)
+
+### Files Changed
+
+| File | Change |
+|---|---|
+| `apps/api/prisma/schema.prisma` | Added `in_progress`, `blocked`, `completed`, `canceled` to `RequestStatus` enum |
+| `src/domain/types.ts` | Added same 4 values to `requestStatuses` const array |
+| `src/domain/lifecycle-transitions.ts` | NEW — `LifecycleAction` type, `lifecycleTransitions` map, `validateLifecycleTransition()` |
+| `src/application/types.ts` | Added lifecycle metadata fields to `ProjectIntakeRecord` |
+| `src/application/intake-workflow-service.ts` | Added `executeLifecycleTransition()` method |
+| `apps/api/src/modules/intake/dto/lifecycle-transition.dto.ts` | NEW — DTO for lifecycle endpoint body |
+| `apps/api/src/modules/intake/intake.controller.ts` | Added `POST /intakes/:id/lifecycle/:action` endpoint |
+| `apps/web/src/lib/types.ts` | Added lifecycle fields to `ProjectIntakeRecord` web type |
+| `apps/web/src/lib/api-client.ts` | Added `executeLifecycleTransition()`, `listDistributedIntakes()` |
+| `apps/web/src/lib/status.ts` | Added status info for 4 new statuses |
+| `apps/web/src/app/distributed/page.tsx` | NEW — distributed dashboard with lifecycle action buttons |
+| `tests/lifecycle-transitions.test.mjs` | NEW — 24 tests (all passing) |
+
+### Tests Run
+- `npm test`: 528/528 pass
+- `npm run build:core`: clean
+- `npm run api:build`: clean
+- `npm run web:build`: clean
+
+### Server Migration Needed
+Run on oreochiserver before using new statuses:
+```bash
+npm run prisma:migrate -- --name add-post-distribution-lifecycle
+```
+
 ## Handoff
 
-All new statuses are additive — the existing enum values are unchanged. Metadata columns are all nullable. No existing logic is modified. The transition validator is a pure function — easy to test without a database. The UI work is a new page plus extending the existing intake detail page.
+All new statuses are additive — the existing enum values are unchanged. Metadata fields are all optional. No existing workflow logic is modified. The transition validator is a pure function. The distributed dashboard at `/distributed` shows all post-distribution projects with action buttons. The `POST /intakes/:id/lifecycle/:action` endpoint accepts `note`, `blockedReason`, `completedNote`, and `canceledReason` in the body.
