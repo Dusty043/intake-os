@@ -1,4 +1,6 @@
 import { Body, Controller, Get, Param, Post, HttpCode } from "@nestjs/common";
+import { Throttle } from "@nestjs/throttler";
+import { loadRateLimitConfig } from "../../config/rate-limit.config.js";
 import { toEvaluationSummaryDto } from "./dto/evaluation.dto.js";
 import { toProvisioningRunDto } from "./dto/provisioning-run.dto.js";
 import { ApiOperation, ApiTags } from "@nestjs/swagger";
@@ -18,6 +20,8 @@ import { RegenerateAnalysisDraftDto } from "./dto/regenerate-analysis-draft.dto.
 import { MarkResolvedDto } from "./dto/mark-resolved.dto.js";
 import { RequestChangesDto } from "./dto/request-changes.dto.js";
 import { ReviseAnalysisDraftDto } from "./dto/revise-analysis-draft.dto.js";
+
+const rlConfig = loadRateLimitConfig();
 
 function toDomainActor(actor: AuthenticatedActor): Actor {
   return { id: actor.id, role: actor.role, displayName: actor.name };
@@ -41,6 +45,7 @@ export class IntakeHttpController {
   }
 
   @Post()
+  @Throttle({ global: { ttl: rlConfig.intakeSubmit.ttl * 1000, limit: rlConfig.intakeSubmit.limit } })
   @ApiOperation({ summary: "Create a manual project intake" })
   create(@Body() body: CreateIntakeDto, @CurrentActor() actor: AuthenticatedActor) {
     return this.workflowService.createIntake(body, toDomainActor(actor));
@@ -73,6 +78,7 @@ export class IntakeHttpController {
   }
 
   @Post(":id/analysis-drafts/mock")
+  @Throttle({ global: { ttl: rlConfig.mockDraft.ttl * 1000, limit: rlConfig.mockDraft.limit } })
   @ApiOperation({ summary: "Generate a schema-backed mock AI analysis draft for human review" })
   generateMockAnalysisDraft(
     @Param("id") id: string,
@@ -83,6 +89,7 @@ export class IntakeHttpController {
   }
 
   @Post(":id/analysis-drafts/regenerate")
+  @Throttle({ global: { ttl: rlConfig.draftRegeneration.ttl * 1000, limit: rlConfig.draftRegeneration.limit } })
   @ApiOperation({ summary: "Regenerate the current pending AI analysis draft with steering guidance" })
   regenerateAnalysisDraft(
     @Param("id") id: string,

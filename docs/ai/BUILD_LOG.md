@@ -1,5 +1,29 @@
 # Build Log
 
+## 2026-06-22 — TASK-0029: Rate Limiting
+
+Wired `@nestjs/throttler` with global + per-route limits and env-var overrides.
+
+Files changed:
+- `apps/api/src/config/rate-limit.config.ts` — NEW: config loader with all tier defaults and env-var overrides
+- `apps/api/src/app.module.ts` — ADD: ThrottlerModule + APP_GUARD (ThrottlerGuard)
+- `apps/api/src/main.ts` — ADD: `trust proxy` + `NestExpressApplication` type
+- `apps/api/src/modules/intake/intake.controller.ts` — ADD: `@Throttle()` on create, mock, regenerate endpoints
+- `apps/api/src/modules/health/health.controller.ts` — ADD: `@SkipThrottle()` on controller
+- `tests/rate-limiting.test.mjs` — NEW: 15 unit tests for config defaults and env-var overrides
+
+Commands run:
+```
+npm install @nestjs/throttler
+npm run api:build       # clean
+npm run build:core && npm test   # 483/483 pass
+```
+
+Notes:
+- `POST /intakes/:id/generate-evaluation` does not exist yet in the controller — not throttled; will be added when the endpoint is built
+- Webhook routes (TASK-0025/0026 intake sources controller) not throttled yet — placeholder noted in task doc
+- Rate limits are per-IP; `trust proxy 1` enables nginx `X-Forwarded-For` passthrough on oreochiserver
+
 ## 2026-06-19 — TASK-0028: Failure and Recovery
 
 Implemented full failure and recovery layer for the provisioning system.

@@ -2,6 +2,7 @@ import "reflect-metadata";
 import cookieParser = require("cookie-parser");
 import { ValidationPipe } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
+import type { NestExpressApplication } from "@nestjs/platform-express";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 import { AppModule } from "./app.module.js";
 import { validateAuthConfig } from "../../../src/auth-config-validator.js";
@@ -13,7 +14,10 @@ async function bootstrap(): Promise<void> {
     `[Auth] Auth mode: ${authConfig.mode} (NODE_ENV: ${process.env.NODE_ENV ?? "development"})`,
   );
 
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+
+  // Trust reverse proxy (nginx on oreochiserver) so ThrottlerGuard uses real client IPs
+  app.set("trust proxy", 1);
 
   // CORS — allow credentials so session cookies work across origins in dev
   const webOrigins = (process.env.WEB_ORIGIN ?? "http://localhost:3001,http://localhost:8080")

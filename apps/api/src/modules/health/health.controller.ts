@@ -1,10 +1,12 @@
 import { Controller, Get, Inject } from "@nestjs/common";
+import { SkipThrottle } from "@nestjs/throttler";
 import { ApiOperation, ApiTags } from "@nestjs/swagger";
 import type { IntakeAnalysisProvider } from "../../../../../src/application/intake-analysis-provider.js";
 import { ANALYSIS_PROVIDER } from "../../ai/provider.token.js";
 import { Public } from "../auth/auth.decorators.js";
 import { PrismaService } from "../../prisma/prisma.service.js";
 
+@SkipThrottle()
 @Public()
 @ApiTags("health")
 @Controller("health")

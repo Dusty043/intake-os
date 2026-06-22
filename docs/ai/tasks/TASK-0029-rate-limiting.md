@@ -1,6 +1,6 @@
 # TASK-0029 — Rate Limiting
 
-**Status:** READY — no credentials required  
+**Status:** COMPLETE  
 **Priority:** HIGH — required before email and Chat intake sources go live  
 **Estimated effort:** 1–2 hours  
 **Blocked on:** nothing
