@@ -217,6 +217,26 @@ export class PrismaProjectIntakeStore implements ProjectIntakeStore {
     return rows.map(fromAgentRunRow);
   }
 
+  async listAllAgentRuns(
+    filters?: { intakeId?: string; startDate?: string; endDate?: string },
+  ): Promise<Array<AgentRunRecord & { intakeId: string }>> {
+    const rows = await this.prisma.agentRun.findMany({
+      where: {
+        evaluation: filters?.intakeId ? { intakeId: filters.intakeId } : undefined,
+        createdAt: {
+          gte: filters?.startDate ? new Date(filters.startDate) : undefined,
+          lte: filters?.endDate ? new Date(filters.endDate) : undefined,
+        },
+      },
+      include: { evaluation: { select: { intakeId: true } } },
+      orderBy: { createdAt: "desc" },
+    });
+    return rows.map((row) => ({
+      ...fromAgentRunRow(row),
+      intakeId: row.evaluation.intakeId,
+    }));
+  }
+
   async getEvaluationById(evaluationId: string): Promise<IntakeEvaluation | undefined> {
     const row = await this.prisma.intakeEvaluation.findUnique({
       where: { id: evaluationId },

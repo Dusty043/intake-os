@@ -1,6 +1,6 @@
 # TASK-0030 — AI Cost Governance
 
-**Status:** READY — no credentials required  
+**Status:** COMPLETE  
 **Priority:** HIGH — prevents runaway spend once real evaluations start  
 **Estimated effort:** 3–4 hours  
 **Blocked on:** nothing  

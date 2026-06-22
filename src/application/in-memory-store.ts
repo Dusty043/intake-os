@@ -70,6 +70,23 @@ export class InMemoryProjectIntakeStore implements ProjectIntakeStore {
     return (this.agentRunsByEvaluationId.get(evaluationId) ?? []).map((r) => clone<AgentRunRecord>(r));
   }
 
+  async listAllAgentRuns(
+    filters?: { intakeId?: string; startDate?: string; endDate?: string },
+  ): Promise<Array<AgentRunRecord & { intakeId: string }>> {
+    const results: Array<AgentRunRecord & { intakeId: string }> = [];
+    for (const [evalId, runs] of this.agentRunsByEvaluationId) {
+      const ev = this.evaluations.get(evalId);
+      if (!ev) continue;
+      if (filters?.intakeId && ev.intakeId !== filters.intakeId) continue;
+      for (const run of runs) {
+        if (filters?.startDate && run.createdAt < filters.startDate) continue;
+        if (filters?.endDate && run.createdAt > filters.endDate) continue;
+        results.push({ ...clone<AgentRunRecord>(run), intakeId: ev.intakeId });
+      }
+    }
+    return results;
+  }
+
   async getEvaluationById(evaluationId: string): Promise<IntakeEvaluation | undefined> {
     const ev = this.evaluations.get(evaluationId);
     if (!ev) return undefined;

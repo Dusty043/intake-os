@@ -252,6 +252,38 @@ export async function getAuditTrail(id: string, actor: UiActor): Promise<AuditEv
   return request(`/intakes/${id}/audit`, { headers: actorHeaders(actor) });
 }
 
+export async function getAiUsage(
+  actor: UiActor,
+  filters?: { intakeId?: string; startDate?: string; endDate?: string },
+) {
+  const params = new URLSearchParams();
+  if (filters?.intakeId) params.set("intakeId", filters.intakeId);
+  if (filters?.startDate) params.set("startDate", filters.startDate);
+  if (filters?.endDate) params.set("endDate", filters.endDate);
+  const qs = params.toString();
+  return request<{
+    runs: Array<AgentRun & { intakeId: string }>;
+    totalCostUsd: number;
+    totalTokens: number;
+    runCount: number;
+    byModel: Record<string, { count: number; costUsd: number; tokens: number }>;
+    byAgentRole: Record<string, { count: number; costUsd: number; tokens: number }>;
+    byIntake: Record<string, { count: number; costUsd: number; tokens: number }>;
+  }>(`/admin/ai-usage${qs ? `?${qs}` : ""}`, { headers: actorHeaders(actor) });
+}
+
+export async function getAiUsageSummary(actor: UiActor, month?: string) {
+  const qs = month ? `?month=${encodeURIComponent(month)}` : "";
+  return request<{
+    month: string;
+    totalCostUsd: number;
+    totalTokens: number;
+    runCount: number;
+    byModel: Record<string, { count: number; costUsd: number }>;
+    byAgentRole: Record<string, { count: number; costUsd: number }>;
+  }>(`/admin/ai-usage/summary${qs}`, { headers: actorHeaders(actor) });
+}
+
 export async function checkHealth(): Promise<{ status: string }> {
   const res = await fetch(`${BASE}/health`, { credentials: "include" });
   return res.json() as Promise<{ status: string }>;

@@ -1,6 +1,7 @@
 import { Module } from "@nestjs/common";
 import { APP_GUARD } from "@nestjs/core";
 import { ThrottlerGuard, ThrottlerModule } from "@nestjs/throttler";
+import { AdminModule } from "./modules/admin/admin.module.js";
 import { AuthModule } from "./modules/auth/auth.module.js";
 import { Bitrix24Module } from "./modules/bitrix24/bitrix24.module.js";
 import { HealthModule } from "./modules/health/health.module.js";
@@ -23,6 +24,7 @@ const rlConfig = loadRateLimitConfig();
     AuthModule,
     HealthModule,
     IntakeModule,
+    AdminModule,
     Bitrix24Module,
   ],
   providers: [

@@ -1,5 +1,33 @@
 # Build Log
 
+## 2026-06-22 — TASK-0030: AI Cost Governance
+
+Token/cost data was already flowing through AgentRun records. Wired the read side: admin usage endpoints, cost badge in evaluation panel, admin AI usage dashboard.
+
+Files changed:
+- `src/application/providers/model-cost-registry.ts` — NEW: model cost lookup with `COST_INPUT_<SLUG>` env-var overrides and built-in defaults for known models
+- `src/application/types.ts` — ADD: `listAllAgentRuns()` to `ProjectIntakeStore` interface
+- `src/application/in-memory-store.ts` — IMPL: `listAllAgentRuns()` with intakeId/date filters
+- `apps/api/src/persistence/prisma-project-intake-store.ts` — IMPL: `listAllAgentRuns()` with Prisma join to evaluation
+- `apps/api/src/modules/admin/ai-usage.controller.ts` — NEW: `GET /admin/ai-usage` and `GET /admin/ai-usage/summary`
+- `apps/api/src/modules/admin/admin.module.ts` — NEW: admin module
+- `apps/api/src/app.module.ts` — ADD: AdminModule
+- `apps/web/src/lib/api-client.ts` — ADD: `getAiUsage()` and `getAiUsageSummary()`
+- `apps/web/src/components/EvaluationPanel.tsx` — ADD: `AiCostBadge` showing estimated cost per evaluation
+- `apps/web/src/app/admin/ai-usage/page.tsx` — NEW: admin AI usage dashboard with monthly summary + by-model/by-role breakdowns
+- `src/index.ts` — EXPORT: token-cost and model-cost-registry
+- `tests/ai-cost-governance.test.mjs` — NEW: 21 unit tests
+
+Commands run:
+```
+npm run build:core && npm run api:build   # clean
+npm test                                  # 504/504 pass
+```
+
+Notes:
+- Model costs for the analysis providers continue to be loaded via the existing `OPENAI_INPUT_COST_PER_1M_TOKENS` / `ANTHROPIC_INPUT_COST_PER_1M_TOKENS` env vars in `analysis-provider-config.ts` — the new `model-cost-registry.ts` is a standalone utility available for other callers
+- Admin endpoints require `admin` or `devops_lead` role, checked in controller
+
 ## 2026-06-22 — TASK-0029: Rate Limiting
 
 Wired `@nestjs/throttler` with global + per-route limits and env-var overrides.

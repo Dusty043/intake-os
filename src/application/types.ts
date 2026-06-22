@@ -294,6 +294,7 @@ export interface ProjectIntakeStore {
   listEvaluationsForIntake(intakeId: string): Promise<IntakeEvaluation[]>;
   getLatestEvaluationForIntake(intakeId: string): Promise<IntakeEvaluation | undefined>;
   listAgentRuns(evaluationId: string): Promise<AgentRunRecord[]>;
+  listAllAgentRuns(filters?: { intakeId?: string; startDate?: string; endDate?: string }): Promise<Array<AgentRunRecord & { intakeId: string }>>;
   getEvaluationById?(evaluationId: string): Promise<IntakeEvaluation | undefined>;
 
   saveProvisioningRun(run: ProvisioningRun): Promise<ProvisioningRun>;

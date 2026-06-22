@@ -19,6 +19,8 @@ export * from "./application/intake-analysis-provider.js";
 export * from "./application/providers/analysis-provider-config.js";
 export * from "./application/providers/analysis-provider-router.js";
 export * from "./application/providers/mock-intake-analysis-provider.js";
+export * from "./application/providers/token-cost.js";
+export * from "./application/providers/model-cost-registry.js";
 export * from "./application/intake-controller.js";
 export * from "./application/intake-workflow-service.js";
 export * from "./application/provisioning-plan.js";

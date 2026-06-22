@@ -52,6 +52,26 @@ function QualityScoreBreakdown({ score }: { score: QualityScore }) {
   );
 }
 
+// ─── AI cost badge ────────────────────────────────────────────────────────────
+
+function AiCostBadge({ agentRuns }: { agentRuns: AgentRun[] }) {
+  if (agentRuns.length === 0) return null;
+  const hasAnyCost = agentRuns.some((r) => r.estimatedCostUsd != null);
+  const total = agentRuns.reduce((sum, r) => sum + (r.estimatedCostUsd ?? 0), 0);
+  return (
+    <div className="flex items-center gap-2 text-xs text-gray-500">
+      <span className="font-medium">AI Cost:</span>
+      {hasAnyCost ? (
+        <span className="font-mono text-gray-700">~${total.toFixed(4)}</span>
+      ) : (
+        <span className="italic">cost unknown</span>
+      )}
+      <span className="text-gray-400">({agentRuns.length} agent run{agentRuns.length !== 1 ? "s" : ""})</span>
+      <span className="text-gray-400 italic text-xs">estimated</span>
+    </div>
+  );
+}
+
 // ─── Evaluation summary card ──────────────────────────────────────────────────
 
 function EvaluationSummaryCard({ evaluation }: { evaluation: IntakeEvaluation }) {
@@ -259,6 +279,12 @@ export function EvaluationPanel({
       </div>
 
       <EvaluationSummaryCard evaluation={evaluation} />
+
+      {agentRuns && agentRuns.length > 0 && (
+        <div className="px-1">
+          <AiCostBadge agentRuns={agentRuns} />
+        </div>
+      )}
 
       {warnings.length > 0 && (
         <div className="card p-5 space-y-2">
