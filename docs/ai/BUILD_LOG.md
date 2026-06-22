@@ -1,5 +1,27 @@
 # Build Log
 
+## 2026-06-23 — QA Run + Frontend Role-Guard Fixes
+
+Standard-tier QA of the running app at http://localhost:8080 (dev_headers mode).
+
+Issues found and fixed:
+- **ISSUE-001 (Medium):** Mark Plan Ready button visible to all roles — now gated to `devops_lead` and `admin`
+- **ISSUE-002 (Medium):** Generate Mock AI Draft button visible to `request_creator` — now gated to roles with `generate_evaluation` permission
+- **ISSUE-003 (Low/prod):** Debug tab visible to all roles — deferred; restrict before OAuth activation
+- **ISSUE-004 (Low):** Approvals tab slow initial load (~3s) — deferred, non-functional
+- **ISSUE-005 (Low):** Intakes table overflow on mobile — deferred, low-priority internal tool
+
+Health score: **82/100**. No critical or high bugs. API enforces all permissions correctly throughout.
+
+Files changed:
+- `apps/web/src/app/intakes/[id]/page.tsx` — ADD `useActor()` to OverviewTab; role-guard Generate Mock AI Draft and Mark Plan Ready buttons
+- `.gstack/qa-reports/qa-report-localhost-2026-06-22.md` — NEW: full QA report
+
+Commands run:
+```
+npm run typecheck   # clean
+```
+
 ## 2026-06-22 — TASK-0030: AI Cost Governance
 
 Token/cost data was already flowing through AgentRun records. Wired the read side: admin usage endpoints, cost badge in evaluation panel, admin AI usage dashboard.

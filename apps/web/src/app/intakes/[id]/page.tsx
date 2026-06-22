@@ -97,6 +97,7 @@ function OverviewTab({
   audit: AuditEvent[];
   onAction: (action: string, payload?: unknown) => Promise<void>;
 }) {
+  const { actor } = useActor();
   const [busy, setBusy] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
@@ -158,7 +159,7 @@ function OverviewTab({
               onResubmit={handleResubmitPanel}
             />
           )}
-          {["submitted", "intake_review"].includes(s) && !hasDraft && (
+          {["submitted", "intake_review"].includes(s) && !hasDraft && actor.role !== "request_creator" && (
             <ActionBtn onClick={() => { void run("mock_draft"); }} loading={busy === "mock_draft"} loadingLabel="Generating mock AI draft…" label="Generate Mock AI Draft" variant="secondary" />
           )}
           {hasDraft && !hasPkg && (
@@ -1130,7 +1131,7 @@ function DistributionTab({
             </dl>
 
             {/* Governance actions */}
-            {!planReady && !isDistributed && !isExecuting && status === "approved" && plan.validation?.valid && (
+            {!planReady && !isDistributed && !isExecuting && status === "approved" && plan.validation?.valid && (actor.role === "devops_lead" || actor.role === "admin") && (
               <div className="border-t border-gray-100 pt-4 flex items-center gap-3">
                 <button
                   className="btn-primary"
