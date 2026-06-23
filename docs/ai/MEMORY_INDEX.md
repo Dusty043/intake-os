@@ -53,6 +53,7 @@ Generated at: 2026-06-09T14:53:20.716Z
 - `docs/ai/tasks/TASK-0031-post-distribution-lifecycle.md`
 - `docs/ai/tasks/TASK-0032-input-validation-hardening.md`
 - `docs/ai/tasks/TASK-0033-google-oauth.md`
+- `docs/ai/tasks/TASK-0034-roster-integration.md`
 
 ## Deployment Docs
 

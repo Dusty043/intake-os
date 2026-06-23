@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, HttpCode } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Param, Post, HttpCode } from "@nestjs/common";
 import { Throttle } from "@nestjs/throttler";
 import { loadRateLimitConfig } from "../../config/rate-limit.config.js";
 import { toEvaluationSummaryDto } from "./dto/evaluation.dto.js";
@@ -21,6 +21,7 @@ import { MarkResolvedDto } from "./dto/mark-resolved.dto.js";
 import { RequestChangesDto } from "./dto/request-changes.dto.js";
 import { ReviseAnalysisDraftDto } from "./dto/revise-analysis-draft.dto.js";
 import { LifecycleTransitionDto, lifecycleActions } from "./dto/lifecycle-transition.dto.js";
+import { OverrideAssignmentDto } from "./dto/override-assignment.dto.js";
 import type { LifecycleAction } from "../../../../../src/domain/lifecycle-transitions.js";
 import { ValidationError } from "../../../../../src/application/errors.js";
 
@@ -264,6 +265,35 @@ export class IntakeHttpController {
     @Param("evaluationId") evaluationId: string,
   ) {
     return this.workflowService.getEvaluationForIntake(id, evaluationId);
+  }
+
+  @Post(":id/assignment")
+  @HttpCode(200)
+  @ApiOperation({ summary: "Manually override developer assignment" })
+  async overrideAssignment(
+    @Param("id") id: string,
+    @Body() body: OverrideAssignmentDto,
+    @CurrentActor() actor: AuthenticatedActor,
+  ) {
+    const record = await this.workflowService.overrideAssignment(
+      id,
+      toDomainActor(actor),
+      body.developerName,
+      body.reason,
+      body.developerId,
+    );
+    return record;
+  }
+
+  @Delete(":id/assignment")
+  @HttpCode(200)
+  @ApiOperation({ summary: "Clear developer assignment override" })
+  async clearAssignmentOverride(
+    @Param("id") id: string,
+    @CurrentActor() actor: AuthenticatedActor,
+  ) {
+    const record = await this.workflowService.clearAssignmentOverride(id, toDomainActor(actor));
+    return record;
   }
 
   @Post(":id/lifecycle/:action")

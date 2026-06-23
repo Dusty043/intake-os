@@ -1,5 +1,43 @@
 # Build Log
 
+## 2026-06-24 — TASK-0034: Roster Integration + Refinement
+
+Roster API integration with graceful degradation, manual assignment override, and UI card.
+Also: ISSUE-003 Debug tab restricted to admin, ISSUE-002 AI Draft empty-state role guard.
+
+Files changed:
+- `src/application/roster/roster-types.ts` — NEW: `TeamMemberRosterRecord`, `ScoredRosterMember`, `RosterAssignmentResult` interfaces
+- `src/application/roster/roster-api-client.ts` — NEW: HTTP client; graceful degradation when `ROSTER_API_URL` unset; normalizes any response shape
+- `src/application/roster/roster-scorer.ts` — NEW: scoring algorithm (skills + project type + availability + capacity − risk penalties); returns sorted ranked list with backup
+- `src/application/roster/index.ts` — NEW: barrel export
+- `src/application/intake-analysis.ts` — ADD: `rosterResult` option to `BuildMockAnalysisDraftOptions`; `buildAssignmentRecommendation` uses live roster data when available, falls back to advisory stub; updated `DeveloperAssignmentRecommendationDraft` with `rosterConnected`, `backupDeveloperId/Name`, `scoringSignals`
+- `src/application/providers/mock-intake-analysis-provider.ts` — INJECT: optional `RosterApiClient`; fetches roster and scores before building draft
+- `src/application/intake-workflow-service.ts` — ADD: `rosterClient` option; `overrideAssignment()` and `clearAssignmentOverride()` methods; import RosterApiClient
+- `src/application/types.ts` — ADD: `assignmentOverride` field on `ProjectIntakeRecord`
+- `src/application/evaluation-draft-mapper.ts` — FIX: add `rosterConnected: false` to stub assignment
+- `src/application/providers/draft-output-mapper.ts` — FIX: add `rosterConnected: false` to stub assignment
+- `apps/api/src/modules/intake/dto/override-assignment.dto.ts` — NEW: DTO
+- `apps/api/src/modules/intake/intake.controller.ts` — ADD: `POST /intakes/:id/assignment` and `DELETE /intakes/:id/assignment`
+- `apps/api/src/runtime/runtime.module.ts` — WIRE: `RosterApiClient` from `ROSTER_API_URL` + `ROSTER_API_KEY` env vars
+- `apps/web/src/lib/types.ts` — ADD: `AssignmentRecommendation`, `AssignmentOverride` types; `assignmentOverride` on `ProjectIntakeRecord`
+- `apps/web/src/lib/api-client.ts` — ADD: `overrideAssignment()`, `clearAssignmentOverride()`
+- `apps/web/src/components/AssignmentCard.tsx` — NEW: UI card with confidence bar, skill chips, workload signals, backup, override form
+- `apps/web/src/app/intakes/[id]/page.tsx` — WIRE: `AssignmentCard` in AI Draft tab; Debug tab restricted to admin role; AI Draft empty-state button role-gated
+- `tests/roster.test.mjs` — NEW: 10 unit tests for scorer + client
+
+Env vars to add to `.env.server` when roster is live:
+```
+ROSTER_API_URL=https://ai-team.simple.biz/api/roster
+ROSTER_API_KEY=<optional>
+```
+
+Commands run:
+```
+npm run build:core && npm run api:build   # clean
+npm run typecheck                         # clean
+npm test                                  # 592/592 pass
+```
+
 ## 2026-06-23 — QA Run + Frontend Role-Guard Fixes
 
 Standard-tier QA of the running app at http://localhost:8080 (dev_headers mode).

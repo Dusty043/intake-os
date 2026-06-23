@@ -63,10 +63,11 @@ export function mapModelOutputToDraft(
     subtasks,
     assignmentRecommendation: {
       confidence: 0.5,
-      reason: "Assignment recommendation pending roster integration (TASK-0015).",
+      reason: "Assignment recommendation pending roster integration.",
       matchedSkills: output.recommendedTechStack.slice(0, 4),
       workloadSignals: ["Roster API not connected"],
       risks: ["Assignment is advisory until roster integration is complete"],
+      rosterConnected: false,
     },
     missingInformation: output.missingInformation,
     warnings: output.warnings,

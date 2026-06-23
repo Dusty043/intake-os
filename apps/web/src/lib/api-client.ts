@@ -343,6 +343,30 @@ export async function executeLifecycleTransition(
   });
 }
 
+export async function overrideAssignment(
+  intakeId: string,
+  actor: UiActor,
+  developerName: string,
+  reason: string,
+  developerId?: string,
+): Promise<ProjectIntakeRecord> {
+  return request(`/intakes/${intakeId}/assignment`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...actorHeaders(actor) },
+    body: JSON.stringify({ developerName, reason, developerId }),
+  });
+}
+
+export async function clearAssignmentOverride(
+  intakeId: string,
+  actor: UiActor,
+): Promise<ProjectIntakeRecord> {
+  return request(`/intakes/${intakeId}/assignment`, {
+    method: "DELETE",
+    headers: { ...actorHeaders(actor) },
+  });
+}
+
 export async function listDistributedIntakes(actor: UiActor): Promise<ProjectIntakeRecord[]> {
   const result = await listIntakes(actor);
   return result.filter((r) =>

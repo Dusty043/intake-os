@@ -123,6 +123,28 @@ export type UiActor = {
   role: ActorRole;
 };
 
+export type AssignmentRecommendation = {
+  developerId?: string;
+  displayName?: string;
+  confidence: number;
+  reason: string;
+  matchedSkills: string[];
+  workloadSignals: string[];
+  risks: string[];
+  backupDeveloperId?: string;
+  backupDisplayName?: string;
+  rosterConnected: boolean;
+  scoringSignals?: string[];
+};
+
+export type AssignmentOverride = {
+  developerId?: string;
+  developerName: string;
+  reason: string;
+  overriddenAt: string;
+  overriddenBy: { id: string; role: string; displayName?: string };
+};
+
 export type PendingClarificationQuestion = {
   id: string;
   question: string;
@@ -151,6 +173,7 @@ export type ProjectIntakeRecord = {
     missingFields: string[];
   };
   priorClarifications?: Array<{ question: string; answer: string }>;
+  assignmentOverride?: AssignmentOverride;
   lifecycleNote?: string;
   blockedReason?: string;
   blockedAt?: string;
@@ -187,7 +210,7 @@ export type IntakeAnalysisDraft = {
     description?: string;
     storyPoints?: number;
   }>;
-  assignmentRecommendation?: unknown;
+  assignmentRecommendation?: AssignmentRecommendation;
   missingInformation?: string[];
   warnings?: string[];
   proposedArchitecture?: string;
@@ -224,7 +247,7 @@ export type ReviewedProjectPackage = {
     description?: string;
     storyPoints?: number;
   }>;
-  assignmentRecommendation?: unknown;
+  assignmentRecommendation?: AssignmentRecommendation;
   missingInformation?: string[];
   [key: string]: unknown;
 };

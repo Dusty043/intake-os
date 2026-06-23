@@ -10,6 +10,7 @@ import { createMockRegistry } from "../../../../src/application/provisioning/moc
 import type { MockExecutorMode } from "../../../../src/application/provisioning/mock-executor.js";
 import { GoogleChatNotifier } from "../../../../src/application/notifications/google-chat-notifier.js";
 import { loadGoogleChatConfig } from "../../../../src/application/notifications/google-chat-config.js";
+import { RosterApiClient } from "../../../../src/application/roster/index.js";
 import { ANALYSIS_PROVIDER } from "../ai/provider.token.js";
 import { ApplicationExceptionFilter } from "../common/application-exception.filter.js";
 import { PrismaProjectIntakeStore } from "../persistence/prisma-project-intake-store.js";
@@ -65,12 +66,23 @@ const logger = new Logger("RuntimeModule");
           logger.log("Google Chat notifications: disabled (GOOGLE_CHAT_WEBHOOK_URL not set)");
         }
 
+        const rosterClient = new RosterApiClient({
+          baseUrl: process.env["ROSTER_API_URL"],
+          apiKey: process.env["ROSTER_API_KEY"],
+        });
+        if (rosterClient.isConnected) {
+          logger.log(`Roster API: ${process.env["ROSTER_API_URL"]}`);
+        } else {
+          logger.log("Roster API: not configured (ROSTER_API_URL not set)");
+        }
+
         return new IntakeWorkflowService({
           store,
           analysisProvider,
           orchestrator: useOrchestrator ? orchestrator : undefined,
           provisioningRegistry,
           notifier,
+          rosterClient,
         });
       },
     },

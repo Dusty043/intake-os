@@ -1,6 +1,7 @@
 import { getProjectTypeDefinition, getRequiredEvaluationSections } from "../domain/project-type-registry.js";
 import type { Actor, ProjectType } from "../domain/types.js";
 import type { ProjectIntakeRecord } from "./types.js";
+import type { RosterAssignmentResult } from "./roster/roster-types.js";
 
 export const intakeAnalysisDraftSchemaVersion = "intake-analysis-draft.v1" as const;
 
@@ -59,6 +60,10 @@ export interface DeveloperAssignmentRecommendationDraft {
   matchedSkills: readonly string[];
   workloadSignals: readonly string[];
   risks: readonly string[];
+  backupDeveloperId?: string;
+  backupDisplayName?: string;
+  rosterConnected: boolean;
+  scoringSignals?: readonly string[];
 }
 
 export interface IntakeAnalysisDraft {
@@ -106,6 +111,7 @@ export interface BuildMockAnalysisDraftOptions {
   actor: Actor;
   idFactory: (prefix: string) => string;
   input?: GenerateMockAnalysisDraftInput;
+  rosterResult?: RosterAssignmentResult;
 }
 
 export function buildMockIntakeAnalysisDraft(
@@ -166,7 +172,7 @@ export function buildMockIntakeAnalysisDraft(
     infrastructureRequirements,
     brief,
     subtasks: buildSubtasks(intake.projectType, estimatedStoryPoints, infrastructureRequirements),
-    assignmentRecommendation: buildAssignmentRecommendation(intake.projectType, recommendedTechStack),
+    assignmentRecommendation: buildAssignmentRecommendation(intake.projectType, recommendedTechStack, options.rosterResult),
     missingInformation,
     warnings: buildWarnings(missingInformation, infrastructureRequirements),
     proposedArchitecture: buildProposedArchitecture(intake.projectType, recommendedTechStack),
@@ -363,14 +369,38 @@ function buildSubtasks(
 function buildAssignmentRecommendation(
   projectType: ProjectType,
   recommendedTechStack: readonly string[],
+  roster?: RosterAssignmentResult,
 ): DeveloperAssignmentRecommendationDraft {
+  if (roster?.rosterConnected && roster.recommended) {
+    const { member, matchedSkills, riskPenalties, score } = roster.recommended;
+    const workloadSignals: string[] = roster.scoringSignals.slice();
+    if (member.availability) workloadSignals.push(`Availability: ${member.availability}`);
+    if (member.currentLoad != null && member.maxCapacity != null) {
+      workloadSignals.push(`Load: ${member.currentLoad}/${member.maxCapacity}`);
+    }
+    return {
+      developerId: member.id,
+      displayName: member.name,
+      confidence: Math.min(0.95, 0.5 + score * 0.1),
+      reason: `Roster match: ${member.name} has ${matchedSkills.length} skill(s) aligned with this ${projectType.replaceAll("_", " ")} project.`,
+      matchedSkills,
+      workloadSignals,
+      risks: riskPenalties,
+      backupDeveloperId: roster.backup?.member.id,
+      backupDisplayName: roster.backup?.member.name,
+      rosterConnected: true,
+      scoringSignals: roster.scoringSignals,
+    };
+  }
+
   const matchedSkills = recommendedTechStack.slice(0, 4);
   return {
     confidence: 0.52,
-    reason: `Mock recommendation only. Match a developer with ${projectType.replaceAll("_", " ")} experience and skills in ${matchedSkills.join(", ")}.`,
+    reason: `Advisory only — roster not connected. Match a developer with ${projectType.replaceAll("_", " ")} experience and skills in ${matchedSkills.join(", ")}.`,
     matchedSkills,
-    workloadSignals: ["Roster API is not connected in TASK-0005", "Current workload must be reviewed manually"],
-    risks: ["Assignment is advisory until roster/workload integration is implemented"],
+    workloadSignals: ["Roster API not connected", "Current workload must be reviewed manually"],
+    risks: ["Assignment is advisory until roster integration is complete"],
+    rosterConnected: false,
   };
 }
 

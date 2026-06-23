@@ -33,8 +33,10 @@ import { getStatusInfo } from "@/lib/status";
 import type { AgentRun, AuditEvent, IntakeEvaluation, ProjectIntakeRecord, ProvisioningRun, ReviseAnalysisDraftInput, UiActor } from "@/lib/types";
 import { ClarificationPanel } from "@/components/ClarificationPanel";
 import { EvaluationPanel } from "@/components/EvaluationPanel";
+import { AssignmentCard } from "@/components/AssignmentCard";
 
-const TABS = ["Overview", "AI Draft", "Evaluation", "Reviewed Package", "Approvals", "Distribution", "Audit Trail", "Debug"];
+const BASE_TABS = ["Overview", "AI Draft", "Evaluation", "Reviewed Package", "Approvals", "Distribution", "Audit Trail"] as const;
+const ADMIN_TABS = [...BASE_TABS, "Debug"] as const;
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -219,6 +221,7 @@ function AiDraftTab({
   intake: ProjectIntakeRecord;
   onAction: (action: string, payload?: unknown) => Promise<void>;
 }) {
+  const { actor } = useActor();
   const draft = intake.latestAnalysisDraft;
   const [busy, setBusy] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -243,7 +246,7 @@ function AiDraftTab({
     return (
       <div className="card p-12 text-center">
         <p className="text-brand-muted font-medium">No AI draft has been generated yet.</p>
-        {["submitted", "intake_review"].includes(intake.status) && (
+        {["submitted", "intake_review"].includes(intake.status) && actor.role !== "request_creator" && (
           <button
             className="btn-primary mt-4"
             onClick={() => { void run("mock_draft"); }}
@@ -1287,6 +1290,7 @@ function IntakeDetailContent() {
   const searchParams = useSearchParams();
 
   const activeTab = searchParams.get("tab") ?? "Overview";
+  const TABS = actor.role === "admin" ? ADMIN_TABS : BASE_TABS;
 
   const [intake, setIntake] = useState<ProjectIntakeRecord | null>(null);
   const [audit, setAudit] = useState<AuditEvent[]>([]);
@@ -1433,7 +1437,17 @@ function IntakeDetailContent() {
         <OverviewTab intake={intake} audit={audit} onAction={handleAction} />
       )}
       {activeTab === "AI Draft" && (
-        <AiDraftTab intake={intake} onAction={handleAction} />
+        <div className="space-y-4">
+          <AiDraftTab intake={intake} onAction={handleAction} />
+          {intake.latestAnalysisDraft && (
+            <AssignmentCard
+              intake={intake}
+              actor={actor}
+              onUpdate={setIntake}
+              canOverride={["intake_owner", "devops_lead", "admin"].includes(actor.role)}
+            />
+          )}
+        </div>
       )}
       {activeTab === "Evaluation" && (
         <EvaluationPanel

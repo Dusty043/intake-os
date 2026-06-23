@@ -23,6 +23,7 @@ import type { ProvisioningRun, ProvisioningTargetResult } from "../domain/provis
 import type { GoogleChatNotifier } from "./notifications/google-chat-notifier.js";
 import { normalizeProvisioningError } from "../domain/error-categories.js";
 import { calculateBackoffMs, sleep } from "./provisioning/backoff.js";
+import type { RosterApiClient } from "./roster/index.js";
 import type {
   AcceptAnalysisDraftInput,
   ApprovalDecisionInput,
@@ -47,6 +48,7 @@ export interface IntakeWorkflowServiceOptions {
   orchestrator?: EvaluationOrchestrator;
   provisioningRegistry?: ProvisioningRegistry;
   notifier?: GoogleChatNotifier;
+  rosterClient?: RosterApiClient;
 }
 
 export class IntakeWorkflowService {
@@ -62,7 +64,7 @@ export class IntakeWorkflowService {
     this.store = options.store;
     this.clock = options.clock ?? (() => new Date().toISOString());
     this.idFactory = options.idFactory ?? createReadableId;
-    this.analysisProvider = options.analysisProvider ?? new MockIntakeAnalysisProvider();
+    this.analysisProvider = options.analysisProvider ?? new MockIntakeAnalysisProvider(options.rosterClient);
     this.orchestrator = options.orchestrator;
     this.provisioningRegistry = options.provisioningRegistry;
     this.notifier = options.notifier;
@@ -854,6 +856,55 @@ export class IntakeWorkflowService {
       },
     });
 
+    return saved;
+  }
+
+  async overrideAssignment(
+    id: string,
+    actor: Actor,
+    developerName: string,
+    reason: string,
+    developerId?: string,
+  ): Promise<ProjectIntakeRecord> {
+    ensurePermission(actor, "generate_evaluation");
+    const record = await this.requireIntake(id);
+    const now = this.clock();
+    const updated: ProjectIntakeRecord = {
+      ...record,
+      assignmentOverride: {
+        developerId,
+        developerName,
+        reason,
+        overriddenAt: now,
+        overriddenBy: actor,
+      },
+      updatedAt: now,
+    };
+    const saved = await this.store.saveIntake(updated);
+    await this.audit({
+      record: saved,
+      actor,
+      action: "ASSIGNMENT_OVERRIDDEN",
+      timestamp: now,
+      metadata: { developerName, developerId, reason },
+    });
+    return saved;
+  }
+
+  async clearAssignmentOverride(id: string, actor: Actor): Promise<ProjectIntakeRecord> {
+    ensurePermission(actor, "generate_evaluation");
+    const record = await this.requireIntake(id);
+    const now = this.clock();
+    const { assignmentOverride: _removed, ...rest } = record;
+    const updated: ProjectIntakeRecord = { ...rest, updatedAt: now };
+    const saved = await this.store.saveIntake(updated);
+    await this.audit({
+      record: saved,
+      actor,
+      action: "ASSIGNMENT_OVERRIDE_CLEARED",
+      timestamp: now,
+      metadata: {},
+    });
     return saved;
   }
 

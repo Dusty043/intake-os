@@ -215,6 +215,7 @@ export function evaluationToLegacyDraft(
       matchedSkills: recommendedTechStack.slice(0, 4),
       workloadSignals: ["Roster API not connected"],
       risks: ["Assignment is advisory until roster integration is complete"],
+      rosterConnected: false,
     },
     missingInformation,
     warnings,

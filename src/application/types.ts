@@ -221,6 +221,15 @@ export interface ProjectIntakeRecord extends ProjectRequestSnapshot {
   };
   priorClarifications?: readonly PriorClarification[];
 
+  // Developer assignment override — set manually, takes precedence over AI recommendation
+  assignmentOverride?: {
+    developerId?: string;
+    developerName: string;
+    reason: string;
+    overriddenAt: string;
+    overriddenBy: Actor;
+  };
+
   // Post-distribution lifecycle metadata (all optional — only set after distribution)
   lifecycleNote?: string;
   blockedReason?: string;
