@@ -26,6 +26,7 @@ export interface AnalysisProviderConfig {
   bedrock?: {
     region: string;
     modelId: string;
+    premiumModelId?: string;
     providerMode: string;
     inputCostPer1MTokens: number | null;
     outputCostPer1MTokens: number | null;
@@ -59,7 +60,7 @@ export function loadAnalysisProviderConfig(env: NodeJS.ProcessEnv = process.env)
     if (!apiKey) throw new ConfigurationError("AI_PROVIDER=openai requires OPENAI_API_KEY.");
     config.openai = {
       apiKey,
-      model: env["OPENAI_MODEL"] ?? "gpt-4o-mini",
+      model: env["OPENAI_TASKS_MODEL"] ?? env["OPENAI_MODEL"] ?? "gpt-4o-mini",
       inputCostPer1MTokens: parseOptionalFloat(env["OPENAI_INPUT_COST_PER_1M_TOKENS"]),
       outputCostPer1MTokens: parseOptionalFloat(env["OPENAI_OUTPUT_COST_PER_1M_TOKENS"]),
     };
@@ -82,6 +83,7 @@ export function loadAnalysisProviderConfig(env: NodeJS.ProcessEnv = process.env)
     config.bedrock = {
       region: env["AWS_REGION"] ?? "us-east-1",
       modelId,
+      premiumModelId: env["BEDROCK_PREMIUM_MODEL_ID"] ?? undefined,
       providerMode: env["BEDROCK_PROVIDER_MODE"] ?? "converse",
       inputCostPer1MTokens: parseOptionalFloat(env["BEDROCK_INPUT_COST_PER_1M_TOKENS"]),
       outputCostPer1MTokens: parseOptionalFloat(env["BEDROCK_OUTPUT_COST_PER_1M_TOKENS"]),
