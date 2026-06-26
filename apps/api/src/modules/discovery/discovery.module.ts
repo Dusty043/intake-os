@@ -1,4 +1,5 @@
 import { Module } from "@nestjs/common";
+import type { ProjectIntakeStore } from "../../../../../src/application/types.js";
 import {
   InMemoryDiscoverySessionStore,
   DiscoveryOrchestrator,
@@ -15,9 +16,10 @@ import {
   OpenAIClarificationAgent,
   OpenAIProposalComposerAgent,
 } from "../../../../../src/application/discovery/index.js";
+import { PROJECT_INTAKE_STORE } from "../../persistence/store.token.js";
 import { DiscoveryHttpController } from "./discovery.controller.js";
 
-function buildOrchestrator(): DiscoveryController {
+function buildOrchestrator(intakeStore?: ProjectIntakeStore): DiscoveryController {
   let _seq = 0;
   const idFactory = (prefix: string) =>
     `${prefix}-${Date.now().toString(36)}-${++_seq}`;
@@ -58,7 +60,7 @@ function buildOrchestrator(): DiscoveryController {
     clarificationAgent,
     proposalAgent,
     manifestAgent,
-    { idFactory, appBaseUrl: process.env["INTAKE_APP_URL"] },
+    { idFactory, appBaseUrl: process.env["INTAKE_APP_URL"], intakeStore },
   );
 
   return new DiscoveryController(orchestrator);
@@ -69,7 +71,8 @@ function buildOrchestrator(): DiscoveryController {
   providers: [
     {
       provide: "DISCOVERY_CONTROLLER",
-      useFactory: () => buildOrchestrator(),
+      inject: [PROJECT_INTAKE_STORE],
+      useFactory: (intakeStore: ProjectIntakeStore) => buildOrchestrator(intakeStore),
     },
   ],
 })

@@ -1,5 +1,37 @@
 # Build Log
 
+## 2026-06-27 — Live Demo: Discovery Engine + OpenAI Agents (gpt-5.5 + gpt-5.4-mini)
+
+**Status:** Full end-to-end Discovery→Intake pipeline demonstrated live on oreochiserver
+
+### What was demonstrated
+- Discovery Engine running fully live with OpenAI on oreochiserver (`docker-compose.server.yml`)
+- gpt-5.5 orchestrated the discovery conversation (intent, framing, solutions, clarification, direction, proposal)
+- gpt-5.4-mini used for all 12 evaluation agents (intake_brief, classification, architecture, risk_security, cost_effort, work_breakdown, distribution_plan, synthesis, quality_review, etc.)
+
+### Live session walkthrough (discovery-mqvd7n6m-1)
+Project: "Branded Client Portal for QuickBooks Invoices, Stripe Payments, and Support Ticketing"
+
+1. **Intent Detected** — gpt-5.5 extracted the core need from free-form description, detected "Solution Bias" (user named Stripe+QuickBooks instead of describing pain)
+2. **Problem Framed** — Full problem frame with 5 affected user groups, 8 pain points, 16 unknowns, confidence scores (90% / 84% / 76% / 82% / 68% / 74%)
+3. **Solutions Generated** — 4 options: off-the-shelf SaaS (low), custom managed portal (medium, Recommended), hybrid portal (medium), enterprise event-driven (high)
+4. **Clarification** — 2 blocking + 1 important questions posed; after answers, "Solution Bias" warning cleared, confidence scores updated upward
+5. **Direction Selected** — Recommended option selected; orchestrator advanced to `direction_selected`
+6. **Proposal Ready** — gpt-5.5 composed full proposal with 6 epics and 8 open unknowns
+7. **Evaluation Ready** — Session reached `evaluation_ready`; `POST /discovery/:id/send-to-evaluation` created intake `intake-mqvduto1-14`
+
+### Bugs found during demo
+- **Frontend gap #1:** No "Generate Proposal" button shown after Direction Selected — proposal must be triggered via API manually (`POST /discovery/:id/proposal`)
+- **Frontend gap #2:** No "Send to Evaluation" button rendered when status is `evaluation_ready` — action must be triggered via API
+- **Persistence gap:** `send-to-evaluation` returns a valid `intakeRecord` but the intake is not persisted to the database — `GET /intakes/:id` returns 404. The `proposal-to-intake-adapter` creates the record object but the controller/orchestrator does not call `intakeRepository.save()`.
+
+### Infrastructure fixes (committed prior to demo)
+- `DynamoJobStatusStore` rewritten to use `DynamoDBDocumentClient` (was using `@aws-sdk/util-dynamodb` which was not in package.json)
+- `src/application/job-status-store.ts` — committed (was untracked)
+- `@aws-sdk/client-dynamodb` + `@aws-sdk/lib-dynamodb` added to package.json
+- OpenAI client fixes: `max_tokens` → `max_completion_tokens`, removed `temperature: 0.2` (gpt-5.x constraints)
+- Server correctly runs on `docker-compose.server.yml` (not `docker-compose.yml`)
+
 ## 2026-06-26 — Discovery Engine Phases 4+5+6: Manifest Generator + NestJS Module + Frontend UI
 
 **Test count:** 93/93 pass (discovery phases 1–4 only; core suite at 671 prior to these additions)

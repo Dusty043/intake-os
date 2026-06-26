@@ -8,7 +8,7 @@ import {
   confidenceTier,
   emptyConfidence,
 } from "../../domain/discovery.js";
-import type { ProjectIntakeRecord } from "../types.js";
+import type { ProjectIntakeRecord, ProjectIntakeStore } from "../types.js";
 import type { IDiscoverySessionStore } from "./discovery-session-store.js";
 import type {
   IClarificationAgent,
@@ -55,6 +55,7 @@ export interface DiscoveryOrchestratorOptions {
   idFactory: (prefix: string) => string;
   now?: () => string;
   appBaseUrl?: string;
+  intakeStore?: ProjectIntakeStore;
 }
 
 // ─── Orchestrator ─────────────────────────────────────────────────────────────
@@ -64,6 +65,7 @@ export class DiscoveryOrchestrator {
   private readonly idFactory: (prefix: string) => string;
   private readonly nowFn: () => string;
   private readonly appBaseUrl: string | undefined;
+  private readonly intakeStore: ProjectIntakeStore | undefined;
 
   constructor(
     private readonly store: IDiscoverySessionStore,
@@ -79,6 +81,7 @@ export class DiscoveryOrchestrator {
     this.idFactory = opts.idFactory;
     this.nowFn = opts.now ?? (() => new Date().toISOString());
     this.appBaseUrl = opts.appBaseUrl;
+    this.intakeStore = opts.intakeStore;
   }
 
   // ─── Start a new discovery session ───────────────────────────────────────
@@ -326,6 +329,10 @@ export class DiscoveryOrchestrator {
       now,
     );
 
+    const savedIntake = this.intakeStore
+      ? await this.intakeStore.saveIntake(intakeRecord)
+      : intakeRecord;
+
     const nextStatus = this.resolveStatus(session.status, "sent_to_evaluation");
     const newEvents: DiscoveryTimelineEvent[] = [];
     if (nextStatus !== session.status) newEvents.push(this.event(nextStatus, now));
@@ -336,7 +343,7 @@ export class DiscoveryOrchestrator {
       updatedAt: now,
     });
 
-    return { session: updatedSession, intakeRecord };
+    return { session: updatedSession, intakeRecord: savedIntake };
   }
 
   // ─── Generate provisioning manifest ──────────────────────────────────────
