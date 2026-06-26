@@ -1,0 +1,103 @@
+import OpenAI from "openai";
+import type { DiscoveryConfidence, ProblemFrame } from "../../../../domain/discovery.js";
+import type { DiscoveryAgentContext, DiscoveryAgentOptions, IProblemFramingAgent } from "../discovery-agent-contract.js";
+import { callStructured, makeClient } from "./openai-discovery-client.js";
+
+const schema = {
+  type: "object",
+  required: ["problemStatement", "affectedUsers", "currentProcess", "painPoints", "businessImpact", "successCriteria", "assumptions", "unknowns", "confidence"],
+  additionalProperties: false,
+  properties: {
+    problemStatement: { type: "string" },
+    affectedUsers: { type: "array", items: { type: "string" } },
+    currentProcess: { type: "string" },
+    painPoints: { type: "array", items: { type: "string" } },
+    businessImpact: { type: "string" },
+    successCriteria: { type: "array", items: { type: "string" } },
+    assumptions: { type: "array", items: { type: "string" } },
+    unknowns: { type: "array", items: { type: "string" } },
+    confidence: {
+      type: "object",
+      required: ["problemUnderstanding", "solutionFit", "scopeClarity", "technicalFeasibility", "stakeholderClarity", "downstreamMapping"],
+      additionalProperties: false,
+      properties: {
+        problemUnderstanding: { type: "number" },
+        solutionFit: { type: "number" },
+        scopeClarity: { type: "number" },
+        technicalFeasibility: { type: "number" },
+        stakeholderClarity: { type: "number" },
+        downstreamMapping: { type: "number" },
+      },
+    },
+  },
+} as const;
+
+type Output = {
+  problemStatement: string;
+  affectedUsers: string[];
+  currentProcess: string;
+  painPoints: string[];
+  businessImpact: string;
+  successCriteria: string[];
+  assumptions: string[];
+  unknowns: string[];
+  confidence: DiscoveryConfidence;
+};
+
+const SYSTEM = `You are a senior business analyst. Frame the problem clearly and score your confidence.
+
+Score each confidence dimension 0.0–1.0:
+- problemUnderstanding: how well you understand the problem
+- solutionFit: how clear the solution direction is
+- scopeClarity: how well-defined the scope is
+- technicalFeasibility: how confident you are it's technically achievable
+- stakeholderClarity: how clear the stakeholders and ownership are
+- downstreamMapping: how clear the Monday/GitHub work items would be
+
+Score 0.3 when information is sparse. Score 0.8+ when the information is thorough.`;
+
+export class OpenAIProblemFramingAgent implements IProblemFramingAgent {
+  private readonly client: OpenAI;
+  private readonly model: string;
+
+  constructor(apiKey: string, model: string) {
+    this.client = makeClient({ apiKey, model });
+    this.model = model;
+  }
+
+  async frameProblem(ctx: DiscoveryAgentContext, _opts: DiscoveryAgentOptions): Promise<{ frame: ProblemFrame; confidence: DiscoveryConfidence }> {
+    const conversation = ctx.messages.map(m => `${m.role.toUpperCase()}: ${m.content}`).join("\n");
+    const intentSummary = ctx.intent ? `Intent: ${ctx.intent.intentType} — ${ctx.intent.underlyingProblem}` : "";
+    const userPrompt = `${intentSummary}\n\nConversation:\n${conversation}\n\nFrame this problem.`;
+
+    const out = await callStructured<Output>(
+      this.client, this.model,
+      SYSTEM, userPrompt,
+      "problem_framing", schema as unknown as Record<string, unknown>,
+    );
+
+    const clamp = (v: number) => Math.max(0, Math.min(1, v));
+    const confidence: DiscoveryConfidence = {
+      problemUnderstanding: clamp(out.confidence.problemUnderstanding),
+      solutionFit: clamp(out.confidence.solutionFit),
+      scopeClarity: clamp(out.confidence.scopeClarity),
+      technicalFeasibility: clamp(out.confidence.technicalFeasibility),
+      stakeholderClarity: clamp(out.confidence.stakeholderClarity),
+      downstreamMapping: clamp(out.confidence.downstreamMapping),
+    };
+
+    return {
+      frame: {
+        problemStatement: out.problemStatement,
+        affectedUsers: out.affectedUsers,
+        currentProcess: out.currentProcess,
+        painPoints: out.painPoints,
+        businessImpact: out.businessImpact,
+        successCriteria: out.successCriteria,
+        assumptions: out.assumptions,
+        unknowns: out.unknowns,
+      },
+      confidence,
+    };
+  }
+}

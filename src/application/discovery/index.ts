@@ -9,3 +9,8 @@ export * from "./agents/mock-solution-generation-agent.js";
 export * from "./agents/mock-clarification-agent.js";
 export * from "./agents/mock-proposal-composer-agent.js";
 export * from "./agents/mock-manifest-generator-agent.js";
+export { OpenAIIntentExtractionAgent } from "./agents/openai/openai-intent-extraction-agent.js";
+export { OpenAIProblemFramingAgent } from "./agents/openai/openai-problem-framing-agent.js";
+export { OpenAISolutionGenerationAgent } from "./agents/openai/openai-solution-generation-agent.js";
+export { OpenAIClarificationAgent } from "./agents/openai/openai-clarification-agent.js";
+export { OpenAIProposalComposerAgent } from "./agents/openai/openai-proposal-composer-agent.js";
