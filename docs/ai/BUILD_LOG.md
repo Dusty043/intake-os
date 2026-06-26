@@ -1330,3 +1330,68 @@ Follow-up:
 
 **Handoff:**
 - Phase 3 next: Proposal composer agent, proposal completeness gate, evaluation handoff adapter (`ProjectProposal` → `ProjectIntakeRecord`), `POST /discovery/:id/send-to-evaluation`
+
+## 2026-06-27 — Discovery Engine Phases 3–6 Complete + Live OpenAI Wiring
+
+**Session:** Continuation (Phases 4–6 from 2026-06-26 BUILD_LOG, integrated with live agent activation)
+
+**Changes:**
+
+### Phases 3–4: Proposal Composer + Manifest Generator
+- `src/application/discovery/agents/mock-proposal-composer-agent.ts` — builds 12-dimension `ProjectProposal`; confidence-scored; completeness gate determines `evaluation_ready` status
+- `src/application/discovery/agents/mock-manifest-generator-agent.ts` — maps intent types to `recommendedAction`; populates Monday epics/tasks, GitHub labels, slug-formatted repo; `readyForLiveAdapter: false` (mock)
+- `src/application/discovery/proposal-to-intake-adapter.ts` — bidirectional `ProjectProposal ↔ ProjectIntakeRecord` mapping
+- `src/application/discovery/agents/discovery-agent-contract.ts` — added `IProposalComposerAgent`, `IManifestGeneratorAgent` interfaces
+- `src/application/discovery/discovery-orchestrator.ts` — added `composeProposal()`, `sendToEvaluation()`, `generateManifest()` methods
+- `src/application/discovery/discovery-controller.ts` — added 6 routes (POST /:id/proposal, POST /:id/manifest, POST /:id/send-to-evaluation, etc.)
+
+### Phase 5: NestJS DiscoveryModule
+- `apps/api/src/modules/discovery/discovery.module.ts` — module with `useFactory` wiring all 7 mock agents
+- `apps/api/src/modules/discovery/discovery.controller.ts` — `DiscoveryHttpController` with 10 routes
+- `apps/api/src/app.module.ts` — registered `DiscoveryModule`
+
+### Phase 6: Frontend Discovery UI
+- `apps/web/src/lib/discovery-client.ts` — typed API client for all 10 discovery endpoints
+- `apps/web/src/lib/discovery-types.ts` — TS types mirroring discovery domain
+- `apps/web/src/app/discovery/page.tsx` — session list with status badges
+- `apps/web/src/app/discovery/[id]/page.tsx` — three-panel session view (chat, timeline, understanding)
+- `apps/web/src/components/discovery/` — 6 components: `DiscoveryLayout`, `DiscoveryTimeline`, `DiscoveryChat`, `DiscoveryUnderstanding`, `DiscoveryStartModal`, `DiscoveryStartForm`
+
+### Monday Manifest Schema Alignment
+- Updated manifest to real 6-board Dev Ops Workspace structure:
+  - Board 2: Projects Portfolio (name, type, status, stack, startDate, targetLaunch, estimatedTotalSP)
+  - Board 3: Roadmap & Epics (typed items with SP and quarter)
+  - Board 4: Sprint Tasks (typed items → Backlog)
+  - Board 6: Microtasks & Ops (for microtask intents)
+- Architecture moved to GitHub README (project brief doc), not Monday board row
+
+### Live OpenAI Agents Wired
+- Replaced 7 mock agents with real OpenAI calls using two-model routing:
+  - `OPENAI_MODEL` → Discovery Engine orchestration (`gpt-5.5`)
+  - `OPENAI_TASKS_MODEL` → Evaluation/analysis tasks (`gpt-5.4-mini`)
+- `src/application/discovery/agents/openai-intent-extraction-agent.ts` — live agent (replaces mock)
+- `src/application/discovery/agents/openai-problem-framing-agent.ts` — live agent
+- `src/application/discovery/agents/openai-solution-generation-agent.ts` — live agent
+- `src/application/discovery/agents/openai-clarification-agent.ts` — live agent
+- `src/application/discovery/agents/openai-proposal-composer-agent.ts` — live agent
+- Manifest generator remains mock (deterministic)
+- `src/application/discovery/agents/index.ts` — factory routing to OpenAI when env enabled
+- `src/application/providers/analysis-provider-config.ts` — wired `OPENAI_TASKS_MODEL` for eval tasks
+
+### Environment Variables Added
+- `OPENAI_MODEL` (gpt-5.5, for discovery orchestration)
+- `OPENAI_TASKS_MODEL` (gpt-5.4-mini, for evaluation tasks)
+- `MONDAY_BOARD_ID=18419115951` (real 6-board workspace)
+- `INTAKE_APP_URL` (for README backlinks; blank until domain assigned)
+
+### Tests Updated
+- `tests/discovery-*.test.mjs` — all phases now test against live agents when credentials present, mock when absent
+- 685/685 pass (up from 592)
+
+**Deployed:** oreochiserver running live agents
+
+**Handoff:**
+- Live `gpt-5.4-mini` now handling all evaluation tasks (mock agents remain for fallback)
+- Monday manifest schema is aligned to real 6-board structure
+- Discovery Engine is 8-stage (intent → problem → solutions → clarification → direction → proposal → manifest → evaluation)
+- Evaluation Orchestrator receives populated 12-dimension proposals from Discovery Engine

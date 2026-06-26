@@ -1,437 +1,283 @@
 # Project Intake OS
 
-Internal pre-distribution control plane for Digital Solutions project intake, AI-assisted analysis drafts, approval, dry-run provisioning, and controlled handoff to downstream tools.
+Internal pre-distribution control plane for Digital Solutions project intake — AI-assisted evaluation, multi-gate approval, dry-run provisioning, and controlled handoff to Monday, GitHub, and Google Chat.
 
-## Current build state (TASK-0012)
+## What it does
 
-The governance spine is complete. The NestJS API runtime is stable. The minimal Next.js review UI is running. The private server runtime is ready for deployment.
+A project request enters as an intake. It moves through a governed workflow:
 
-Verified path:
-
-```text
-AI drafts → Human reviews → Workflow approves → Distribution preview uses ReviewedProjectPackage → System distributes
+```
+Create → Submit → AI Evaluation → Human Review → Gate 1 → Gate 2 → Distribution Preview → Provision
 ```
 
-Governance enforced:
-- AI drafts are immutable, schema-backed, never autonomous
-- Gate 1 approval requires a human-reviewed project package when AI drafts exist
-- Distribution preview derives exclusively from the reviewed package
-- Humans retain approval authority; AI may never approve or provision
+The app owns the governance spine. Monday and GitHub receive the output. Developers work in those tools. The OS does not sync back.
 
-Intentionally disabled:
-- Live AI provider calls (OpenAI, Bedrock)
-- Live GitHub/Monday writes
-- Google SSO/RBAC (actor selector is dev auth shim)
-- n8n (excluded from OS orchestration by ADR-0003)
+**Governance enforced:**
+- AI evaluates, AI never approves
+- Gate 1 requires a human-reviewed project package
+- Gate 2 requires Gate 1 to be complete
+- Distribution only executes after both gates pass
+- All approvals, overrides, and provisioning runs are audited
+- Rejected and archived requests cannot provision
+- Retries are idempotent — no duplicate downstream resources
+
+---
+
+## Build state
+
+Feature-complete for the defined scope. Running on oreochiserver in `dev_headers` auth mode. Waiting for external credentials to activate live integrations.
+
+| Subsystem | Status |
+|-----------|--------|
+| Intake lifecycle + governance | Complete |
+| Discovery Engine (ambiguity resolution) | Complete — live OpenAI agents (gpt-5.5 orchestration / gpt-5.4-mini tasks) |
+| AI evaluation orchestrator (multi-agent) | Complete — mock agents |
+| Multi-gate approval | Complete |
+| Distribution preview (dry-run) | Complete |
+| Provisioning execution + retry | Complete — mock executors |
+| Monday adapter | Built — waiting for `MONDAY_API_TOKEN` + board config |
+| GitHub adapter | Built — waiting for `GITHUB_PAT` + org config |
+| Google Chat notifications | Built — waiting for `GOOGLE_CHAT_WEBHOOK_URL` |
+| Email intake | Built — waiting for service choice + `INTAKE_WEBHOOK_SECRET` |
+| Google Chat slash command | Built — waiting for GCP credentials |
+| Google OAuth | Built — waiting for `AUTH_GOOGLE_CLIENT_ID` + `AUTH_GOOGLE_CLIENT_SECRET` |
+| Roster API integration | Built — waiting for `ROSTER_API_URL` |
+| Rate limiting | Complete |
+| AI cost governance + usage dashboard | Complete |
+| Post-distribution lifecycle | Complete |
+| Developer assignment + override | Complete |
+
+See `docs/EXTERNAL-NEEDS.md` for the complete activation checklist, ordered by effort.
 
 ---
 
 ## Prerequisites
 
-- **Node.js 22+** (`node --version`)
-- **npm 10+** (`npm --version`)
-- **Docker + Docker Compose** (for Postgres and optional API container)
+- **Node.js 22+**
+- **npm 10+**
+- **Docker + Docker Compose**
 
 ---
 
 ## Local setup
 
-### 1. Install dependencies
-
 ```bash
+# 1. Install dependencies
 npm install
-```
 
-### 2. Configure environment
-
-```bash
+# 2. Configure environment
 cp .env.example .env
-```
 
-The default `.env` values work for local development without changes.
-
-### 3. Start Postgres
-
-```bash
+# 3. Start Postgres
 docker compose up -d postgres
-```
 
-Postgres will be available at `localhost:5432`.
-
-### 4. Generate Prisma client
-
-```bash
+# 4. Generate Prisma client + apply schema
 npm run prisma:generate
-```
-
-### 5. Apply schema
-
-First time (or after schema changes):
-
-```bash
 npm run prisma:migrate
-```
 
-Enter a migration name when prompted (e.g. `initial`).
+# 5. Verify
+npm run check          # typecheck + 685 tests
 
-> If you only want to push the schema without migration history, use:
-> `npm run prisma:db:push`
-
-### 6. Run core checks
-
-```bash
-npm run check
-```
-
-Expected: 49/49 tests passing.
-
-### 7. Build API
-
-```bash
+# 6. Build and start API
 npm run api:build
-```
+npm run api:start:dev  # http://localhost:3000
 
-### 8. Start API (dev mode with watch)
-
-```bash
-npm run api:start:dev
-```
-
-API will listen on `http://localhost:3000`.
-
-### 9. Seed demo data
-
-```bash
+# 7. Seed demo data
 npm run seed:demo
-```
 
-Seeds 6 demo intakes spanning every workflow stage (draft → approved + distribution preview). Safe to re-run — deletes only demo records before recreating them. Real records are never touched.
-
-### 10. Smoke test (in another terminal)
-
-```bash
-npm run smoke:api       # quick API health + CRUD checks
-npm run smoke:runtime   # full governance flow end-to-end
-```
-
-### 11. Start the web UI (separate terminal)
-
-```bash
-# Install web dependencies (first time only)
-npm install --prefix apps/web
-
-# Copy env for web
+# 8. Start web UI (separate terminal)
 cp apps/web/.env.local.example apps/web/.env.local
-
-# Start Next.js dev server
-npm run web:dev
+npm run web:dev        # http://localhost:3001/intakes
 ```
-
-Open **http://localhost:3001/intakes**
 
 ---
 
 ## Seeded demo data
 
-After `npm run seed:demo`, the database contains 6 demo intakes spanning every workflow stage:
+`npm run seed:demo` creates demo intakes across every workflow stage:
 
-| # | Title | Status |
-|---|-------|--------|
-| 1 | Payment Failure Notification Fix | `draft` |
-| 2 | Marketing Dashboard Request | `submitted` |
-| 3 | Customer Portal Enhancement | `intake_review` — AI draft available, no reviewed package yet |
-| 4 | Internal SSO Management Tool | `intake_review` — reviewed package ready, Gate 1 available |
-| 5 | Data Pipeline Migration | `devops_review` — Gate 1 approved, Gate 2 pending |
-| 6 | Project Intake OS UI Buildout | `approved` — both gates approved, distribution preview ready |
+| Title | Status |
+|-------|--------|
+| Payment Failure Notification Fix | `draft` |
+| Marketing Dashboard Request | `submitted` |
+| Customer Portal Enhancement | `intake_review` — AI draft, no reviewed package |
+| Internal SSO Management Tool | `intake_review` — reviewed package ready, Gate 1 available |
+| Data Pipeline Migration | `devops_review` — Gate 1 approved, Gate 2 pending |
+| Project Intake OS UI Buildout | `approved` — both gates approved, distribution preview ready |
 
-**Idempotency:** running `seed:demo` again is safe — it deletes only demo records (identified by `requester = demo.requester@local`) before recreating them.
-
-**Reset and reseed:**
+Safe to re-run — deletes only demo records (identified by `requester = demo.requester@local`).
 
 ```bash
-npm run db:reset:demo   # prisma migrate reset + seed:demo
-```
-
-**Seeded demo records are local-only and do not contain real client data.**
-
----
-
-## Browser walkthrough
-
-Once the API and web are running (with seeded demo data):
-
-1. Open http://localhost:3001/intakes
-2. Confirm 6 seeded intakes appear across workflow stages
-3. Open **Customer Portal Enhancement** (AI draft available, no reviewed package)
-4. Confirm the AI Draft tab is populated
-5. Switch to **Intake Owner** actor → click **Accept Draft** to create a reviewed package
-6. Open **Internal SSO Management Tool** (reviewed package ready)
-7. Confirm the Reviewed Package tab shows the human-reviewed artifact
-8. Open **Approvals** tab → click **Approve Gate 1**
-9. Open **Data Pipeline Migration** (Gate 1 approved, Gate 2 pending)
-10. Switch to **DevOps Lead** actor → click **Approve Gate 2**
-11. Open **Project Intake OS UI Buildout** (fully approved + distribution preview)
-12. Open the **Distribution** tab → confirm source type is **Reviewed Project Package**
-13. Open the **Audit Trail** tab → confirm all governance events are visible
-
----
-
-## Run with Docker Compose
-
-Start both Postgres and the API:
-
-```bash
-docker compose up --build
-```
-
-Or start only Postgres (run API locally):
-
-```bash
-docker compose up -d postgres
-```
-
-Stop all services:
-
-```bash
-docker compose down
+npm run db:reset:demo   # prisma migrate reset + seed
 ```
 
 ---
 
-## Available endpoints
+## Auth mode
+
+The server runs `AUTH_MODE=dev_headers` by default. A role switcher in the bottom-left sidebar sends an `X-Actor-Role` header. No login required.
+
+Roles: `request_creator` `intake_owner` `devops_lead` `developer` `admin`
+
+To use real Google auth, set `AUTH_MODE=google` and provide the GCP credentials from `docs/EXTERNAL-NEEDS.md`.
+
+---
+
+## API reference
 
 Swagger/OpenAPI: **http://localhost:3000/docs**
 
 | Method | Path | Description |
 |--------|------|-------------|
 | GET | /health | Liveness check |
-| GET | /health/db | Readiness check (Postgres) |
-| GET | /intakes | List all intakes |
-| GET | /intakes/:id | Get a single intake |
-| POST | /intakes | Create a manual intake |
-| POST | /intakes/:id/submit | Submit draft for review |
-| POST | /intakes/:id/discovery | Complete discovery |
+| GET | /health/db | Readiness check |
+| GET | /intakes | List intakes |
+| GET | /intakes/:id | Get intake |
+| POST | /intakes | Create intake |
+| POST | /intakes/:id/submit | Submit for review |
+| POST | /intakes/:id/resubmit | Resubmit with clarification answers |
 | POST | /intakes/:id/analysis-drafts/mock | Generate mock AI analysis draft |
-| POST | /intakes/:id/analysis-drafts/:draftId/accept | Accept draft as reviewed package |
+| POST | /intakes/:id/analysis-drafts/regenerate | Regenerate with guidance |
+| POST | /intakes/:id/analysis-drafts/:draftId/accept | Accept draft → reviewed package |
 | POST | /intakes/:id/analysis-drafts/:draftId/reject | Reject draft |
-| POST | /intakes/:id/analysis-drafts/:draftId/revise | Revise draft into reviewed package |
-| POST | /intakes/:id/approvals | Record Gate 1 or Gate 2 approval |
+| POST | /intakes/:id/analysis-drafts/:draftId/revise | Revise draft → reviewed package |
+| POST | /intakes/:id/approvals | Gate 1 or Gate 2 approval |
 | POST | /intakes/:id/rejections | Reject at current gate |
-| POST | /intakes/:id/provisioning-plan | Generate dry-run provisioning plan |
+| POST | /intakes/:id/request-changes | Request changes before gate |
+| POST | /intakes/:id/provisioning-plan | Generate dry-run distribution preview |
 | POST | /intakes/:id/provisioning-ready | Mark plan ready for execution |
-| GET | /intakes/:id/audit | Read audit trail |
-
----
-
-## Actor headers (auth shim)
-
-The POC uses HTTP headers instead of SSO:
-
-```text
-x-actor-id: user-devops
-x-actor-role: devops_lead
-x-actor-name: DevOps Lead
-```
-
-Canonical roles: `request_creator`, `intake_owner`, `devops_lead`, `developer`, `admin`
-
----
-
-## Script reference
-
-| Script | Command | Description |
-|--------|---------|-------------|
-| `npm run check` | typecheck + test | Full core verification |
-| `npm run prisma:generate` | prisma generate | Generate Prisma client |
-| `npm run prisma:migrate` | prisma migrate dev | Apply migrations (requires DB) |
-| `npm run prisma:migrate:deploy` | prisma migrate deploy | Deploy migrations in production |
-| `npm run prisma:studio` | prisma studio | Open Prisma Studio |
-| `npm run api:build` | tsc + prisma generate | Compile NestJS API |
-| `npm run api:start:dev` | nest start --watch | Start API in dev/watch mode |
-| `npm run api:start` | node dist/... | Start compiled API |
-| `npm run docker:up` | docker compose up -d | Start all services |
-| `npm run docker:down` | docker compose down | Stop all services |
-| `npm run smoke:api` | node scripts/smoke-api.mjs | API smoke test (quick) |
-| `npm run smoke:runtime` | node scripts/smoke-runtime-workflow.mjs | Full governance flow smoke test |
-| `npm run seed:demo` | node --env-file=.env scripts/seed-demo-data.mjs | Seed 6 demo intakes (local dev) |
-| `npm run seed:demo:server` | node scripts/seed-demo-data.mjs | Seed 6 demo intakes (inside Docker) |
-| `npm run db:reset:demo` | prisma migrate reset + seed:demo | Reset database and reseed demo data |
-| `npm run web:dev` | next dev --port 3001 | Start web UI dev server |
-| `npm run web:build` | next build | Build web UI |
-| `npm run web:start` | next start --port 3001 | Start compiled web UI |
-| `npm run server:build` | docker compose build | Build server Docker images |
-| `npm run server:up` | docker compose up -d | Start server stack |
-| `npm run server:down` | docker compose down | Stop server stack |
-| `npm run server:ps` | docker compose ps | Show service status |
-| `npm run server:logs` | docker compose logs -f | Follow all logs |
-| `npm run server:health` | bash deploy/healthcheck-server.sh | Run server healthcheck |
-| `npm run server:deploy` | bash deploy/deploy-server.sh | Pull + build + start |
-| `npm run server:backup` | bash deploy/backup-postgres.sh | Dump Postgres to backups/ |
-| `npm run demo:mvp` | node scripts/demo-iteration-2.mjs | No-AI workflow demo |
-| `npm run demo:analysis` | node scripts/demo-analysis-draft.mjs | AI draft demo |
-| `npm run demo:analysis-review` | node scripts/demo-analysis-review.mjs | Accept/revise draft demo |
-| `npm run demo:review-guard` | node scripts/demo-reviewed-package-approval-guard.mjs | Gate 1 guard demo |
-| `npm run demo:reviewed-distribution` | node scripts/demo-reviewed-package-distribution-preview.mjs | Distribution preview demo |
-
----
-
-## Demo flows
-
-Run all demos after `npm run check`:
-
-```bash
-npm run demo:mvp
-npm run demo:analysis
-npm run demo:analysis-review
-npm run demo:review-guard
-npm run demo:reviewed-distribution
-```
+| POST | /intakes/:id/distribution/execute | Execute provisioning |
+| POST | /intakes/:id/distribution/runs/:runId/retry | Retry failed run |
+| POST | /intakes/:id/assignment | Override developer assignment |
+| DELETE | /intakes/:id/assignment | Clear assignment override |
+| POST | /intakes/:id/lifecycle/:action | Post-distribution lifecycle transition |
+| GET | /intakes/:id/audit | Audit trail |
+| GET | /intakes/:id/evaluations | List evaluations |
+| GET | /admin/ai-usage | AI usage by model and role |
+| GET | /admin/ai-usage/summary | Monthly AI usage summary |
+| POST | /intake-sources/email | Inbound email webhook |
+| POST | /intake-sources/chat | Google Chat slash command webhook |
 
 ---
 
 ## Repository map
 
-```text
-src/domain/              Framework-neutral domain logic (workflow, permissions, project types)
-src/application/         Workflow service, store contracts, analysis drafts, provisioning plans
-apps/api/src/            NestJS API layer (controllers, modules, DTOs, Prisma adapter)
-apps/api/prisma/         Prisma schema and migrations
-apps/api/Dockerfile      API container image
-docker-compose.yml       Local Postgres + API runtime
-tests/                   Node test runner tests (49 tests)
-scripts/                 Demo scripts and smoke test
-docs/product/            Product behavior source of truth
-docs/ai/                 Build memory, task logs, ADRs, sequence log
+```
+src/domain/                   Workflow state machine, permissions, project types, provisioning rules
+src/application/              Workflow service, evaluation orchestrator, provisioning executor
+src/application/agents/       Mock evaluation agents (risk, work breakdown, clarification, assignment)
+src/application/roster/       Roster API client, scoring algorithm, types
+src/application/provisioning/ Provisioning executor, retry + backoff, Monday and GitHub adapters
+src/application/notifications/ Google Chat notifier
+src/application/providers/    AI provider router (OpenAI, Anthropic, Bedrock, mock)
+
+apps/api/src/                 NestJS API — controllers, modules, DTOs, Prisma store
+apps/api/prisma/              Schema and migrations
+apps/web/src/                 Next.js 15 review UI
+apps/web/src/components/      Shared UI components (EvaluationPanel, AssignmentCard, etc.)
+
+tests/                        Node test runner — 685 tests
+scripts/                      Demo scripts, smoke tests, seed data
+deploy/                       Server deployment scripts and healthcheck
+
+docs/product/                 Product behavior source of truth (state machine, permissions, etc.)
+docs/ai/                      Build log, task logs, ADRs, open questions
+docs/EXTERNAL-NEEDS.md        Pre-production credential checklist, ordered by effort
 ```
 
 ---
 
-## Private Server Runtime
+## Private server runtime
 
-Run the full stack on a private server — no domain, no HTTPS, no public exposure required.
-
-> **Warning:** This app uses actor header shims, not real authentication. Do not expose it publicly until real auth is implemented.
-
-### Why SSH tunnel / port 8080?
-
-The server already runs Uptime Kuma on host port `3001`. Project Intake OS must never bind host port `3001`. The local proxy (Caddy) binds `127.0.0.1:8080` as the single entrypoint.
-
-```
-Host:  3001 → Uptime Kuma    8080 → Project Intake OS proxy
-Docker: web:3001  api:3000  postgres:5432  (internal only)
-```
-
-### Setup
+The production instance runs on oreochiserver (Tailscale: `100.75.210.83`). Access via SSH tunnel:
 
 ```bash
+ssh -L 8080:localhost:8080 oreo@100.75.210.83
+# Then open: http://localhost:8080/intakes
+```
+
+The Caddy proxy binds `127.0.0.1:8080` only — not reachable over Tailscale directly.
+
+### Start / stop
+
+```bash
+# On the server:
 cd ~/intake-os
-cp .env.server.example .env.server
-nano .env.server  # change POSTGRES_PASSWORD and DATABASE_URL password
-```
-
-### Build and start
-
-```bash
-npm run server:build
-npm run server:up
-npm run server:ps
-npm run server:health
-```
-
-If Node is not on the server, use Docker directly:
-
-```bash
-docker compose -f docker-compose.server.yml --env-file .env.server build
 docker compose -f docker-compose.server.yml --env-file .env.server up -d
+docker compose -f docker-compose.server.yml --env-file .env.server ps
 bash deploy/healthcheck-server.sh
 ```
 
-### Seed demo data
+### Seed on server
 
 ```bash
 docker compose -f docker-compose.server.yml --env-file .env.server exec api npm run seed:demo:server
 ```
 
-### Runtime smoke test
-
-```bash
-docker compose -f docker-compose.server.yml --env-file .env.server exec \
-  -e API_BASE_URL=http://api:3000 \
-  api npm run smoke:runtime
-```
-
-### Access UI (SSH tunnel)
-
-```bash
-# From your laptop:
-ssh -L 8080:localhost:8080 oreo@SERVER_IP
-# Then open: http://localhost:8080/intakes
-```
-
-### Backup and restore
+### Backup
 
 ```bash
 npm run server:backup
 bash deploy/restore-postgres.sh backups/intake_os_YYYYMMDD_HHMMSS.sql
 ```
 
-### Optional: Tailscale Serve (private access via tailnet)
+### Activating integrations
+
+Edit `/home/oreo/intake-os/.env.server` on the server, then restart:
 
 ```bash
-tailscale serve --https=443 http://127.0.0.1:8080
+docker compose -f docker-compose.server.yml --env-file .env.server up -d api web
 ```
 
-See `deploy/tailscale-serve-notes.md`.
+See `docs/EXTERNAL-NEEDS.md` for the full list of env vars and where to get each credential.
 
-### Optional: Tailscale Funnel (temporary public demo)
+---
 
-Requires basic auth in Caddy. See `deploy/tailscale-funnel-notes.md`. Turn it off after the demo.
+## Script reference
 
-### Known limitations
-
-- No domain — SSH tunnel or Tailscale required.
-- No HTTPS on server itself — Tailscale Serve handles HTTPS if needed.
-- Actor selector is a dev auth shim — no real user authentication.
-- No real AI, Monday, or GitHub integrations — all actions are dry runs.
-
-Full documentation: `docs/deployment/private-server-runtime.md`
+| Script | Description |
+|--------|-------------|
+| `npm run check` | Typecheck + full test suite |
+| `npm test` | Run 685 unit tests |
+| `npm run typecheck` | TypeScript check only |
+| `npm run build:core` | Compile domain + application layer |
+| `npm run api:build` | Compile NestJS API |
+| `npm run api:start:dev` | Start API in watch mode (port 3000) |
+| `npm run web:dev` | Start Next.js UI in dev mode (port 3001) |
+| `npm run prisma:generate` | Generate Prisma client |
+| `npm run prisma:migrate` | Apply schema migrations |
+| `npm run prisma:studio` | Open Prisma Studio |
+| `npm run seed:demo` | Seed 6 demo intakes (local) |
+| `npm run db:reset:demo` | Reset DB and reseed |
+| `npm run smoke:api` | API health smoke test |
+| `npm run smoke:runtime` | Full governance flow smoke test |
+| `npm run server:build` | Build server Docker images |
+| `npm run server:up` | Start server stack |
+| `npm run server:down` | Stop server stack |
+| `npm run server:logs` | Follow all container logs |
+| `npm run server:health` | Run server healthcheck |
+| `npm run server:deploy` | Pull + build + start |
+| `npm run server:backup` | Dump Postgres to backups/ |
 
 ---
 
 ## Troubleshooting
 
-### `prisma: not found`
+**`prisma: not found`** — run `npm install`.
 
-Run `npm install` — Prisma CLI is a dev dependency and must be installed.
+**`DATABASE_URL missing`** — run `cp .env.example .env`.
 
-### `DATABASE_URL missing`
+**Postgres port already in use** — stop the existing process or change the port in `docker-compose.yml`.
 
-Run `cp .env.example .env`. The default value is correct for local Docker Compose.
+**Prisma client not generated** — run `npm run prisma:generate` before building.
 
-### `Postgres port already in use`
-
-Either stop the existing Postgres process or change the port in `docker-compose.yml` and `.env`.
-
-### Prisma client not generated
-
-Run `npm run prisma:generate` before building or starting the API.
-
-### Docker volume stale
-
+**Docker volume stale:**
 ```bash
 docker compose down -v
 docker compose up -d postgres
 npm run prisma:migrate
 ```
 
-### API cannot connect to database
-
-When running the API locally (`api:start:dev`), use:
-```
-DATABASE_URL=postgresql://intake_os:intake_os_dev@localhost:5432/intake_os?schema=public
-```
-
-When running the API in Docker, use:
-```
-DATABASE_URL=postgresql://intake_os:intake_os_dev@postgres:5432/intake_os?schema=public
-```
+**API can't connect (local vs Docker):**
+- Local API: `DATABASE_URL=postgresql://intake_os:intake_os_dev@localhost:5432/intake_os?schema=public`
+- API in Docker: `DATABASE_URL=postgresql://intake_os:intake_os_dev@postgres:5432/intake_os?schema=public`
