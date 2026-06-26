@@ -210,12 +210,6 @@ function estimateTargetLaunch(startIso: string, totalSP: number): string {
   return new Date(new Date(startIso).getTime() + ms).toISOString().slice(0, 10);
 }
 
-function architectureNoteFrom(proposal: ProjectProposal): string | null {
-  const arch = proposal.systemDesign.value?.serviceArchitecture;
-  if (!arch || arch.recommendation === "undetermined") return null;
-  return `${arch.recommendation} — ${arch.rationale}`;
-}
-
 function buildProjectsPortfolio(
   proposal: ProjectProposal,
   _session: DiscoverySession,
@@ -232,7 +226,6 @@ function buildProjectsPortfolio(
     status: "Conceptualization",
     health: "green",
     techStack: techStackFrom(proposal),
-    architectureNote: architectureNoteFrom(proposal),
     startDate,
     targetLaunch: totalSP > 0 ? estimateTargetLaunch(startDate, totalSP) : null,
     estimatedTotalSP: totalSP > 0 ? totalSP : null,

@@ -341,12 +341,6 @@ export function DiscoveryUnderstanding({
                           {manifest.monday.projectsPortfolio.techStack.join(", ")}
                         </p>
                       )}
-                      {manifest.monday.projectsPortfolio.architectureNote && (
-                        <p className="text-xs text-gray-600">
-                          <span className="font-medium">Archi:</span>{" "}
-                          {manifest.monday.projectsPortfolio.architectureNote}
-                        </p>
-                      )}
                       {manifest.monday.projectsPortfolio.startDate && (
                         <p className="text-xs text-gray-600">
                           <span className="font-medium">Start:</span>{" "}

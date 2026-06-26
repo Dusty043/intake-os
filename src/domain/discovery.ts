@@ -356,7 +356,6 @@ export interface MondayProjectsPortfolioItem {
   status: MondayProjectStatus;
   health: MondayHealth;
   techStack: string[];
-  architectureNote: string | null;
   startDate: string | null;
   targetLaunch: string | null;
   estimatedTotalSP: number | null;
