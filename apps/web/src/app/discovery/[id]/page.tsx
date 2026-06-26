@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useActor } from "@/components/ActorProvider";
 import { ErrorBanner } from "@/components/ErrorBanner";
 import { DiscoveryLayout } from "@/components/discovery/DiscoveryLayout";
@@ -21,6 +21,15 @@ import {
 } from "@/lib/discovery-client";
 import type { DiscoverySession } from "@/lib/discovery-types";
 
+// Statuses where the AI is actively processing — poll until we leave these
+const AI_PROCESSING_STATUSES = new Set([
+  "draft",
+  "conversation_started",
+  "intent_detected",
+  "problem_framed",
+  "direction_selected",
+]);
+
 export default function DiscoverySessionPage() {
   const { id } = useParams<{ id: string }>();
   const { actor } = useActor();
@@ -30,6 +39,14 @@ export default function DiscoverySessionPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const stopPolling = useCallback(() => {
+    if (pollRef.current) {
+      clearInterval(pollRef.current);
+      pollRef.current = null;
+    }
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -44,7 +61,34 @@ export default function DiscoverySessionPage() {
     }
   }, [id, actor]);
 
+  const pollOnce = useCallback(async () => {
+    try {
+      const data = await getDiscoverySession(id, actor);
+      setSession(prev => {
+        if (prev?.status === data.status && prev?.messages.length === data.messages.length) return prev;
+        return data;
+      });
+      if (!AI_PROCESSING_STATUSES.has(data.status)) stopPolling();
+    } catch {
+      // ignore transient poll errors
+    }
+  }, [id, actor, stopPolling]);
+
+  const startPolling = useCallback(() => {
+    stopPolling();
+    pollRef.current = setInterval(() => { void pollOnce(); }, 3000);
+  }, [pollOnce, stopPolling]);
+
+  // Cleanup on unmount
+  useEffect(() => () => stopPolling(), [stopPolling]);
+
   useEffect(() => { void load(); }, [load]);
+
+  // Auto-poll if session is already in an AI-processing state when page loads
+  useEffect(() => {
+    if (session && AI_PROCESSING_STATUSES.has(session.status)) startPolling();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session?.status]);
 
   // ── Handlers ─────────────────────────────────────────────────────────────
 
@@ -54,6 +98,8 @@ export default function DiscoverySessionPage() {
     try {
       const updated = await fn();
       setSession(updated);
+      // If AI is still processing, start polling so updates appear automatically
+      if (AI_PROCESSING_STATUSES.has(updated.status)) startPolling();
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred.");
     } finally {
@@ -64,15 +110,13 @@ export default function DiscoverySessionPage() {
   const handleSendMessage = async (text: string) => {
     await withBusy(async () => {
       const updated = await sendMessage(id, text, actor);
-      // Auto-trigger solutions generation when enough context has built up
-      if (
-        updated.status === "problem_framed" &&
-        updated.solutionOptions.length === 0
-      ) {
+      if (updated.status === "problem_framed" && updated.solutionOptions.length === 0) {
         return generateSolutions(id, actor);
       }
       return updated;
     });
+    // Always start polling after a message — the AI response may arrive async
+    startPolling();
   };
 
   const handleAnswerClarification = async (questionId: string, answer: string) => {
