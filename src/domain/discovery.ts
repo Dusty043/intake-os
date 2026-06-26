@@ -322,18 +322,111 @@ export function emptyProjectProposal(
 
 // ─── Provisioning Manifest ────────────────────────────────────────────────────
 
+// Monday board shared primitives
+export type MondayProjectType =
+  | "Web App"
+  | "Chrome Extension"
+  | "n8n Workflow"
+  | "Dashboard"
+  | "CRM"
+  | "SaaS"
+  | "Process Change"
+  | "Other";
+
+export type MondayProjectStatus =
+  | "Conceptualization"
+  | "Development"
+  | "Testing"
+  | "Complete"
+  | "On Hold";
+
+export type MondayHealth = "green" | "yellow" | "red";
+export type MondaySprintGroup = "Current Sprint" | "Next Sprint" | "Backlog";
+export type MondayOpsGroup = "This Week" | "Next Week" | "Someday";
+export type MondayQuarter = "Q1" | "Q2" | "Q3" | "Q4";
+export type StoryPoints = 1 | 2 | 3 | 5 | 8 | 13;
+
+// Board 2: Projects Portfolio — one row per whole deliverable
+export interface MondayProjectsPortfolioItem {
+  create: boolean;
+  name: string;
+  client: string | null;
+  projectType: MondayProjectType;
+  projectLead: string | null;
+  status: MondayProjectStatus;
+  health: MondayHealth;
+  techStack: string[];
+  targetLaunch: string | null;
+  estimatedTotalSP: number | null;
+}
+
+// Board 3: Roadmap & Epics — one row per large chunk of a project
+export interface MondayEpicItem {
+  title: string;
+  owner: string | null;
+  status: "Not Started" | "In Progress" | "Complete" | "On Hold";
+  quarter: MondayQuarter | null;
+  targetDate: string | null;
+  estimatedSP: StoryPoints | null;
+}
+
+// Board 4: Sprint Tasks — one row per concrete piece of work
+export interface MondayTaskItem {
+  title: string;
+  type: "Feature" | "Bug" | "Chore" | "Research";
+  epicTitle: string | null;
+  status: "Not Started" | "In Progress" | "Blocked" | "Done";
+  priority: "Low" | "Medium" | "High" | "Critical";
+  estimatedSP: StoryPoints;
+  sprint: MondaySprintGroup;
+  unplanned: boolean;
+  githubLink: string | null;
+}
+
+// Board 5: Credentials Vault — access register (not secret values)
+export interface MondayCredentialItem {
+  type: string;
+  serviceProvider: string;
+  owner: string | null;
+  status: "Active" | "Needs Rotation" | "Expired";
+  storedIn: string | null;
+}
+
+// Board 6: Microtasks & Ops — small one-offs outside sprints
+export interface MondayMicrotaskItem {
+  title: string;
+  owner: string | null;
+  category: string | null;
+  priority: "Low" | "Medium" | "High";
+  dueGroup: MondayOpsGroup;
+  dueDate: string | null;
+}
+
 export interface MondayManifest {
-  projectsPortfolio: { create: boolean; name: string } | null;
-  roadmapEpics: string[];
-  sprintTasks: string[];
-  credentialsVault: string[];
-  microtasksOps: string[];
+  projectsPortfolio: MondayProjectsPortfolioItem | null;
+  roadmapEpics: MondayEpicItem[];
+  sprintTasks: MondayTaskItem[];
+  credentialsVault: MondayCredentialItem[];
+  microtasksOps: MondayMicrotaskItem[];
+}
+
+// GitHub manifest
+export interface GitHubReadme {
+  content: string; // markdown
+}
+
+export interface GitHubIssue {
+  title: string;
+  body: string | null;
+  labels: string[];
 }
 
 export interface GitHubManifest {
   createRepo: boolean;
   repoName: string | null;
   labels: string[];
+  readme: GitHubReadme | null;
+  initialIssues: GitHubIssue[];
 }
 
 export interface ProvisioningManifest {

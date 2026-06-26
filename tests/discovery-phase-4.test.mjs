@@ -113,7 +113,8 @@ describe("MockManifestGeneratorAgent — manifest shape", () => {
     const m = session.manifest;
     const proposal = session.proposal;
     if (proposal && proposal.suggestedEpics.length > 0 && m.recommendedAction !== "defer" && m.recommendedAction !== "archive") {
-      assert.deepEqual(m.monday.roadmapEpics, proposal.suggestedEpics);
+      const epicTitles = m.monday.roadmapEpics.map((e) => e.title);
+      assert.deepEqual(epicTitles, proposal.suggestedEpics);
     }
   });
 

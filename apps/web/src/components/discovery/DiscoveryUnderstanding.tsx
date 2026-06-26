@@ -309,42 +309,69 @@ export function DiscoveryUnderstanding({
         {manifest && (
           <section>
             <p className="section-label">Manifest</p>
-            <div className="card p-3 space-y-2">
-              <p className="text-xs font-medium text-gray-800">{manifest.recommendedAction}</p>
-
-              <div className="flex gap-3 text-xs text-gray-600">
-                <span className="flex items-center gap-1">
-                  <span className="font-semibold text-gray-700">
-                    {manifest.monday.roadmapEpics.length}
-                  </span>{" "}
-                  epics
+            <div className="card p-3 space-y-3">
+              {/* Action badge */}
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Action</span>
+                <span className="text-xs font-medium bg-indigo-100 text-indigo-700 border border-indigo-200 px-1.5 py-0.5 rounded">
+                  {manifest.recommendedAction.replace(/_/g, " ")}
                 </span>
-                <span className="flex items-center gap-1">
-                  <span className="font-semibold text-gray-700">
-                    {manifest.monday.sprintTasks.length}
-                  </span>{" "}
-                  tasks
-                </span>
-                {manifest.github.createRepo && (
-                  <span className="flex items-center gap-1">
-                    <span className="font-semibold text-gray-700">GitHub</span> repo
-                  </span>
-                )}
               </div>
 
-              {manifest.readyForLiveAdapter && (
-                <div className="flex items-center gap-1.5 text-xs text-green-700">
-                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 14 14">
-                    <path
-                      d="M2.5 7l3 3 6-6"
-                      stroke="currentColor"
-                      strokeWidth="1.5"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                  Ready for live adapter
+              {/* Monday summary */}
+              {(manifest.monday.roadmapEpics.length > 0 || manifest.monday.projectsPortfolio) && (
+                <div>
+                  <p className="text-xs font-semibold text-gray-500 mb-1">Monday</p>
+                  {manifest.monday.projectsPortfolio && (
+                    <p className="text-xs text-gray-700 mb-1">
+                      <span className="font-medium">Project:</span>{" "}
+                      {manifest.monday.projectsPortfolio.name}
+                      <span className="text-gray-400 ml-1">
+                        ({manifest.monday.projectsPortfolio.projectType})
+                      </span>
+                    </p>
+                  )}
+                  {manifest.monday.roadmapEpics.length > 0 && (
+                    <div className="space-y-0.5">
+                      {manifest.monday.roadmapEpics.map((epic, i) => (
+                        <div key={i} className="flex items-center justify-between text-xs text-gray-600">
+                          <span className="flex gap-1.5">
+                            <span className="text-indigo-400 shrink-0">▸</span>
+                            <span className="truncate">{epic.title}</span>
+                          </span>
+                          {epic.estimatedSP && (
+                            <span className="shrink-0 ml-1 text-gray-400">{epic.estimatedSP} SP</span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {manifest.monday.sprintTasks.length > 0 && (
+                    <p className="text-xs text-gray-500 mt-1">
+                      + {manifest.monday.sprintTasks.length} task{manifest.monday.sprintTasks.length !== 1 ? "s" : ""} → Backlog
+                    </p>
+                  )}
                 </div>
+              )}
+
+              {/* GitHub summary */}
+              {manifest.github.createRepo && (
+                <div>
+                  <p className="text-xs font-semibold text-gray-500 mb-1">GitHub</p>
+                  <p className="text-xs text-gray-700">
+                    <span className="font-medium">Repo:</span>{" "}
+                    <span className="font-mono">{manifest.github.repoName}</span>
+                  </p>
+                  {manifest.github.readme && (
+                    <p className="text-xs text-gray-500 mt-0.5">README · {manifest.github.labels.length} labels · {manifest.github.initialIssues.length} issues</p>
+                  )}
+                </div>
+              )}
+
+              {!manifest.readyForLiveAdapter && (
+                <p className="text-xs text-amber-600">
+                  Mock manifest — live adapter not yet connected
+                </p>
               )}
             </div>
 

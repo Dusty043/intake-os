@@ -43,18 +43,98 @@ Monday should receive management-visible delivery tracking:
 
 Do not mirror every OS field into Monday.
 
+## Monday Downstream Target — Dev Operations Workspace
+
+The live Monday target is the **Dev Operations Workspace** (six linked boards). The provisioning manifest must generate items that map to this structure.
+
+### Board 2: Projects Portfolio
+One row per whole deliverable. The intake OS creates this when `recommendedAction = create_project`.
+
+| Field | Source |
+|---|---|
+| Name | proposal title |
+| Client | intake client field (null = internal) |
+| Project Type (group) | intent type → Web App / n8n Workflow / Dashboard / Process Change / Other |
+| Project Lead | assigned developer (null until roster match confirmed) |
+| Status | "Conceptualization" on creation |
+| Health | "green" on creation |
+| Tech Stack | derived from system design slot |
+| Target Launch | not populated at intake — set by PM |
+| Estimated Total SP | sum of epic SPs (bottom-up, not top-down guess) |
+
+### Board 3: Roadmap & Epics
+One row per large chunk of the project. Epics are grouped by quarter (Q1–Q4).
+
+| Field | Source |
+|---|---|
+| Title | suggestedEpics from proposal |
+| Quarter | planning quarter (next quarter from generation date) |
+| Estimated SP | per epic: 8 SP (design), 13 SP (core), 8 SP (testing), 5 SP thereafter |
+| Status | "Not Started" on creation |
+| Owner | null until assigned |
+
+### Board 4: Sprint Tasks
+One row per concrete piece of work. Tasks go to **Backlog** on creation.
+
+| Field | Source |
+|---|---|
+| Title | suggestedTasks from proposal |
+| Type | "Feature" by default |
+| Epic | linked to first epic |
+| Estimated SP | 3 SP default (refined in sprint planning) |
+| Sprint Group | "Backlog" on creation |
+| Priority | "Medium" by default |
+| GitHub Link | populated after GitHub issue is created |
+
+### Board 5: Credentials Vault
+Populated manually by PM after provisioning. The intake OS may suggest credentials needed (e.g. API keys detected in tech stack) but does not write to this board automatically.
+
+### Board 6: Microtasks & Ops
+Used when `recommendedAction = create_microtask` or `create_task`. Goes to "This Week" by default.
+
 ## What Goes to GitHub
 
 GitHub should receive engineering execution assets:
 
 - repository if required
-- README/project brief
-- labels
-- initial issues
-- task breakdown
-- acceptance criteria
+- README/project brief (generated from proposal: title, problem statement, requirements, tech stack, epics, assumptions, open questions)
+- labels (derived from intent type)
+- initial issues (one per suggested task, with labels)
 - link back to Project Intake OS record
 - Monday project/item link if created
+
+### README Template Structure
+
+```markdown
+# {Project Title}
+> {problem statement}
+
+## Key Requirements
+- functional requirement 1
+- functional requirement 2
+
+## Tech Stack
+- API layer
+- Client layer
+- Infrastructure
+
+## Architecture
+{monolith/microservices} — {rationale}
+
+## Epics
+- Epic: Requirements & Design
+- Epic: Core Implementation
+- Epic: Testing & QA
+
+## Assumptions
+- assumption 1
+
+## Open Questions
+- unknown 1
+
+## Links
+- Project Intake OS record: {url}
+```
 
 ## Distribution Modes
 

@@ -73,17 +73,81 @@ export type DiscoveryProposal = {
   status: string;
 };
 
+// Monday board item types (mirror src/domain/discovery.ts)
+
+export type MondayProjectType =
+  | "Web App"
+  | "Chrome Extension"
+  | "n8n Workflow"
+  | "Dashboard"
+  | "CRM"
+  | "SaaS"
+  | "Process Change"
+  | "Other";
+
+export type MondaySprintGroup = "Current Sprint" | "Next Sprint" | "Backlog";
+export type MondayOpsGroup = "This Week" | "Next Week" | "Someday";
+export type MondayQuarter = "Q1" | "Q2" | "Q3" | "Q4";
+export type StoryPoints = 1 | 2 | 3 | 5 | 8 | 13;
+
+export type MondayProjectsPortfolioItem = {
+  create: boolean;
+  name: string;
+  client: string | null;
+  projectType: MondayProjectType;
+  projectLead: string | null;
+  status: "Conceptualization" | "Development" | "Testing" | "Complete" | "On Hold";
+  health: "green" | "yellow" | "red";
+  techStack: string[];
+  targetLaunch: string | null;
+  estimatedTotalSP: number | null;
+};
+
+export type MondayEpicItem = {
+  title: string;
+  owner: string | null;
+  status: "Not Started" | "In Progress" | "Complete" | "On Hold";
+  quarter: MondayQuarter | null;
+  targetDate: string | null;
+  estimatedSP: StoryPoints | null;
+};
+
+export type MondayTaskItem = {
+  title: string;
+  type: "Feature" | "Bug" | "Chore" | "Research";
+  epicTitle: string | null;
+  status: "Not Started" | "In Progress" | "Blocked" | "Done";
+  priority: "Low" | "Medium" | "High" | "Critical";
+  estimatedSP: StoryPoints;
+  sprint: MondaySprintGroup;
+  unplanned: boolean;
+  githubLink: string | null;
+};
+
+export type MondayMicrotaskItem = {
+  title: string;
+  owner: string | null;
+  category: string | null;
+  priority: "Low" | "Medium" | "High";
+  dueGroup: MondayOpsGroup;
+  dueDate: string | null;
+};
+
 export type DiscoveryManifest = {
   recommendedAction: string;
   monday: {
-    roadmapEpics: string[];
-    sprintTasks: string[];
-    projectsPortfolio: unknown;
+    projectsPortfolio: MondayProjectsPortfolioItem | null;
+    roadmapEpics: MondayEpicItem[];
+    sprintTasks: MondayTaskItem[];
+    credentialsVault: unknown[];
+    microtasksOps: MondayMicrotaskItem[];
   };
   github: {
     createRepo: boolean;
     repoName: string | null;
     labels: string[];
+    readme: { content: string } | null;
+    initialIssues: { title: string; body: string | null; labels: string[] }[];
   };
   readyForLiveAdapter: boolean;
 };
