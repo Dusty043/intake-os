@@ -31,7 +31,7 @@ import { DiscoveryHttpController } from "./discovery.controller.js";
           new MockClarificationAgent(),
           new MockProposalComposerAgent(),
           new MockManifestGeneratorAgent(),
-          { idFactory },
+          { idFactory, appBaseUrl: process.env["INTAKE_APP_URL"] },
         );
 
         return new DiscoveryController(orchestrator);

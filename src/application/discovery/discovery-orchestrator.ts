@@ -54,6 +54,7 @@ export interface DiscoveryOrchestratorOptions {
   model?: string;
   idFactory: (prefix: string) => string;
   now?: () => string;
+  appBaseUrl?: string;
 }
 
 // ─── Orchestrator ─────────────────────────────────────────────────────────────
@@ -62,6 +63,7 @@ export class DiscoveryOrchestrator {
   private readonly provider: DiscoveryAgentOptions["provider"];
   private readonly idFactory: (prefix: string) => string;
   private readonly nowFn: () => string;
+  private readonly appBaseUrl: string | undefined;
 
   constructor(
     private readonly store: IDiscoverySessionStore,
@@ -76,6 +78,7 @@ export class DiscoveryOrchestrator {
     this.provider = opts.provider ?? "mock";
     this.idFactory = opts.idFactory;
     this.nowFn = opts.now ?? (() => new Date().toISOString());
+    this.appBaseUrl = opts.appBaseUrl;
   }
 
   // ─── Start a new discovery session ───────────────────────────────────────
@@ -356,7 +359,12 @@ export class DiscoveryOrchestrator {
       throw new Error(`Proposal composition failed for session: ${sessionId}`);
     }
 
-    const agentOpts: DiscoveryAgentOptions = { provider: this.provider, idFactory: this.idFactory, now };
+    const agentOpts: DiscoveryAgentOptions = {
+      provider: this.provider,
+      idFactory: this.idFactory,
+      now,
+      appBaseUrl: this.appBaseUrl,
+    };
     const manifest = await this.manifestGeneratorAgent.generateManifest(
       session.proposal,
       session,

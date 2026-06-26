@@ -25,6 +25,7 @@ export interface DiscoveryAgentOptions {
   idFactory: (prefix: string) => string;
   now: string;
   model?: string;
+  appBaseUrl?: string;
 }
 
 // ─── Intent extraction ────────────────────────────────────────────────────────
