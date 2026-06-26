@@ -1,39 +1,36 @@
+import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import {
-  DynamoDBClient,
-  GetItemCommand,
-  PutItemCommand,
-  DeleteItemCommand,
-  UpdateItemCommand,
-} from "@aws-sdk/client-dynamodb";
-import { marshall, unmarshall } from "@aws-sdk/util-dynamodb";
+  DynamoDBDocumentClient,
+  GetCommand,
+  PutCommand,
+  DeleteCommand,
+  UpdateCommand,
+} from "@aws-sdk/lib-dynamodb";
 import type { JobRecord, JobState, JobStatusStore } from "../application/job-status-store.js";
 
 export class DynamoJobStatusStore implements JobStatusStore {
-  private readonly client: DynamoDBClient;
+  private readonly docClient: DynamoDBDocumentClient;
   private readonly tableName: string;
 
   constructor(tableName: string, client?: DynamoDBClient) {
+    const base = client ?? new DynamoDBClient({});
+    this.docClient = DynamoDBDocumentClient.from(base, {
+      marshallOptions: { removeUndefinedValues: true },
+    });
     this.tableName = tableName;
-    this.client = client ?? new DynamoDBClient({});
   }
 
   async put(record: JobRecord): Promise<void> {
-    await this.client.send(
-      new PutItemCommand({
-        TableName: this.tableName,
-        Item: marshall(record, { removeUndefinedValues: true }),
-      }),
+    await this.docClient.send(
+      new PutCommand({ TableName: this.tableName, Item: record }),
     );
   }
 
   async get(jobId: string): Promise<JobRecord | null> {
-    const { Item } = await this.client.send(
-      new GetItemCommand({
-        TableName: this.tableName,
-        Key: marshall({ jobId }),
-      }),
+    const { Item } = await this.docClient.send(
+      new GetCommand({ TableName: this.tableName, Key: { jobId } }),
     );
-    return Item ? (unmarshall(Item) as JobRecord) : null;
+    return Item ? (Item as JobRecord) : null;
   }
 
   async update(
@@ -55,23 +52,20 @@ export class DynamoJobStatusStore implements JobStatusStore {
       values[valKey] = val;
     }
 
-    await this.client.send(
-      new UpdateItemCommand({
+    await this.docClient.send(
+      new UpdateCommand({
         TableName: this.tableName,
-        Key: marshall({ jobId }),
+        Key: { jobId },
         UpdateExpression: `SET ${exprParts.join(", ")}`,
         ExpressionAttributeNames: names,
-        ExpressionAttributeValues: marshall(values),
+        ExpressionAttributeValues: values,
       }),
     );
   }
 
   async delete(jobId: string): Promise<void> {
-    await this.client.send(
-      new DeleteItemCommand({
-        TableName: this.tableName,
-        Key: marshall({ jobId }),
-      }),
+    await this.docClient.send(
+      new DeleteCommand({ TableName: this.tableName, Key: { jobId } }),
     );
   }
 }
