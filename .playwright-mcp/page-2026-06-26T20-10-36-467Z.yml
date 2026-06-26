@@ -1,0 +1,205 @@
+- generic [active] [ref=e1]:
+  - alert [ref=e2]
+  - generic [ref=e3]:
+    - complementary [ref=e4]:
+      - generic [ref=e5]:
+        - paragraph [ref=e6]: Project Intake OS
+        - paragraph [ref=e7]: Operational Control
+      - navigation "Main navigation" [ref=e8]:
+        - link "Intakes" [ref=e9] [cursor=pointer]:
+          - /url: /intakes
+        - link "Create Intake" [ref=e10] [cursor=pointer]:
+          - /url: /intakes/new
+        - link "Discovery" [ref=e11] [cursor=pointer]:
+          - /url: /discovery
+        - generic [ref=e12]:
+          - generic [ref=e13]: Reports
+          - generic [ref=e14]: Soon
+        - generic [ref=e15]:
+          - generic [ref=e16]: Settings
+          - generic [ref=e17]: Soon
+      - generic [ref=e18]:
+        - paragraph [ref=e19]: Acting as
+        - combobox "Select actor role" [ref=e20]:
+          - option "Request Creator (request_creator)" [selected]
+          - option "Intake Owner (intake_owner)"
+          - option "DevOps Lead (devops_lead)"
+          - option "Admin (admin)"
+          - option "Developer (developer)"
+        - paragraph [ref=e21]: Controls API permission headers.
+    - main [ref=e22]:
+      - generic [ref=e52]:
+        - generic [ref=e53]:
+          - generic [ref=e54]:
+            - link "← Discovery" [ref=e55] [cursor=pointer]:
+              - /url: /discovery
+            - generic [ref=e56]: /
+            - generic [ref=e57]: discovery-mqvd…
+          - button "Refresh" [ref=e59] [cursor=pointer]
+        - generic [ref=e61]:
+          - complementary [ref=e62]:
+            - generic [ref=e63]:
+              - paragraph [ref=e65]: Discovery Timeline
+              - list [ref=e67]:
+                - listitem [ref=e68]:
+                  - img [ref=e72]
+                  - paragraph [ref=e75]: Started
+                - listitem [ref=e76]:
+                  - img [ref=e80]
+                  - generic [ref=e82]:
+                    - paragraph [ref=e83]: Conversation
+                    - paragraph [ref=e84]: 04:09 am
+                - listitem [ref=e85]:
+                  - img [ref=e89]
+                  - paragraph [ref=e92]: Intent Detected
+                - listitem [ref=e93]:
+                  - generic [ref=e98]:
+                    - paragraph [ref=e99]: Problem Framed
+                    - paragraph [ref=e100]: 04:09 am
+                - listitem [ref=e101]:
+                  - generic [ref=e105]:
+                    - paragraph [ref=e106]: Solutions
+                    - paragraph [ref=e107]: Pending
+                - listitem [ref=e108]:
+                  - generic [ref=e112]:
+                    - paragraph [ref=e113]: Clarification
+                    - paragraph [ref=e114]: Pending
+                - listitem [ref=e115]:
+                  - generic [ref=e119]:
+                    - paragraph [ref=e120]: Direction Selected
+                    - paragraph [ref=e121]: Pending
+                - listitem [ref=e122]:
+                  - generic [ref=e126]:
+                    - paragraph [ref=e127]: Proposal Ready
+                    - paragraph [ref=e128]: Pending
+                - listitem [ref=e129]:
+                  - generic [ref=e133]:
+                    - paragraph [ref=e134]: Evaluation Ready
+                    - paragraph [ref=e135]: Pending
+                - listitem [ref=e136]:
+                  - generic [ref=e139]:
+                    - paragraph [ref=e140]: Sent to Evaluation
+                    - paragraph [ref=e141]: Pending
+          - generic [ref=e143]:
+            - paragraph [ref=e145]: Conversation
+            - generic [ref=e148]:
+              - paragraph [ref=e149]: We need a client-facing portal where customers can view their invoice history, download PDFs, pay outstanding invoices via Stripe, and raise support tickets. Right now everything goes through email and the team spends about 8 hours a week manually sending PDFs and chasing payments. We have about 200 active clients. The data lives in QuickBooks.
+              - paragraph [ref=e150]: 04:09 am
+            - generic [ref=e152]:
+              - textbox "Describe your project or idea… (Enter to send, Shift+Enter for newline)" [ref=e153]
+              - button "Send" [disabled] [ref=e154]
+          - complementary [ref=e155]:
+            - generic [ref=e156]:
+              - paragraph [ref=e158]: AI Understanding
+              - generic [ref=e159]:
+                - generic [ref=e160]:
+                  - paragraph [ref=e161]: Confidence
+                  - generic [ref=e162]:
+                    - generic [ref=e164]:
+                      - generic [ref=e165]: Problem Understanding
+                      - generic [ref=e166]: 90%
+                    - generic [ref=e170]:
+                      - generic [ref=e171]: Solution Fit
+                      - generic [ref=e172]: 84%
+                    - generic [ref=e176]:
+                      - generic [ref=e177]: Scope Clarity
+                      - generic [ref=e178]: 76%
+                    - generic [ref=e182]:
+                      - generic [ref=e183]: Technical Feasibility
+                      - generic [ref=e184]: 82%
+                    - generic [ref=e188]:
+                      - generic [ref=e189]: Stakeholder Clarity
+                      - generic [ref=e190]: 68%
+                    - generic [ref=e194]:
+                      - generic [ref=e195]: Downstream Mapping
+                      - generic [ref=e196]: 74%
+                - generic [ref=e199]:
+                  - paragraph [ref=e200]: Detected Intent
+                  - generic [ref=e201]:
+                    - generic [ref=e202]:
+                      - generic [ref=e203]: software_project
+                      - generic [ref=e204]: Solution Bias
+                    - paragraph [ref=e205]: Invoice delivery, payment collection, and support intake are currently handled manually over email, causing the team to spend about 8 hours per week sending PDFs and chasing payments for approximately 200 active clients.
+                    - paragraph [ref=e206]: The request specifies a particular solution—a client portal with Stripe and QuickBooks integration—rather than only describing the operational pain. However, the underlying problem is clear.
+                - generic [ref=e207]:
+                  - paragraph [ref=e208]: Problem Frame
+                  - generic [ref=e209]:
+                    - paragraph [ref=e210]: The business needs a secure client-facing portal integrated with QuickBooks and Stripe so approximately 200 active clients can self-serve invoice history, download invoice PDFs, pay outstanding invoices, and submit support tickets. This will replace or reduce manual email-based invoice delivery, payment chasing, and support intake, which currently costs the team about 8 hours per week and creates operational friction.
+                    - generic [ref=e211]:
+                      - paragraph [ref=e212]: Affected Users
+                      - list [ref=e213]:
+                        - listitem [ref=e214]:
+                          - generic [ref=e215]: ·
+                          - text: Active clients who need invoice access, payment options, and support channels
+                        - listitem [ref=e216]:
+                          - generic [ref=e217]: ·
+                          - text: Finance/admin team responsible for sending invoices and chasing payments
+                        - listitem [ref=e218]:
+                          - generic [ref=e219]: ·
+                          - text: Support team receiving and triaging client issues
+                        - listitem [ref=e220]:
+                          - generic [ref=e221]: ·
+                          - text: Operations/management tracking collections and client service workload
+                    - generic [ref=e222]:
+                      - paragraph [ref=e223]: Pain Points
+                      - list [ref=e224]:
+                        - listitem [ref=e225]:
+                          - generic [ref=e226]: ·
+                          - text: Manual invoice PDF sending consumes approximately 8 hours per week.
+                        - listitem [ref=e227]:
+                          - generic [ref=e228]: ·
+                          - text: Payment follow-up is manual and likely inconsistent or difficult to track at scale.
+                        - listitem [ref=e229]:
+                          - generic [ref=e230]: ·
+                          - text: Clients lack self-service access to invoice history and downloads.
+                        - listitem [ref=e231]:
+                          - generic [ref=e232]: ·
+                          - text: Outstanding invoice payment requires manual coordination instead of direct online payment.
+                        - listitem [ref=e233]:
+                          - generic [ref=e234]: ·
+                          - text: Support requests are mixed into email, making triage, ownership, and status tracking harder.
+                        - listitem [ref=e235]:
+                          - generic [ref=e236]: ·
+                          - text: Reliance on email increases risk of missed messages, duplicate work, and slow response times.
+                        - listitem [ref=e237]:
+                          - generic [ref=e238]: ·
+                          - text: The process does not scale well as the client base grows beyond the current 200 active clients.
+                    - generic [ref=e239]:
+                      - paragraph [ref=e240]: Unknowns
+                      - list [ref=e241]:
+                        - listitem [ref=e242]:
+                          - generic [ref=e243]: "?"
+                          - text: "Which QuickBooks product is used: QuickBooks Online or Desktop?"
+                        - listitem [ref=e244]:
+                          - generic [ref=e245]: "?"
+                          - text: Does QuickBooks currently store invoice PDFs, or would the portal need to generate them?
+                        - listitem [ref=e246]:
+                          - generic [ref=e247]: "?"
+                          - text: Should Stripe payments create payment records directly in QuickBooks, or will reconciliation remain manual?
+                        - listitem [ref=e248]:
+                          - generic [ref=e249]: "?"
+                          - text: Are clients individual users, companies with multiple contacts, or both?
+                        - listitem [ref=e250]:
+                          - generic [ref=e251]: "?"
+                          - text: "What authentication method is required: email/password, magic link, SSO, or invite-only access?"
+                        - listitem [ref=e252]:
+                          - generic [ref=e253]: "?"
+                          - text: Is there an existing support/helpdesk system to integrate with, or should ticket management be built into the portal?
+                        - listitem [ref=e254]:
+                          - generic [ref=e255]: "?"
+                          - text: "What ticket lifecycle is required: submission only, status tracking, threaded replies, attachments, SLAs, notifications?"
+                        - listitem [ref=e256]:
+                          - generic [ref=e257]: "?"
+                          - text: Are partial payments, credits, deposits, overdue fees, or payment plans required?
+                        - listitem [ref=e258]:
+                          - generic [ref=e259]: "?"
+                          - text: What branding, domain, and client notification requirements exist?
+                        - listitem [ref=e260]:
+                          - generic [ref=e261]: "?"
+                          - text: What security, compliance, audit logging, or data retention requirements apply?
+                        - listitem [ref=e262]:
+                          - generic [ref=e263]: "?"
+                          - text: Should the portal send automated invoice reminders and payment confirmations?
+                        - listitem [ref=e264]:
+                          - generic [ref=e265]: "?"
+                          - text: Who will own administration of client access, payment disputes, and support routing?

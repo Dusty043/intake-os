@@ -373,3 +373,40 @@ export async function listDistributedIntakes(actor: UiActor): Promise<ProjectInt
     ["distributed", "in_progress", "blocked", "completed", "canceled"].includes(r.status),
   );
 }
+
+// ── Settings ─────────────────────────────────────────────────────────────────
+
+export interface DiscoverySettings {
+  confidenceThreshold: number;
+}
+
+export async function getDiscoverySettings(actor: UiActor): Promise<DiscoverySettings> {
+  return request<DiscoverySettings>("/admin/settings/discovery", { headers: actorHeaders(actor) });
+}
+
+export async function updateDiscoverySettings(
+  actor: UiActor,
+  patch: Partial<DiscoverySettings>,
+): Promise<DiscoverySettings> {
+  return request<DiscoverySettings>("/admin/settings/discovery", {
+    method: "PATCH",
+    headers: actorHeaders(actor),
+    body: JSON.stringify(patch),
+  });
+}
+
+// ── Reports ───────────────────────────────────────────────────────────────────
+
+export interface IntakePipelineSummary {
+  total: number;
+  byStatus: Record<string, number>;
+}
+
+export async function getIntakePipelineSummary(actor: UiActor): Promise<IntakePipelineSummary> {
+  const intakes = await listIntakes(actor);
+  const byStatus: Record<string, number> = {};
+  for (const intake of intakes) {
+    byStatus[intake.status] = (byStatus[intake.status] ?? 0) + 1;
+  }
+  return { total: intakes.length, byStatus };
+}

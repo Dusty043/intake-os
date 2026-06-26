@@ -9,11 +9,11 @@ import { UserMenu } from "./UserMenu";
 type NavItem = { href: string; label: string; soon?: boolean };
 
 const NAV: NavItem[] = [
-  { href: "/intakes",     label: "Intakes"       },
-  { href: "/intakes/new", label: "Create Intake"  },
-  { href: "/discovery",   label: "Discovery"      },
-  { href: "#reports",     label: "Reports",  soon: true },
-  { href: "#settings",    label: "Settings", soon: true },
+  { href: "/intakes",     label: "Intakes"      },
+  { href: "/intakes/new", label: "Create Intake" },
+  { href: "/discovery",   label: "Discovery"     },
+  { href: "/reports",     label: "Reports"       },
+  { href: "/settings",    label: "Settings"      },
 ];
 
 export function AppShell({ children }: { children: React.ReactNode }) {

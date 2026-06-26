@@ -56,6 +56,7 @@ export interface DiscoveryOrchestratorOptions {
   now?: () => string;
   appBaseUrl?: string;
   intakeStore?: ProjectIntakeStore;
+  getConfidenceThreshold?: () => Promise<number>;
 }
 
 // ─── Orchestrator ─────────────────────────────────────────────────────────────
@@ -66,6 +67,7 @@ export class DiscoveryOrchestrator {
   private readonly nowFn: () => string;
   private readonly appBaseUrl: string | undefined;
   private readonly intakeStore: ProjectIntakeStore | undefined;
+  private readonly getConfidenceThreshold: () => Promise<number>;
 
   constructor(
     private readonly store: IDiscoverySessionStore,
@@ -82,6 +84,7 @@ export class DiscoveryOrchestrator {
     this.nowFn = opts.now ?? (() => new Date().toISOString());
     this.appBaseUrl = opts.appBaseUrl;
     this.intakeStore = opts.intakeStore;
+    this.getConfidenceThreshold = opts.getConfidenceThreshold ?? (() => Promise.resolve(0.65));
   }
 
   // ─── Start a new discovery session ───────────────────────────────────────
@@ -409,9 +412,12 @@ export class DiscoveryOrchestrator {
     const { frame, confidence } = await this.framingAgent.frameProblem(framingCtx, agentOpts);
 
     // Determine next status based on confidence tier.
+    // Load the admin-configurable threshold fresh each analysis run.
+    const roughFrameMax = await this.getConfidenceThreshold();
+
     // If the user's last message signals "proceed anyway / wing it", force
     // propose_with_assumptions so the session doesn't loop asking questions.
-    const rawTier = confidenceTier(confidence);
+    const rawTier = confidenceTier(confidence, roughFrameMax);
     const lastUserMsg = [...session.messages].reverse().find((m) => m.role === "user");
     const userWantsToProceed =
       rawTier === "rough_frame" &&

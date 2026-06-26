@@ -1,0 +1,275 @@
+- generic [active] [ref=e1]:
+  - alert [ref=e2]
+  - generic [ref=e3]:
+    - complementary [ref=e4]:
+      - generic [ref=e5]:
+        - paragraph [ref=e6]: Project Intake OS
+        - paragraph [ref=e7]: Operational Control
+      - navigation "Main navigation" [ref=e8]:
+        - link "Intakes" [ref=e9] [cursor=pointer]:
+          - /url: /intakes
+        - link "Create Intake" [ref=e10] [cursor=pointer]:
+          - /url: /intakes/new
+        - link "Discovery" [ref=e11] [cursor=pointer]:
+          - /url: /discovery
+        - generic [ref=e12]:
+          - generic [ref=e13]: Reports
+          - generic [ref=e14]: Soon
+        - generic [ref=e15]:
+          - generic [ref=e16]: Settings
+          - generic [ref=e17]: Soon
+      - generic [ref=e18]:
+        - paragraph [ref=e19]: Acting as
+        - combobox "Select actor role" [ref=e20]:
+          - option "Request Creator (request_creator)" [selected]
+          - option "Intake Owner (intake_owner)"
+          - option "DevOps Lead (devops_lead)"
+          - option "Admin (admin)"
+          - option "Developer (developer)"
+        - paragraph [ref=e21]: Controls API permission headers.
+    - main [ref=e22]:
+      - generic [ref=e52]:
+        - generic [ref=e266]:
+          - generic [ref=e267]:
+            - link "← Discovery" [ref=e268] [cursor=pointer]:
+              - /url: /discovery
+            - generic [ref=e269]: /
+            - generic [ref=e270]: discovery-mqvd…
+          - button "Refresh" [ref=e272] [cursor=pointer]
+        - generic [ref=e274]:
+          - complementary [ref=e275]:
+            - generic [ref=e276]:
+              - paragraph [ref=e278]: Discovery Timeline
+              - list [ref=e280]:
+                - listitem [ref=e281]:
+                  - img [ref=e285]
+                  - paragraph [ref=e288]: Started
+                - listitem [ref=e289]:
+                  - img [ref=e293]
+                  - generic [ref=e295]:
+                    - paragraph [ref=e296]: Conversation
+                    - paragraph [ref=e297]: 04:09 am
+                - listitem [ref=e298]:
+                  - img [ref=e302]
+                  - paragraph [ref=e305]: Intent Detected
+                - listitem [ref=e306]:
+                  - img [ref=e488]
+                  - generic [ref=e311]:
+                    - paragraph [ref=e312]: Problem Framed
+                    - paragraph [ref=e313]: 04:09 am
+                - listitem [ref=e314]:
+                  - img [ref=e490]
+                  - generic [ref=e318]:
+                    - paragraph [ref=e319]: Solutions
+                    - paragraph [ref=e492]: 04:15 am
+                - listitem [ref=e321]:
+                  - generic [ref=e325]:
+                    - paragraph [ref=e326]: Clarification
+                    - paragraph [ref=e494]: 04:15 am
+                - listitem [ref=e328]:
+                  - generic [ref=e332]:
+                    - paragraph [ref=e333]: Direction Selected
+                    - paragraph [ref=e334]: Pending
+                - listitem [ref=e335]:
+                  - generic [ref=e339]:
+                    - paragraph [ref=e340]: Proposal Ready
+                    - paragraph [ref=e341]: Pending
+                - listitem [ref=e342]:
+                  - generic [ref=e346]:
+                    - paragraph [ref=e347]: Evaluation Ready
+                    - paragraph [ref=e348]: Pending
+                - listitem [ref=e349]:
+                  - generic [ref=e352]:
+                    - paragraph [ref=e353]: Sent to Evaluation
+                    - paragraph [ref=e354]: Pending
+          - generic [ref=e356]:
+            - paragraph [ref=e358]: Conversation
+            - generic [ref=e359]:
+              - generic [ref=e361]:
+                - paragraph [ref=e362]: We need a client-facing portal where customers can view their invoice history, download PDFs, pay outstanding invoices via Stripe, and raise support tickets. Right now everything goes through email and the team spends about 8 hours a week manually sending PDFs and chasing payments. We have about 200 active clients. The data lives in QuickBooks.
+                - paragraph [ref=e363]: 04:09 am
+              - generic [ref=e496]:
+                - paragraph [ref=e497]: We use QuickBooks Online. The portal should generate PDFs from QuickBooks data. Stripe payments should create records in QuickBooks automatically. Clients are companies with multiple contacts — the primary contact pays invoices, others can only view. Authentication via magic link (no passwords). No existing helpdesk — build ticket management into the portal. Tickets need status tracking, threaded replies, and email notifications. No partial payments for now. White-label with our branding and domain. PCI compliance required. Send automated reminders 7 and 3 days before due date.
+                - paragraph [ref=e498]: 04:15 am
+              - generic [ref=e581]:
+                - paragraph [ref=e582]: "1. Source of truth is QuickBooks — we import invoices and client data from QBO into the portal on a nightly sync. Client contacts and roles are managed in the portal but QBO is the master for financial data. Payments made in the portal write back to QBO via API. 2. Stripe-hosted checkout pages only — card data must never touch our servers. Redirect flow is fine. 3. For staff at launch: shared inbox with status tracking, threaded replies, and agent assignment. Internal notes and priority tags are needed. SLAs and reporting can wait for v2."
+                - paragraph [ref=e583]: 04:17 am
+            - generic [ref=e499]:
+              - paragraph [ref=e500]: Clarification Questions
+              - 'button "blocking What should be the source of truth and sync flow for companies, contacts/roles, invoices, and payment status: should these be imported from QuickBooks Online into the portal, managed in the portal and pushed to QuickBooks, or a mix? Please specify where client contacts and their primary/view-only roles will be created and maintained. ▼" [ref=e502] [cursor=pointer]':
+                - generic [ref=e503]: blocking
+                - generic [ref=e504]: "What should be the source of truth and sync flow for companies, contacts/roles, invoices, and payment status: should these be imported from QuickBooks Online into the portal, managed in the portal and pushed to QuickBooks, or a mix? Please specify where client contacts and their primary/view-only roles will be created and maintained."
+                - generic [ref=e505]: ▼
+              - button "blocking For Stripe payments and PCI compliance, should the portal redirect users to Stripe-hosted Checkout/payment pages so card data never touches the portal, or must payment entry be embedded inside the portal UI? ▼" [ref=e507] [cursor=pointer]:
+                - generic [ref=e508]: blocking
+                - generic [ref=e509]: For Stripe payments and PCI compliance, should the portal redirect users to Stripe-hosted Checkout/payment pages so card data never touches the portal, or must payment entry be embedded inside the portal UI?
+                - generic [ref=e510]: ▼
+              - 'button "important What internal ticket-management features are required for staff at launch: basic shared inbox with status/threaded replies only, or also agent assignment, internal notes, priorities, categories, SLAs, search/filtering, and reporting? ▼" [ref=e512] [cursor=pointer]':
+                - generic [ref=e513]: important
+                - generic [ref=e514]: "What internal ticket-management features are required for staff at launch: basic shared inbox with status/threaded replies only, or also agent assignment, internal notes, priorities, categories, SLAs, search/filtering, and reporting?"
+                - generic [ref=e515]: ▼
+            - generic [ref=e365]:
+              - textbox "Describe your project or idea… (Enter to send, Shift+Enter for newline)" [ref=e366]
+              - button "Send" [disabled] [ref=e584]
+          - complementary [ref=e368]:
+            - generic [ref=e369]:
+              - paragraph [ref=e371]: AI Understanding
+              - generic [ref=e372]:
+                - generic [ref=e373]:
+                  - paragraph [ref=e374]: Confidence
+                  - generic [ref=e375]:
+                    - generic [ref=e377]:
+                      - generic [ref=e378]: Problem Understanding
+                      - generic [ref=e379]: 90%
+                    - generic [ref=e383]:
+                      - generic [ref=e384]: Solution Fit
+                      - generic [ref=e385]: 84%
+                    - generic [ref=e389]:
+                      - generic [ref=e390]: Scope Clarity
+                      - generic [ref=e391]: 86%
+                    - generic [ref=e395]:
+                      - generic [ref=e396]: Technical Feasibility
+                      - generic [ref=e397]: 82%
+                    - generic [ref=e401]:
+                      - generic [ref=e402]: Stakeholder Clarity
+                      - generic [ref=e403]: 76%
+                    - generic [ref=e407]:
+                      - generic [ref=e408]: Downstream Mapping
+                      - generic [ref=e409]: 82%
+                - generic [ref=e412]:
+                  - paragraph [ref=e413]: Detected Intent
+                  - generic [ref=e414]:
+                    - generic [ref=e416]: software_project
+                    - paragraph [ref=e418]: Invoice delivery, payment collection, and support handling are currently email-based and manual, costing the team about 8 hours per week and creating friction for ~200 clients. The organization needs a self-service, branded client experience that reduces manual PDF sending and payment chasing, centralizes ticket communication, preserves QuickBooks Online as the financial source of truth, and keeps payment handling PCI-compliant by using Stripe-hosted checkout.
+                - generic [ref=e420]:
+                  - paragraph [ref=e421]: Problem Frame
+                  - generic [ref=e422]:
+                    - paragraph [ref=e423]: The organization needs to replace manual, email-based invoice delivery, payment collection, and support handling with a branded client portal. The portal must allow client companies to securely access invoice history, download QuickBooks-derived PDFs, pay outstanding invoices through Stripe-hosted checkout, and manage support tickets with threaded communication and notifications. QuickBooks Online must remain the financial source of truth, while the portal manages client contacts, roles, authentication, and support workflows.
+                    - generic [ref=e424]:
+                      - paragraph [ref=e425]: Affected Users
+                      - list [ref=e426]:
+                        - listitem [ref=e427]:
+                          - generic [ref=e428]: ·
+                          - text: ~200 active client companies using invoice/payment/support interactions
+                        - listitem [ref=e429]:
+                          - generic [ref=e430]: ·
+                          - text: Primary client contacts responsible for paying invoices
+                        - listitem [ref=e431]:
+                          - generic [ref=e432]: ·
+                          - text: Secondary client contacts who need read-only invoice visibility
+                        - listitem [ref=e433]:
+                          - generic [ref=e434]: ·
+                          - text: Internal finance/admin team currently sending PDFs and chasing payments
+                        - listitem [ref=e517]:
+                          - generic [ref=e518]: ·
+                          - text: Internal support staff/agents handling client issues
+                    - generic [ref=e435]:
+                      - paragraph [ref=e436]: Pain Points
+                      - list [ref=e437]:
+                        - listitem [ref=e438]:
+                          - generic [ref=e439]: ·
+                          - text: Manual PDF sending and payment chasing consumes about 8 staff hours per week.
+                        - listitem [ref=e440]:
+                          - generic [ref=e441]: ·
+                          - text: Clients lack a self-service place to view invoice history, download PDFs, and pay balances.
+                        - listitem [ref=e442]:
+                          - generic [ref=e443]: ·
+                          - text: Email-based support communication is fragmented and difficult to track across statuses, assignees, and threads.
+                        - listitem [ref=e444]:
+                          - generic [ref=e445]: ·
+                          - text: Primary and secondary client contacts need different permissions, which email does not enforce well.
+                        - listitem [ref=e446]:
+                          - generic [ref=e447]: ·
+                          - text: Payment collection needs to be convenient while remaining PCI-compliant.
+                        - listitem [ref=e448]:
+                          - generic [ref=e449]: ·
+                          - text: Financial data must stay consistent with QuickBooks Online, avoiding duplicate sources of truth.
+                        - listitem [ref=e450]:
+                          - generic [ref=e451]: ·
+                          - text: No automated reminders currently reduce payment follow-up workload.
+                        - listitem [ref=e521]:
+                          - generic [ref=e522]: ·
+                          - text: Lack of white-label branded experience creates friction for approximately 200 clients.
+                    - generic [ref=e452]:
+                      - paragraph [ref=e453]: Unknowns
+                      - list [ref=e454]:
+                        - listitem [ref=e455]:
+                          - generic [ref=e456]: "?"
+                          - text: Which QuickBooks Online objects and fields must be synchronized exactly, including invoice attachments, tax, discounts, credits, deposits, and voided invoices.
+                        - listitem [ref=e457]:
+                          - generic [ref=e458]: "?"
+                          - text: Whether invoice PDFs should be generated by QuickBooks itself or rendered by the portal from synchronized QBO data.
+                        - listitem [ref=e459]:
+                          - generic [ref=e460]: "?"
+                          - text: How client companies and contacts will be initially imported, invited, verified, and matched to QBO customers.
+                        - listitem [ref=e461]:
+                          - generic [ref=e462]: "?"
+                          - text: Whether primary contact designation already exists somewhere or must be manually configured in the portal.
+                        - listitem [ref=e463]:
+                          - generic [ref=e464]: "?"
+                          - text: Whether staff users should use magic-link authentication, SSO, or another authentication method.
+                        - listitem [ref=e465]:
+                          - generic [ref=e466]: "?"
+                          - text: Exact branding, domain, email sender, and deliverability requirements.
+                        - listitem [ref=e467]:
+                          - generic [ref=e468]: "?"
+                          - text: Expected payment methods in Stripe Checkout, such as card, ACH, Apple Pay, or other local methods.
+                        - listitem [ref=e469]:
+                          - generic [ref=e470]: "?"
+                          - text: How to handle failed, disputed, refunded, or reversed payments and their synchronization back to QBO.
+                        - listitem [ref=e471]:
+                          - generic [ref=e472]: "?"
+                          - text: Whether existing unpaid invoices should receive reminders immediately after launch or only invoices created after launch.
+                        - listitem [ref=e473]:
+                          - generic [ref=e474]: "?"
+                          - text: Required audit logs, data retention rules, and access logs for finance and support activity.
+                        - listitem [ref=e475]:
+                          - generic [ref=e476]: "?"
+                          - text: Support email ingestion requirements, if any, such as whether clients can reply to ticket emails and have replies added to the thread.
+                        - listitem [ref=e477]:
+                          - generic [ref=e478]: "?"
+                          - text: Migration requirements for historical support emails, if any.
+                        - listitem [ref=e527]:
+                          - generic [ref=e528]: "?"
+                          - text: Permission model details beyond primary payer versus viewer contacts.
+                        - listitem [ref=e529]:
+                          - generic [ref=e530]: "?"
+                          - text: Volume/performance requirements beyond approximately 200 active clients.
+                        - listitem [ref=e585]:
+                          - generic [ref=e586]: "?"
+                          - text: Whether multi-currency, multiple QBO entities, or multiple Stripe accounts are in scope.
+                        - listitem [ref=e587]:
+                          - generic [ref=e588]: "?"
+                          - text: Operational ownership for resolving sync failures, payment reconciliation issues, and ticket administration.
+                - generic [ref=e531]:
+                  - paragraph [ref=e532]: Solution Options
+                  - generic [ref=e533]:
+                    - generic [ref=e534]:
+                      - generic [ref=e537]:
+                        - generic [ref=e538]: Configure an off-the-shelf white-label client portal SaaS
+                        - generic [ref=e539]: low
+                      - paragraph [ref=e540]: Use an off-the-shelf white-labeled client portal platform, configure client companies and contacts, connect QuickBooks Online for invoice visibility, route payments through Stripe-hosted checkout/payment pages, and use the platform’s built-in ticketing and email notifications. Automated reminders can be configured natively or via Zapier/Make.
+                      - paragraph [ref=e541]: Fastest path to reduce manual invoice PDF sending and payment chasing, likely deployable in weeks with limited custom development. Most PCI scope can be avoided by using Stripe-hosted payment pages.
+                      - button "Select this direction" [ref=e542] [cursor=pointer]
+                    - generic [ref=e543]:
+                      - generic [ref=e546]:
+                        - generic [ref=e547]: Build a custom managed portal with QuickBooks, Stripe, magic links, and native ticketing
+                        - generic [ref=e548]: Recommended
+                        - generic [ref=e549]: medium
+                      - paragraph [ref=e550]: Build a purpose-fit branded portal with managed services. Store client companies, contacts, roles, portal sessions, ticket threads, notification state, invoice cache, and payment audit records locally. Sync invoice metadata from QuickBooks Online, retrieve/download QuickBooks-generated invoice PDFs, take full-balance payments through Stripe-hosted flows, and use Stripe webhooks to create corresponding payment records in QuickBooks. Include ticket status tracking, threaded replies, magic-link login, email notifications, and scheduled invoice reminders 7 and 3 days before due date.
+                      - paragraph [ref=e551]: Provides the best balance of control, compliance posture, implementation effort, and long-term maintainability. It can exactly support company accounts, multiple contacts, payer/viewer roles, QuickBooks invoice sync, PDF retrieval, Stripe full-invoice payments, automatic QuickBooks payment creation, reminders, and built-in ticket tracking.
+                      - button "Select this direction" [ref=e552] [cursor=pointer]
+                    - generic [ref=e553]:
+                      - generic [ref=e556]:
+                        - generic [ref=e557]: Hybrid portal with dedicated helpdesk backend
+                        - generic [ref=e558]: medium
+                      - paragraph [ref=e559]: Build the invoice/payment portal custom or low-code, but use a dedicated helpdesk system behind the scenes for tickets. Clients create and reply to tickets in the branded portal; the portal uses helpdesk APIs to create conversations, sync statuses, send threaded replies, and trigger notifications. Invoices and payments are still handled through QuickBooks Online and Stripe.
+                      - paragraph [ref=e560]: Reduces the amount of custom ticket-management code while giving the support team a mature backend for assignment, internal notes, collision handling, reporting, and notification workflows. The client still sees a branded portal experience.
+                      - button "Select this direction" [ref=e561] [cursor=pointer]
+                    - generic [ref=e562]:
+                      - generic [ref=e565]:
+                        - generic [ref=e566]: Enterprise-grade event-driven portal platform
+                        - generic [ref=e567]: high
+                      - paragraph [ref=e568]: Create an event-driven portal platform with separate services for identity, customer/company management, QuickBooks synchronization, invoice PDF handling, Stripe payment processing, payment reconciliation, reminders, ticketing, and notifications. Use queues and idempotent event processing for all accounting and email workflows, with strong audit trails and monitoring.
+                      - paragraph [ref=e569]: Maximum robustness, auditability, scalability, and operational control. Supports future needs such as multi-brand portals, advanced permissions, approvals, payment plans, SLA workflows, analytics, customer self-service knowledge base, and deeper accounting reconciliation.
+                      - button "Select this direction" [ref=e570] [cursor=pointer]

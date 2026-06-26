@@ -1,0 +1,245 @@
+- generic [active] [ref=e1]:
+  - alert [ref=e2]
+  - generic [ref=e3]:
+    - complementary [ref=e4]:
+      - generic [ref=e5]:
+        - paragraph [ref=e6]: Project Intake OS
+        - paragraph [ref=e7]: Operational Control
+      - navigation "Main navigation" [ref=e8]:
+        - link "Intakes" [ref=e9] [cursor=pointer]:
+          - /url: /intakes
+        - link "Create Intake" [ref=e10] [cursor=pointer]:
+          - /url: /intakes/new
+        - link "Discovery" [ref=e11] [cursor=pointer]:
+          - /url: /discovery
+        - generic [ref=e12]:
+          - generic [ref=e13]: Reports
+          - generic [ref=e14]: Soon
+        - generic [ref=e15]:
+          - generic [ref=e16]: Settings
+          - generic [ref=e17]: Soon
+      - generic [ref=e18]:
+        - paragraph [ref=e19]: Acting as
+        - combobox "Select actor role" [ref=e20]:
+          - option "Request Creator (request_creator)" [selected]
+          - option "Intake Owner (intake_owner)"
+          - option "DevOps Lead (devops_lead)"
+          - option "Admin (admin)"
+          - option "Developer (developer)"
+        - paragraph [ref=e21]: Controls API permission headers.
+    - main [ref=e22]:
+      - generic [ref=e23]:
+        - generic [ref=e24]:
+          - generic [ref=e25]:
+            - heading "Active Intakes" [level=1] [ref=e26]
+            - paragraph [ref=e27]: Manage and track project requests.
+          - generic [ref=e28]:
+            - button "Refresh intakes" [ref=e29] [cursor=pointer]: Refresh
+            - link "Create Intake" [ref=e30] [cursor=pointer]:
+              - /url: /intakes/new
+        - table [ref=e33]:
+          - rowgroup [ref=e34]:
+            - row "ID Title Project Type Status Requester Created Updated" [ref=e35]:
+              - columnheader "ID" [ref=e36]
+              - columnheader "Title" [ref=e37]
+              - columnheader "Project Type" [ref=e38]
+              - columnheader "Status" [ref=e39]
+              - columnheader "Requester" [ref=e40]
+              - columnheader "Created" [ref=e41]
+              - columnheader "Updated" [ref=e42]
+          - rowgroup [ref=e43]:
+            - row "REQ-MQTXZ06G-M… HEllo world Internal Tool Approved Test 26 June 2026, 04:15 am 26 June 2026, 04:19 am" [ref=e44]:
+              - cell "REQ-MQTXZ06G-M…" [ref=e45]:
+                - link "REQ-MQTXZ06G-M…" [ref=e46] [cursor=pointer]:
+                  - /url: /intakes/REQ-MQTXZ06G-MEG3F8
+              - cell "HEllo world" [ref=e47]:
+                - link "HEllo world" [ref=e48] [cursor=pointer]:
+                  - /url: /intakes/REQ-MQTXZ06G-MEG3F8
+              - cell "Internal Tool" [ref=e49]
+              - cell "Approved" [ref=e50]:
+                - generic [ref=e51]: Approved
+              - cell "Test" [ref=e52]
+              - cell "26 June 2026, 04:15 am" [ref=e53]
+              - cell "26 June 2026, 04:19 am" [ref=e54]
+            - row "REQ-MQPJ4347-4… QA Test Intake — Automated Billing Dashboard Internal Tool Submitted QA Team 23 June 2026, 02:08 am 23 June 2026, 02:09 am" [ref=e55]:
+              - cell "REQ-MQPJ4347-4…" [ref=e56]:
+                - link "REQ-MQPJ4347-4…" [ref=e57] [cursor=pointer]:
+                  - /url: /intakes/REQ-MQPJ4347-452M3Q
+              - cell "QA Test Intake — Automated Billing Dashboard" [ref=e58]:
+                - link "QA Test Intake — Automated Billing Dashboard" [ref=e59] [cursor=pointer]:
+                  - /url: /intakes/REQ-MQPJ4347-452M3Q
+              - cell "Internal Tool" [ref=e60]
+              - cell "Submitted" [ref=e61]:
+                - generic [ref=e62]: Submitted
+              - cell "QA Team" [ref=e63]
+              - cell "23 June 2026, 02:08 am" [ref=e64]
+              - cell "23 June 2026, 02:09 am" [ref=e65]
+            - row "REQ-MQFI7017-B… ffesfsef Internal Tool Clarification Needed fawfaw 16 June 2026, 01:45 am 16 June 2026, 01:45 am" [ref=e66]:
+              - cell "REQ-MQFI7017-B…" [ref=e67]:
+                - link "REQ-MQFI7017-B…" [ref=e68] [cursor=pointer]:
+                  - /url: /intakes/REQ-MQFI7017-BBC38H
+              - cell "ffesfsef" [ref=e69]:
+                - link "ffesfsef" [ref=e70] [cursor=pointer]:
+                  - /url: /intakes/REQ-MQFI7017-BBC38H
+              - cell "Internal Tool" [ref=e71]
+              - cell "Clarification Needed" [ref=e72]:
+                - generic [ref=e73]: Clarification Needed
+              - cell "fawfaw" [ref=e74]
+              - cell "16 June 2026, 01:45 am" [ref=e75]
+              - cell "16 June 2026, 01:45 am" [ref=e76]
+            - row "REQ-MQFCPVFL-P… hello Internal Tool Approved hello 15 June 2026, 11:11 pm 15 June 2026, 11:34 pm" [ref=e77]:
+              - cell "REQ-MQFCPVFL-P…" [ref=e78]:
+                - link "REQ-MQFCPVFL-P…" [ref=e79] [cursor=pointer]:
+                  - /url: /intakes/REQ-MQFCPVFL-P0S70C
+              - cell "hello" [ref=e80]:
+                - link "hello" [ref=e81] [cursor=pointer]:
+                  - /url: /intakes/REQ-MQFCPVFL-P0S70C
+              - cell "Internal Tool" [ref=e82]
+              - cell "Approved" [ref=e83]:
+                - generic [ref=e84]: Approved
+              - cell "hello" [ref=e85]
+              - cell "15 June 2026, 11:11 pm" [ref=e86]
+              - cell "15 June 2026, 11:34 pm" [ref=e87]
+            - row "REQ-MQB7Y4DP-G… test Internal Tool Review In Progress me 13 June 2026, 01:47 am 13 June 2026, 01:57 am" [ref=e88]:
+              - cell "REQ-MQB7Y4DP-G…" [ref=e89]:
+                - link "REQ-MQB7Y4DP-G…" [ref=e90] [cursor=pointer]:
+                  - /url: /intakes/REQ-MQB7Y4DP-GHIOH2
+              - cell "test" [ref=e91]:
+                - link "test" [ref=e92] [cursor=pointer]:
+                  - /url: /intakes/REQ-MQB7Y4DP-GHIOH2
+              - cell "Internal Tool" [ref=e93]
+              - cell "Review In Progress" [ref=e94]:
+                - generic [ref=e95]: Review In Progress
+              - cell "me" [ref=e96]
+              - cell "13 June 2026, 01:47 am" [ref=e97]
+              - cell "13 June 2026, 01:57 am" [ref=e98]
+            - 'row "REQ-MQB7K0GA-6… kuyouhi Internal Tool Review In Progress uytiuyhou1`` 13 June 2026, 01:36 am 13 June 2026, 02:19 am" [ref=e99]':
+              - cell "REQ-MQB7K0GA-6…" [ref=e100]:
+                - link "REQ-MQB7K0GA-6…" [ref=e101] [cursor=pointer]:
+                  - /url: /intakes/REQ-MQB7K0GA-68Z74V
+              - cell "kuyouhi" [ref=e102]:
+                - link "kuyouhi" [ref=e103] [cursor=pointer]:
+                  - /url: /intakes/REQ-MQB7K0GA-68Z74V
+              - cell "Internal Tool" [ref=e104]
+              - cell "Review In Progress" [ref=e105]:
+                - generic [ref=e106]: Review In Progress
+              - 'cell "uytiuyhou1``" [ref=e107]'
+              - cell "13 June 2026, 01:36 am" [ref=e108]
+              - cell "13 June 2026, 02:19 am" [ref=e109]
+            - row "REQ-MQB709YM-G… jdwd Internal Tool Review In Progress awdawdad 13 June 2026, 01:20 am 13 June 2026, 01:21 am" [ref=e110]:
+              - cell "REQ-MQB709YM-G…" [ref=e111]:
+                - link "REQ-MQB709YM-G…" [ref=e112] [cursor=pointer]:
+                  - /url: /intakes/REQ-MQB709YM-GZMZGX
+              - cell "jdwd" [ref=e113]:
+                - link "jdwd" [ref=e114] [cursor=pointer]:
+                  - /url: /intakes/REQ-MQB709YM-GZMZGX
+              - cell "Internal Tool" [ref=e115]
+              - cell "Review In Progress" [ref=e116]:
+                - generic [ref=e117]: Review In Progress
+              - cell "awdawdad" [ref=e118]
+              - cell "13 June 2026, 01:20 am" [ref=e119]
+              - cell "13 June 2026, 01:21 am" [ref=e120]
+            - row "REQ-MQB57PDE-1… test Client Portal Review In Progress test 13 June 2026, 12:30 am 13 June 2026, 12:30 am" [ref=e121]:
+              - cell "REQ-MQB57PDE-1…" [ref=e122]:
+                - link "REQ-MQB57PDE-1…" [ref=e123] [cursor=pointer]:
+                  - /url: /intakes/REQ-MQB57PDE-1AFOVG
+              - cell "test" [ref=e124]:
+                - link "test" [ref=e125] [cursor=pointer]:
+                  - /url: /intakes/REQ-MQB57PDE-1AFOVG
+              - cell "Client Portal" [ref=e126]
+              - cell "Review In Progress" [ref=e127]:
+                - generic [ref=e128]: Review In Progress
+              - cell "test" [ref=e129]
+              - cell "13 June 2026, 12:30 am" [ref=e130]
+              - cell "13 June 2026, 12:30 am" [ref=e131]
+            - row "REQ-MQB4GJ3V-O… test Internal Tool Archived test 13 June 2026, 12:09 am 13 June 2026, 12:12 am" [ref=e132]:
+              - cell "REQ-MQB4GJ3V-O…" [ref=e133]:
+                - link "REQ-MQB4GJ3V-O…" [ref=e134] [cursor=pointer]:
+                  - /url: /intakes/REQ-MQB4GJ3V-O8A1T7
+              - cell "test" [ref=e135]:
+                - link "test" [ref=e136] [cursor=pointer]:
+                  - /url: /intakes/REQ-MQB4GJ3V-O8A1T7
+              - cell "Internal Tool" [ref=e137]
+              - cell "Archived" [ref=e138]:
+                - generic [ref=e139]: Archived
+              - cell "test" [ref=e140]
+              - cell "13 June 2026, 12:09 am" [ref=e141]
+              - cell "13 June 2026, 12:12 am" [ref=e142]
+            - row "REQ-seed-011… Project Intake OS UI Buildout Internal Tool Approved demo.requester@local 12 June 2026, 01:06 am 12 June 2026, 01:06 am" [ref=e143]:
+              - cell "REQ-seed-011…" [ref=e144]:
+                - link "REQ-seed-011…" [ref=e145] [cursor=pointer]:
+                  - /url: /intakes/REQ-seed-011
+              - cell "Project Intake OS UI Buildout" [ref=e146]:
+                - link "Project Intake OS UI Buildout" [ref=e147] [cursor=pointer]:
+                  - /url: /intakes/REQ-seed-011
+              - cell "Internal Tool" [ref=e148]
+              - cell "Approved" [ref=e149]:
+                - generic [ref=e150]: Approved
+              - cell "demo.requester@local" [ref=e151]
+              - cell "12 June 2026, 01:06 am" [ref=e152]
+              - cell "12 June 2026, 01:06 am" [ref=e153]
+            - row "REQ-seed-008… Data Pipeline Migration Data Sync Integration Gate 1 Approved demo.requester@local 12 June 2026, 01:06 am 12 June 2026, 01:06 am" [ref=e154]:
+              - cell "REQ-seed-008…" [ref=e155]:
+                - link "REQ-seed-008…" [ref=e156] [cursor=pointer]:
+                  - /url: /intakes/REQ-seed-008
+              - cell "Data Pipeline Migration" [ref=e157]:
+                - link "Data Pipeline Migration" [ref=e158] [cursor=pointer]:
+                  - /url: /intakes/REQ-seed-008
+              - cell "Data Sync Integration" [ref=e159]
+              - cell "Gate 1 Approved" [ref=e160]:
+                - generic [ref=e161]: Gate 1 Approved
+              - cell "demo.requester@local" [ref=e162]
+              - cell "12 June 2026, 01:06 am" [ref=e163]
+              - cell "12 June 2026, 01:06 am" [ref=e164]
+            - row "REQ-seed-005… Internal SSO Management Tool Internal Tool Approved demo.requester@local 12 June 2026, 01:06 am 13 June 2026, 01:00 am" [ref=e165]:
+              - cell "REQ-seed-005…" [ref=e166]:
+                - link "REQ-seed-005…" [ref=e167] [cursor=pointer]:
+                  - /url: /intakes/REQ-seed-005
+              - cell "Internal SSO Management Tool" [ref=e168]:
+                - link "Internal SSO Management Tool" [ref=e169] [cursor=pointer]:
+                  - /url: /intakes/REQ-seed-005
+              - cell "Internal Tool" [ref=e170]
+              - cell "Approved" [ref=e171]:
+                - generic [ref=e172]: Approved
+              - cell "demo.requester@local" [ref=e173]
+              - cell "12 June 2026, 01:06 am" [ref=e174]
+              - cell "13 June 2026, 01:00 am" [ref=e175]
+            - row "REQ-seed-003… Customer Portal Enhancement Client Portal Review In Progress demo.requester@local 12 June 2026, 01:06 am 12 June 2026, 01:06 am" [ref=e176]:
+              - cell "REQ-seed-003…" [ref=e177]:
+                - link "REQ-seed-003…" [ref=e178] [cursor=pointer]:
+                  - /url: /intakes/REQ-seed-003
+              - cell "Customer Portal Enhancement" [ref=e179]:
+                - link "Customer Portal Enhancement" [ref=e180] [cursor=pointer]:
+                  - /url: /intakes/REQ-seed-003
+              - cell "Client Portal" [ref=e181]
+              - cell "Review In Progress" [ref=e182]:
+                - generic [ref=e183]: Review In Progress
+              - cell "demo.requester@local" [ref=e184]
+              - cell "12 June 2026, 01:06 am" [ref=e185]
+              - cell "12 June 2026, 01:06 am" [ref=e186]
+            - row "REQ-seed-002… Marketing Dashboard Request Internal Dashboard Submitted demo.requester@local 12 June 2026, 01:06 am 12 June 2026, 01:06 am" [ref=e187]:
+              - cell "REQ-seed-002…" [ref=e188]:
+                - link "REQ-seed-002…" [ref=e189] [cursor=pointer]:
+                  - /url: /intakes/REQ-seed-002
+              - cell "Marketing Dashboard Request" [ref=e190]:
+                - link "Marketing Dashboard Request" [ref=e191] [cursor=pointer]:
+                  - /url: /intakes/REQ-seed-002
+              - cell "Internal Dashboard" [ref=e192]
+              - cell "Submitted" [ref=e193]:
+                - generic [ref=e194]: Submitted
+              - cell "demo.requester@local" [ref=e195]
+              - cell "12 June 2026, 01:06 am" [ref=e196]
+              - cell "12 June 2026, 01:06 am" [ref=e197]
+            - row "REQ-seed-001… Payment Failure Notification Fix Api Service Archived demo.requester@local 12 June 2026, 01:06 am 13 June 2026, 01:19 am" [ref=e198]:
+              - cell "REQ-seed-001…" [ref=e199]:
+                - link "REQ-seed-001…" [ref=e200] [cursor=pointer]:
+                  - /url: /intakes/REQ-seed-001
+              - cell "Payment Failure Notification Fix" [ref=e201]:
+                - link "Payment Failure Notification Fix" [ref=e202] [cursor=pointer]:
+                  - /url: /intakes/REQ-seed-001
+              - cell "Api Service" [ref=e203]
+              - cell "Archived" [ref=e204]:
+                - generic [ref=e205]: Archived
+              - cell "demo.requester@local" [ref=e206]
+              - cell "12 June 2026, 01:06 am" [ref=e207]
+              - cell "13 June 2026, 01:19 am" [ref=e208]

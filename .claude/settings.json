@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ssh -i ~/.ssh/oreochiserver oreo@oreochiserver \"cd ~/intake-os && docker compose -f docker-compose.server.yml --env-file .env.server build\")"
+    ]
+  }
+}

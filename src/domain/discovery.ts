@@ -98,10 +98,10 @@ export type ConfidenceTier =
   | "propose_with_assumptions" // 0.66 – 0.80
   | "recommend_evaluation"; // > 0.80
 
-export function confidenceTier(c: DiscoveryConfidence): ConfidenceTier {
+export function confidenceTier(c: DiscoveryConfidence, roughFrameMax = 0.65): ConfidenceTier {
   const score = overallConfidence(c);
   if (score <= 0.40) return "keep_discovering";
-  if (score <= 0.65) return "rough_frame";
+  if (score <= roughFrameMax) return "rough_frame";
   if (score <= 0.80) return "propose_with_assumptions";
   return "recommend_evaluation";
 }

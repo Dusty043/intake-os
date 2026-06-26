@@ -18,8 +18,13 @@ import {
 } from "../../../../../src/application/discovery/index.js";
 import { PROJECT_INTAKE_STORE } from "../../persistence/store.token.js";
 import { DiscoveryHttpController } from "./discovery.controller.js";
+import { GlobalSettingsService } from "../admin/global-settings.service.js";
+import { AdminModule } from "../admin/admin.module.js";
 
-function buildOrchestrator(intakeStore?: ProjectIntakeStore): DiscoveryController {
+function buildOrchestrator(
+  intakeStore?: ProjectIntakeStore,
+  settingsService?: GlobalSettingsService,
+): DiscoveryController {
   let _seq = 0;
   const idFactory = (prefix: string) =>
     `${prefix}-${Date.now().toString(36)}-${++_seq}`;
@@ -60,19 +65,28 @@ function buildOrchestrator(intakeStore?: ProjectIntakeStore): DiscoveryControlle
     clarificationAgent,
     proposalAgent,
     manifestAgent,
-    { idFactory, appBaseUrl: process.env["INTAKE_APP_URL"], intakeStore },
+    {
+      idFactory,
+      appBaseUrl: process.env["INTAKE_APP_URL"],
+      intakeStore,
+      getConfidenceThreshold: settingsService
+        ? () => settingsService.getConfidenceThreshold()
+        : undefined,
+    },
   );
 
   return new DiscoveryController(orchestrator);
 }
 
 @Module({
+  imports: [AdminModule],
   controllers: [DiscoveryHttpController],
   providers: [
     {
       provide: "DISCOVERY_CONTROLLER",
-      inject: [PROJECT_INTAKE_STORE],
-      useFactory: (intakeStore: ProjectIntakeStore) => buildOrchestrator(intakeStore),
+      inject: [PROJECT_INTAKE_STORE, GlobalSettingsService],
+      useFactory: (intakeStore: ProjectIntakeStore, settings: GlobalSettingsService) =>
+        buildOrchestrator(intakeStore, settings),
     },
   ],
 })

@@ -20,3 +20,4 @@ backups/
 # Next.js build output
 apps/web/.next/
 apps/web/tsconfig.tsbuildinfo
+.gstack/

@@ -1,0 +1,58 @@
+- generic [active] [ref=e1]:
+  - alert [ref=e2]
+  - generic [ref=e3]:
+    - complementary [ref=e4]:
+      - generic [ref=e5]:
+        - paragraph [ref=e6]: Project Intake OS
+        - paragraph [ref=e7]: Operational Control
+      - navigation "Main navigation" [ref=e8]:
+        - link "Intakes" [ref=e9] [cursor=pointer]:
+          - /url: /intakes
+        - link "Create Intake" [ref=e10] [cursor=pointer]:
+          - /url: /intakes/new
+        - link "Discovery" [ref=e11] [cursor=pointer]:
+          - /url: /discovery
+        - generic [ref=e12]:
+          - generic [ref=e13]: Reports
+          - generic [ref=e14]: Soon
+        - generic [ref=e15]:
+          - generic [ref=e16]: Settings
+          - generic [ref=e17]: Soon
+      - generic [ref=e18]:
+        - paragraph [ref=e19]: Acting as
+        - combobox "Select actor role" [ref=e20]:
+          - option "Request Creator (request_creator)" [selected]
+          - option "Intake Owner (intake_owner)"
+          - option "DevOps Lead (devops_lead)"
+          - option "Admin (admin)"
+          - option "Developer (developer)"
+        - paragraph [ref=e21]: Controls API permission headers.
+    - main [ref=e22]:
+      - generic [ref=e23]:
+        - generic [ref=e24]:
+          - generic [ref=e25]:
+            - heading "Discovery Sessions" [level=1] [ref=e26]
+            - paragraph [ref=e27]: AI-guided conversations to clarify project intent before intake.
+          - generic [ref=e28]:
+            - button "Refresh" [ref=e29] [cursor=pointer]
+            - button "+ Start Discovery" [ref=e30] [cursor=pointer]
+        - generic [ref=e32]:
+          - paragraph [ref=e33]: No discovery sessions yet.
+          - paragraph [ref=e34]: Start a guided AI conversation to clarify a project idea before submitting an intake.
+          - button "+ Start Discovery" [ref=e35] [cursor=pointer]
+        - generic [ref=e37]:
+          - generic [ref=e38]:
+            - generic [ref=e39]:
+              - heading "Start Discovery" [level=2] [ref=e40]
+              - paragraph [ref=e41]: Describe your project idea or problem. The AI will guide you through discovery.
+            - button "Close" [ref=e42] [cursor=pointer]: ×
+          - generic [ref=e43]:
+            - generic [ref=e44]:
+              - generic [ref=e45]: What are you trying to build or solve?
+              - textbox "What are you trying to build or solve?" [disabled] [ref=e46]:
+                - /placeholder: e.g. We need a way for field technicians to log equipment faults without internet access…
+                - text: We need a client-facing portal where customers can view their invoice history, download PDFs, pay outstanding invoices via Stripe, and raise support tickets. Right now everything goes through email and the team spends about 8 hours a week manually sending PDFs and chasing payments. We have about 200 active clients. The data lives in QuickBooks.
+              - paragraph [ref=e47]: Don't worry about structure — just describe it naturally.
+            - generic [ref=e48]:
+              - button "Cancel" [disabled] [ref=e49]
+              - button "Starting…" [disabled] [ref=e51]

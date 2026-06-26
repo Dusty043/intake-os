@@ -34,6 +34,19 @@ const STAGE_1_KINDS: EvaluationSectionKind[] = [
 
 const STAGE_3_KINDS: EvaluationSectionKind[] = ["synthesis", "quality_review"];
 
+// Agents that benefit from a higher-capability model.
+// Includes all stage-2 specialist sections plus synthesis (not quality_review).
+const PREMIUM_TIER_KINDS = new Set<EvaluationSectionKind>([
+  "architecture",
+  "low_code_path",
+  "custom_build",
+  "risk_security",
+  "cost_effort",
+  "work_breakdown",
+  "distribution_plan",
+  "synthesis",
+]);
+
 const REQUIRED_CONSTRUCTION_KINDS: EvaluationSectionKind[] = [
   "intake_brief",
   "clarification_questions",
@@ -57,6 +70,8 @@ export interface EvaluationOrchestrationOptions {
   depth: EvaluationDepth;
   provider: "mock" | "openai" | "anthropic" | "bedrock";
   model?: string;
+  /** Higher-capability model for architecture, risk, work-breakdown, and synthesis agents. Falls back to `model` when not set. */
+  premiumModel?: string;
   discoveryNotes?: string[];
   priorClarifications?: Array<{ question: string; answer: string }>;
   allowDepthUpgrade?: boolean;
@@ -130,12 +145,19 @@ export class EvaluationOrchestrator {
     const evaluationId = this.idFactory("eval");
     const allowDepthUpgrade = options.allowDepthUpgrade ?? true;
 
-    const agentOpts: AgentRunOptions = {
+    const baseOpts: AgentRunOptions = {
       actor: options.actor,
       provider: options.provider,
       model: options.model,
       idFactory: this.idFactory,
       now: runNow,
+    };
+
+    const agentOptsFor = (kind: EvaluationSectionKind): AgentRunOptions => {
+      if (options.premiumModel && PREMIUM_TIER_KINDS.has(kind)) {
+        return { ...baseOpts, model: options.premiumModel };
+      }
+      return baseOpts;
     };
 
     const sections: Partial<Record<EvaluationSectionKind, EvaluationSection>> = {};
@@ -146,7 +168,7 @@ export class EvaluationOrchestrator {
       "intake_brief",
       evaluationId,
       buildCtx(intake, options.depth, sections, options),
-      agentOpts,
+      agentOptsFor("intake_brief"),
     );
     sections.intake_brief = intakeBriefResult.section;
 
@@ -161,7 +183,7 @@ export class EvaluationOrchestrator {
         "clarification_questions",
         evaluationId,
         buildCtx(intake, options.depth, sections, options),
-        agentOpts,
+        agentOptsFor("clarification_questions"),
       );
 
       const clarContent = clarResult.section.content as ClarificationQuestionsSectionContent;
@@ -194,7 +216,7 @@ export class EvaluationOrchestrator {
       "classification",
       evaluationId,
       buildCtx(intake, options.depth, sections, options),
-      agentOpts,
+      agentOptsFor("classification"),
     );
     sections.classification = classResult.section;
 
@@ -226,7 +248,7 @@ export class EvaluationOrchestrator {
           kind,
           evaluationId,
           buildCtx(intake, effectiveDepth, stage1Snapshot, options),
-          agentOpts,
+          agentOptsFor(kind),
         ),
       ),
     );
@@ -245,7 +267,7 @@ export class EvaluationOrchestrator {
       "synthesis",
       evaluationId,
       buildCtx(intake, effectiveDepth, sections, options),
-      agentOpts,
+      agentOptsFor("synthesis"),
     );
     sections.synthesis = synthResult.section;
 
@@ -253,7 +275,7 @@ export class EvaluationOrchestrator {
       "quality_review",
       evaluationId,
       buildCtx(intake, effectiveDepth, sections, options),
-      agentOpts,
+      agentOptsFor("quality_review"),
     );
     sections.quality_review = qualityResult.section;
 
