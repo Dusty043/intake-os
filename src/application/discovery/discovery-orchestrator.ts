@@ -417,14 +417,74 @@ export class DiscoveryOrchestrator {
       newEvents.push(this.event(nextStatus, now));
     }
 
+    // Build conversational AI reply from structured analysis results
+    const replyContent = this.buildAnalysisReply(intent, frame, tier);
+    const assistantMessage: ConversationMessage = {
+      id: this.idFactory("msg"),
+      role: "ai",
+      content: replyContent,
+      createdAt: now,
+    };
+
     return this.store.update(session.id, {
       intent,
       problemFrame: frame,
       confidence,
       status: nextStatus,
+      messages: [...session.messages, assistantMessage],
       timeline: [...session.timeline, ...newEvents],
       updatedAt: now,
     });
+  }
+
+  private buildAnalysisReply(
+    intent: import("../../domain/discovery.js").IntentExtractionResult | null,
+    frame: import("../../domain/discovery.js").ProblemFrame | null,
+    tier: ReturnType<typeof confidenceTier>,
+  ): string {
+    const parts: string[] = [];
+
+    if (tier === "keep_discovering") {
+      parts.push("I want to make sure I understand what you're trying to solve before we go further.");
+      if (intent?.underlyingProblem) {
+        parts.push(`My initial read: you're working on something related to **${intent.underlyingProblem}** — is that right?`);
+      }
+      parts.push("Could you tell me a bit more about the problem you're facing and who it affects?");
+      return parts.join(" ");
+    }
+
+    if (frame?.problemStatement) {
+      parts.push(`Got it. Here's my understanding so far:\n\n**${frame.problemStatement}**`);
+    } else if (intent?.underlyingProblem) {
+      parts.push(`Got it. You're trying to solve: **${intent.underlyingProblem}**`);
+    }
+
+    if (intent?.solutionBiasDetected && intent.solutionBiasNote) {
+      parts.push(`\n\n> ${intent.solutionBiasNote}`);
+    }
+
+    if (tier === "rough_frame") {
+      if (frame?.unknowns && frame.unknowns.length > 0) {
+        const questions = frame.unknowns.slice(0, 3).map((u) => `- ${u}`).join("\n");
+        parts.push(`\n\nTo sharpen this up, I need a few more details:\n${questions}`);
+      } else {
+        parts.push("\n\nCan you tell me more about who this affects and what success looks like?");
+      }
+      return parts.join("");
+    }
+
+    if (tier === "propose_with_assumptions" || tier === "recommend_evaluation") {
+      if (frame?.assumptions && frame.assumptions.length > 0) {
+        const assumptions = frame.assumptions.slice(0, 3).map((a) => `- ${a}`).join("\n");
+        parts.push(`\n\nI'm moving forward with a few assumptions:\n${assumptions}`);
+      }
+      if (frame?.successCriteria && frame.successCriteria.length > 0) {
+        parts.push(`\n\nSuccess looks like: ${frame.successCriteria[0]}`);
+      }
+      parts.push("\n\nI'm generating solution options now — they'll appear in the panel on the right.");
+    }
+
+    return parts.join("") || "I'm processing your request — the analysis panel on the right shows what I've understood so far.";
   }
 
   // ─── Status resolution ────────────────────────────────────────────────────

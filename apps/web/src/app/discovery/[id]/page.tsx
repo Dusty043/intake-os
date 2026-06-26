@@ -21,11 +21,12 @@ import {
 } from "@/lib/discovery-client";
 import type { DiscoverySession } from "@/lib/discovery-types";
 
-// Statuses where the AI is actively processing — poll until we leave these
+// Statuses where the AI is actively processing — poll until we leave these.
+// intent_detected is intentionally excluded: it's a stable "waiting for user input"
+// state, not a transient processing state. Polling it endlessly causes infinite loops.
 const AI_PROCESSING_STATUSES = new Set([
   "draft",
   "conversation_started",
-  "intent_detected",
   "problem_framed",
   "direction_selected",
 ]);
