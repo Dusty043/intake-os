@@ -202,11 +202,26 @@ function generateReadme(proposal: ProjectProposal, session: DiscoverySession, ap
 
 // ─── Monday builder helpers ───────────────────────────────────────────────────
 
+function estimateTargetLaunch(startIso: string, totalSP: number): string {
+  // Rough heuristic: 1 SP ≈ 1 day, team velocity ~10 SP/sprint (2 weeks)
+  // Add 2 sprints minimum buffer; cap estimate at 26 sprints (1 year)
+  const sprints = Math.min(26, Math.max(2, Math.ceil(totalSP / 10) + 2));
+  const ms = sprints * 14 * 24 * 60 * 60 * 1000;
+  return new Date(new Date(startIso).getTime() + ms).toISOString().slice(0, 10);
+}
+
+function architectureNoteFrom(proposal: ProjectProposal): string | null {
+  const arch = proposal.systemDesign.value?.serviceArchitecture;
+  if (!arch || arch.recommendation === "undetermined") return null;
+  return `${arch.recommendation} — ${arch.rationale}`;
+}
+
 function buildProjectsPortfolio(
   proposal: ProjectProposal,
-  session: DiscoverySession,
+  _session: DiscoverySession,
   intentType: IntentType | undefined,
   totalSP: number,
+  startDate: string,
 ): MondayProjectsPortfolioItem {
   return {
     create: true,
@@ -217,7 +232,9 @@ function buildProjectsPortfolio(
     status: "Conceptualization",
     health: "green",
     techStack: techStackFrom(proposal),
-    targetLaunch: null,
+    architectureNote: architectureNoteFrom(proposal),
+    startDate,
+    targetLaunch: totalSP > 0 ? estimateTargetLaunch(startDate, totalSP) : null,
     estimatedTotalSP: totalSP > 0 ? totalSP : null,
   };
 }
@@ -311,9 +328,11 @@ export class MockManifestGeneratorAgent implements IManifestGeneratorAgent {
 
     const credentialsVault: MondayCredentialItem[] = [];
 
+    const startDate = opts.now.slice(0, 10);
+
     const monday: MondayManifest = {
       projectsPortfolio: isProjectLevel
-        ? buildProjectsPortfolio(proposal, session, intentType, epicSPTotal)
+        ? buildProjectsPortfolio(proposal, session, intentType, epicSPTotal, startDate)
         : null,
       roadmapEpics: epics,
       sprintTasks: tasks,

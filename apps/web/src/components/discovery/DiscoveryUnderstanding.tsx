@@ -323,13 +323,43 @@ export function DiscoveryUnderstanding({
                 <div>
                   <p className="text-xs font-semibold text-gray-500 mb-1">Monday</p>
                   {manifest.monday.projectsPortfolio && (
-                    <p className="text-xs text-gray-700 mb-1">
-                      <span className="font-medium">Project:</span>{" "}
-                      {manifest.monday.projectsPortfolio.name}
-                      <span className="text-gray-400 ml-1">
-                        ({manifest.monday.projectsPortfolio.projectType})
-                      </span>
-                    </p>
+                    <div className="space-y-0.5 mb-1">
+                      <p className="text-xs text-gray-700">
+                        <span className="font-medium">Project:</span>{" "}
+                        {manifest.monday.projectsPortfolio.name}
+                        <span className="text-gray-400 ml-1">
+                          ({manifest.monday.projectsPortfolio.projectType})
+                        </span>
+                      </p>
+                      <p className="text-xs text-gray-600">
+                        <span className="font-medium">Status:</span>{" "}
+                        {manifest.monday.projectsPortfolio.status}
+                      </p>
+                      {manifest.monday.projectsPortfolio.techStack.length > 0 && (
+                        <p className="text-xs text-gray-600">
+                          <span className="font-medium">Stack:</span>{" "}
+                          {manifest.monday.projectsPortfolio.techStack.join(", ")}
+                        </p>
+                      )}
+                      {manifest.monday.projectsPortfolio.architectureNote && (
+                        <p className="text-xs text-gray-600">
+                          <span className="font-medium">Archi:</span>{" "}
+                          {manifest.monday.projectsPortfolio.architectureNote}
+                        </p>
+                      )}
+                      {manifest.monday.projectsPortfolio.startDate && (
+                        <p className="text-xs text-gray-600">
+                          <span className="font-medium">Start:</span>{" "}
+                          {manifest.monday.projectsPortfolio.startDate}
+                        </p>
+                      )}
+                      {manifest.monday.projectsPortfolio.targetLaunch && (
+                        <p className="text-xs text-gray-600">
+                          <span className="font-medium">Target launch:</span>{" "}
+                          {manifest.monday.projectsPortfolio.targetLaunch}
+                        </p>
+                      )}
+                    </div>
                   )}
                   {manifest.monday.roadmapEpics.length > 0 && (
                     <div className="space-y-0.5">

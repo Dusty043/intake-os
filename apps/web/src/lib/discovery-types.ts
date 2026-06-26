@@ -99,6 +99,8 @@ export type MondayProjectsPortfolioItem = {
   status: "Conceptualization" | "Development" | "Testing" | "Complete" | "On Hold";
   health: "green" | "yellow" | "red";
   techStack: string[];
+  architectureNote: string | null;
+  startDate: string | null;
   targetLaunch: string | null;
   estimatedTotalSP: number | null;
 };
