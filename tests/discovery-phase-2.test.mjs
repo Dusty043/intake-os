@@ -14,6 +14,7 @@ import {
   MockSolutionGenerationAgent,
   MockClarificationAgent,
   MockProposalComposerAgent,
+  MockManifestGeneratorAgent,
   emptyConfidence,
 } from "../dist/src/index.js";
 
@@ -36,6 +37,7 @@ function makeOrchestrator() {
     new MockSolutionGenerationAgent(),
     new MockClarificationAgent(),
     new MockProposalComposerAgent(),
+    new MockManifestGeneratorAgent(),
     { idFactory, now: fixedNow },
   );
   return { store, orchestrator };

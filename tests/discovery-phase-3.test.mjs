@@ -14,6 +14,7 @@ import {
   MockSolutionGenerationAgent,
   MockClarificationAgent,
   MockProposalComposerAgent,
+  MockManifestGeneratorAgent,
   proposalToIntakeRecord,
   emptyConfidence,
   emptyProjectProposal,
@@ -38,6 +39,7 @@ function makeOrchestrator() {
     new MockSolutionGenerationAgent(),
     new MockClarificationAgent(),
     new MockProposalComposerAgent(),
+    new MockManifestGeneratorAgent(),
     { idFactory, now: fixedNow },
   );
   return { store, orchestrator };

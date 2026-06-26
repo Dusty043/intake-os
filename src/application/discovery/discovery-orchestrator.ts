@@ -13,6 +13,7 @@ import type { IDiscoverySessionStore } from "./discovery-session-store.js";
 import type {
   IClarificationAgent,
   IIntentExtractionAgent,
+  IManifestGeneratorAgent,
   IProblemFramingAgent,
   IProposalComposerAgent,
   ISolutionGenerationAgent,
@@ -69,6 +70,7 @@ export class DiscoveryOrchestrator {
     private readonly solutionAgent: ISolutionGenerationAgent,
     private readonly clarificationAgent: IClarificationAgent,
     private readonly proposalComposerAgent: IProposalComposerAgent,
+    private readonly manifestGeneratorAgent: IManifestGeneratorAgent,
     opts: DiscoveryOrchestratorOptions,
   ) {
     this.provider = opts.provider ?? "mock";
@@ -332,6 +334,39 @@ export class DiscoveryOrchestrator {
     });
 
     return { session: updatedSession, intakeRecord };
+  }
+
+  // ─── Generate provisioning manifest ──────────────────────────────────────
+
+  async generateManifest(sessionId: string): Promise<DiscoverySession> {
+    const now = this.nowFn();
+
+    let session = await this.store.getById(sessionId);
+    if (!session) throw new Error(`DiscoverySession not found: ${sessionId}`);
+    if (!session.selectedSolutionId) {
+      throw new Error(`No solution selected for session: ${sessionId} — call selectDirection first`);
+    }
+
+    // Auto-compose proposal if not yet done
+    if (!session.proposal || session.proposal.status === "draft") {
+      session = await this.composeProposal(sessionId);
+    }
+
+    if (!session.proposal) {
+      throw new Error(`Proposal composition failed for session: ${sessionId}`);
+    }
+
+    const agentOpts: DiscoveryAgentOptions = { provider: this.provider, idFactory: this.idFactory, now };
+    const manifest = await this.manifestGeneratorAgent.generateManifest(
+      session.proposal,
+      session,
+      agentOpts,
+    );
+
+    return this.store.update(session.id, {
+      manifest,
+      updatedAt: now,
+    });
   }
 
   // ─── Core analysis pipeline ───────────────────────────────────────────────

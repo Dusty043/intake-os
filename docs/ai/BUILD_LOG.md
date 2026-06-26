@@ -1,5 +1,47 @@
 # Build Log
 
+## 2026-06-26 — Discovery Engine Phases 4+5+6: Manifest Generator + NestJS Module + Frontend UI
+
+**Test count:** 93/93 pass (discovery phases 1–4 only; core suite at 671 prior to these additions)
+
+Added the final three phases of the Discovery Engine in one combined session.
+
+### Phase 4: Provisioning Manifest Generator
+- `src/application/discovery/agents/mock-manifest-generator-agent.ts` — `IManifestGeneratorAgent` implementation; maps all 10 intent types to `recommendedAction`; populates Monday epics/tasks, GitHub labels, slug-formatted repo name; `readyForLiveAdapter: false` always (mock)
+- `src/application/discovery/agents/discovery-agent-contract.ts` — added `IManifestGeneratorAgent` interface
+- `src/application/discovery/discovery-orchestrator.ts` — added `manifestGeneratorAgent` 7th constructor arg, `generateManifest()` method (auto-composes proposal if needed)
+- `src/application/discovery/discovery-controller.ts` — added `generateManifest()` proxy
+- `src/application/discovery/index.ts` — exported `MockManifestGeneratorAgent`
+- `src/application/api-composition-root.ts` — wired `MockManifestGeneratorAgent`
+- `tests/discovery-phase-4.test.mjs` — 14 new tests: manifest shape, Monday/GitHub blocks, intent routing, auto-compose, E2E Phase 1–4 happy path
+- `tests/discovery-phase-1.test.mjs`, `tests/discovery-phase-2.test.mjs`, `tests/discovery-phase-3.test.mjs` — updated `makeOrchestrator()` to 8-arg constructor
+
+### Phase 5: NestJS DiscoveryModule
+- `apps/api/src/modules/discovery/discovery.module.ts` — `@Module` with `useFactory` wiring all 7 mock agents, idFactory, `DiscoveryOrchestrator`, `DiscoveryController`
+- `apps/api/src/modules/discovery/discovery.controller.ts` — `DiscoveryHttpController` with 10 routes: POST /discovery, GET /discovery, GET /discovery/:id, POST /:id/message, POST /:id/solutions, POST /:id/clarifications/answer, POST /:id/direction, POST /:id/proposal, POST /:id/manifest, POST /:id/send-to-evaluation
+- `apps/api/src/app.module.ts` — registered `DiscoveryModule`
+- NestJS typecheck: clean
+
+### Phase 6: Frontend UI
+- `apps/web/src/lib/discovery-client.ts` — typed API client for all 10 discovery endpoints
+- `apps/web/src/lib/discovery-types.ts` — TS types mirroring discovery domain
+- `apps/web/src/app/discovery/page.tsx` — session list with status badges, start modal trigger
+- `apps/web/src/app/discovery/[id]/page.tsx` — three-panel session view with all action handlers (send message, answer clarification, select direction, compose proposal, generate manifest, send to evaluation)
+- `apps/web/src/components/discovery/DiscoveryLayout.tsx` — three-column grid layout
+- `apps/web/src/components/discovery/DiscoveryTimeline.tsx` — vertical step tracker for 10 statuses
+- `apps/web/src/components/discovery/DiscoveryChat.tsx` — message list, clarification cards, input box
+- `apps/web/src/components/discovery/DiscoveryUnderstanding.tsx` — confidence bars, intent, problem frame, solution option cards, proposal/manifest summary, action buttons
+- `apps/web/src/components/discovery/DiscoveryStartModal.tsx` — modal to start a new session
+- `apps/web/src/components/discovery/DiscoveryStartForm.tsx` — form within modal
+- Web app typecheck: clean
+
+### Key design decisions
+- `generateManifest` and `sendToEvaluation` both auto-compose the proposal if not done — callers skip the explicit composeProposal step
+- Mock manifest never sets `readyForLiveAdapter = true` — live adapter wiring is a future phase
+- NestJS `useFactory` creates all agents inline (no DI for discovery agents) — keeps module self-contained while live providers are absent
+- Frontend uses `useActor()` for API auth headers; all discovery client calls take `actor` parameter matching existing app conventions
+- `sendToEvaluation` navigates to the intake if the response includes an `intakeRecord.id`, otherwise stays on the session page
+
 ## 2026-06-26 — Discovery Engine Phase 3: Proposal Composer + Evaluation Handoff Adapter
 
 **Test count:** 671/671 pass (up from 638 after Phase 2)

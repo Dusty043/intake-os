@@ -32,6 +32,7 @@ export interface SelectDirectionRequest {
  * POST /discovery/:id/clarifications/answer → answerClarification
  * POST /discovery/:id/direction             → selectDirection
  * POST /discovery/:id/proposal             → composeProposal
+ * POST /discovery/:id/manifest             → generateManifest
  * POST /discovery/:id/send-to-evaluation   → sendToEvaluation
  * GET  /discovery/:id                       → getSession
  * GET  /discovery?userId=…                  → listSessions
@@ -79,6 +80,10 @@ export class DiscoveryController {
 
   composeProposal(sessionId: string) {
     return this.orchestrator.composeProposal(sessionId);
+  }
+
+  generateManifest(sessionId: string) {
+    return this.orchestrator.generateManifest(sessionId);
   }
 
   sendToEvaluation(sessionId: string) {

@@ -6,6 +6,7 @@ import type {
   IntentExtractionResult,
   ProblemFrame,
   ProjectProposal,
+  ProvisioningManifest,
   SolutionOption,
 } from "../../../domain/discovery.js";
 
@@ -69,4 +70,14 @@ export interface IProposalComposerAgent {
     session: DiscoverySession,
     opts: DiscoveryAgentOptions,
   ): Promise<ProjectProposal>;
+}
+
+// ─── Provisioning manifest ────────────────────────────────────────────────────
+
+export interface IManifestGeneratorAgent {
+  generateManifest(
+    proposal: ProjectProposal,
+    session: DiscoverySession,
+    opts: DiscoveryAgentOptions,
+  ): Promise<ProvisioningManifest>;
 }

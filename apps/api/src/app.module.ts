@@ -6,6 +6,7 @@ import { AuthModule } from "./modules/auth/auth.module.js";
 import { Bitrix24Module } from "./modules/bitrix24/bitrix24.module.js";
 import { HealthModule } from "./modules/health/health.module.js";
 import { IntakeModule } from "./modules/intake/intake.module.js";
+import { DiscoveryModule } from "./modules/discovery/discovery.module.js";
 import { RuntimeModule } from "./runtime/runtime.module.js";
 import { loadRateLimitConfig } from "./config/rate-limit.config.js";
 
@@ -24,6 +25,7 @@ const rlConfig = loadRateLimitConfig();
     AuthModule,
     HealthModule,
     IntakeModule,
+    DiscoveryModule,
     AdminModule,
     Bitrix24Module,
   ],

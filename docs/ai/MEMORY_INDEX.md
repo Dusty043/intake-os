@@ -103,3 +103,6 @@ Generated at: 2026-06-09T14:53:20.716Z
 - `docs/ai/tasks/TASK-DISCOVERY-PHASE1.md` — Phase 1: session, intent extraction, problem framing, confidence gating
 - `docs/ai/tasks/TASK-DISCOVERY-PHASE2.md` — Phase 2: solution generation, clarification (dimension-guided), direction selection
 - `docs/ai/tasks/TASK-DISCOVERY-PHASE3.md` — Phase 3: proposal composer, completeness gate, intake adapter, sendToEvaluation
+- `docs/ai/tasks/TASK-DISCOVERY-PHASE4.md` — Phase 4: manifest generator, intent→action routing, Monday/GitHub manifest blocks
+- `docs/ai/tasks/TASK-DISCOVERY-PHASE5.md` — Phase 5: NestJS DiscoveryModule, DiscoveryHttpController, 10 API routes
+- `docs/ai/tasks/TASK-DISCOVERY-PHASE6.md` — Phase 6: Next.js frontend — session list, three-panel session view, all action handlers

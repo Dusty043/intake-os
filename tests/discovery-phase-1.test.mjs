@@ -10,6 +10,7 @@ import {
   MockSolutionGenerationAgent,
   MockClarificationAgent,
   MockProposalComposerAgent,
+  MockManifestGeneratorAgent,
   overallConfidence,
   confidenceTier,
   emptyConfidence,
@@ -42,6 +43,7 @@ function makeOrchestrator() {
     new MockSolutionGenerationAgent(),
     new MockClarificationAgent(),
     new MockProposalComposerAgent(),
+    new MockManifestGeneratorAgent(),
     { idFactory, now: fixedNow },
   );
   return { store, orchestrator };

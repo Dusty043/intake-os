@@ -8,3 +8,4 @@ export * from "./agents/mock-problem-framing-agent.js";
 export * from "./agents/mock-solution-generation-agent.js";
 export * from "./agents/mock-clarification-agent.js";
 export * from "./agents/mock-proposal-composer-agent.js";
+export * from "./agents/mock-manifest-generator-agent.js";

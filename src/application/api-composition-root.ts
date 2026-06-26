@@ -10,6 +10,7 @@ import {
   MockSolutionGenerationAgent,
   MockClarificationAgent,
   MockProposalComposerAgent,
+  MockManifestGeneratorAgent,
 } from "./discovery/index.js";
 
 let _idCounter = 0;
@@ -37,6 +38,7 @@ export function createApiCompositionRoot(): ApiCompositionRoot {
     new MockSolutionGenerationAgent(),
     new MockClarificationAgent(),
     new MockProposalComposerAgent(),
+    new MockManifestGeneratorAgent(),
     { idFactory: defaultIdFactory },
   );
   const discoveryController = new DiscoveryController(discoveryOrchestrator);
