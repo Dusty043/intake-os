@@ -21,3 +21,9 @@ backups/
 apps/web/.next/
 apps/web/tsconfig.tsbuildinfo
 .gstack/
+
+# Playwright MCP artifacts
+.playwright-mcp/
+
+# Scratch task files
+task-*.md
