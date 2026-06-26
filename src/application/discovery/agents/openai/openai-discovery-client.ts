@@ -16,8 +16,7 @@ export async function callStructured<T>(
 ): Promise<T> {
   const response = await client.chat.completions.create({
     model,
-    max_tokens: maxTokens,
-    temperature: 0.2,
+    max_completion_tokens: maxTokens,
     response_format: {
       type: "json_schema",
       json_schema: {

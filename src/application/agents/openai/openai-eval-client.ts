@@ -19,8 +19,7 @@ export async function callEvalStructured<T>(
   const client = getEvalClient(apiKey);
   const response = await client.chat.completions.create({
     model,
-    max_tokens: maxTokens,
-    temperature: 0.2,
+    max_completion_tokens: maxTokens,
     response_format: {
       type: "json_schema",
       json_schema: { name: schemaName, strict: true, schema },
