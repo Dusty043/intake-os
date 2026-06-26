@@ -1,8 +1,11 @@
 import { Global, Logger, Module } from "@nestjs/common";
 import { APP_FILTER } from "@nestjs/core";
+import { DynamoJobStatusStore } from "../../../../src/infrastructure/dynamo-job-status-store.js";
+import type { JobStatusStore } from "../../../../src/application/job-status-store.js";
 import { EvaluationOrchestrator } from "../../../../src/application/evaluation-orchestrator.js";
 import { IntakeWorkflowService } from "../../../../src/application/intake-workflow-service.js";
 import { createAllMockEvaluationAgents } from "../../../../src/application/agents/mock/index.js";
+import { createAllOpenAIEvaluationAgents } from "../../../../src/application/agents/openai/index.js";
 import { loadAnalysisProviderConfig } from "../../../../src/application/providers/analysis-provider-config.js";
 import { AnalysisProviderRouter } from "../../../../src/application/providers/analysis-provider-router.js";
 import { ProvisioningRegistry } from "../../../../src/application/provisioning/provisioning-executor.js";
@@ -90,12 +93,40 @@ const logger = new Logger("RuntimeModule");
       provide: EvaluationOrchestrator,
       useFactory: () => {
         let _seq = 0;
+        const idFactory = (prefix: string) =>
+          `${prefix}-${Date.now().toString(36).toUpperCase()}-${String(++_seq).padStart(6, "0")}`;
+
+        const apiKey = process.env["OPENAI_API_KEY"] ?? "";
+        const model = process.env["OPENAI_TASKS_MODEL"] ?? process.env["OPENAI_MODEL"] ?? "gpt-4o-mini";
+        const useOpenAI = process.env["AI_PROVIDER"] === "openai" && !!apiKey;
+
+        const agents = useOpenAI
+          ? createAllOpenAIEvaluationAgents(apiKey, model)
+          : createAllMockEvaluationAgents();
+
+        if (useOpenAI) {
+          logger.log(`Evaluation orchestrator: openai (${model})`);
+        } else {
+          logger.log("Evaluation orchestrator: mock agents");
+        }
+
         return new EvaluationOrchestrator({
-          agents: createAllMockEvaluationAgents(),
-          idFactory: (prefix: string) =>
-            `${prefix}-${Date.now().toString(36).toUpperCase()}-${String(++_seq).padStart(6, "0")}`,
+          agents,
+          idFactory,
           now: () => new Date().toISOString(),
         });
+      },
+    },
+    {
+      provide: "JOB_STATUS_STORE",
+      useFactory: (): JobStatusStore | null => {
+        const tableName = process.env["DYNAMODB_JOB_STATUS_TABLE"];
+        if (!tableName) {
+          logger.log("Job status store: disabled (DYNAMODB_JOB_STATUS_TABLE not set)");
+          return null;
+        }
+        logger.log(`Job status store: DynamoDB table="${tableName}"`);
+        return new DynamoJobStatusStore(tableName);
       },
     },
     {
@@ -103,6 +134,6 @@ const logger = new Logger("RuntimeModule");
       useClass: ApplicationExceptionFilter,
     },
   ],
-  exports: [PrismaService, PROJECT_INTAKE_STORE, IntakeWorkflowService, ANALYSIS_PROVIDER, EvaluationOrchestrator],
+  exports: [PrismaService, PROJECT_INTAKE_STORE, IntakeWorkflowService, ANALYSIS_PROVIDER, EvaluationOrchestrator, "JOB_STATUS_STORE"],
 })
 export class RuntimeModule {}
