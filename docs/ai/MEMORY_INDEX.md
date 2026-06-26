@@ -96,3 +96,10 @@ Generated at: 2026-06-09T14:53:20.716Z
 - `docs/product/repository-and-naming.md`
 - `docs/product/post-distribution-lifecycle.md`
 - `docs/product/requirements-trace.md`
+
+## Discovery Engine
+
+- `docs/discovery_engine_spec.pdf` — Full product spec (v0.1, 2026-06-26): 8-stage pipeline, 12-dimension evaluation scaffold, state machine, UI design, handoff contract
+- `docs/ai/tasks/TASK-DISCOVERY-PHASE1.md` — Phase 1: session, intent extraction, problem framing, confidence gating
+- `docs/ai/tasks/TASK-DISCOVERY-PHASE2.md` — Phase 2: solution generation, clarification (dimension-guided), direction selection
+- `docs/ai/tasks/TASK-DISCOVERY-PHASE3.md` — Phase 3: proposal composer, completeness gate, intake adapter, sendToEvaluation

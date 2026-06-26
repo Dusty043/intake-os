@@ -1,5 +1,64 @@
 # Build Log
 
+## 2026-06-26 — Discovery Engine Phase 3: Proposal Composer + Evaluation Handoff Adapter
+
+**Test count:** 671/671 pass (up from 638 after Phase 2)
+
+Added the third phase of the Discovery Engine — proposal composition and evaluation handoff.
+
+### Files added
+- `src/application/discovery/agents/mock-proposal-composer-agent.ts` — builds a `ProjectProposal` from `DiscoverySession` state; populates all 11 populated dimensions as `DimensionSlot<T>` with confidence and provenance; completeness gate determines `evaluation_ready` vs `complete` status
+- `src/application/discovery/proposal-to-intake-adapter.ts` — maps `ProjectProposal + DiscoverySession → ProjectIntakeRecord`; preserves `discoverySessionId` in source payload; maps intent type to project type; builds `DiscoveryRecord` from proposal data
+- `tests/discovery-phase-3.test.mjs` — 33 new tests covering proposal shape, completeness gate, adapter mapping, orchestrator methods, controller proxy, E2E happy path
+- `docs/ai/tasks/TASK-DISCOVERY-PHASE3.md` — task log
+
+### Files modified
+- `src/application/discovery/agents/discovery-agent-contract.ts` — added `IProposalComposerAgent` interface
+- `src/application/discovery/discovery-orchestrator.ts` — added `IProposalComposerAgent` constructor arg, `composeProposal()`, `sendToEvaluation()`, `SendToEvaluationResult` type
+- `src/application/discovery/discovery-controller.ts` — added `composeProposal()`, `sendToEvaluation()` routes
+- `src/application/discovery/index.ts` — barrel-exported new files
+- `src/application/api-composition-root.ts` — wired `MockProposalComposerAgent`
+- `tests/discovery-phase-1.test.mjs` — updated constructor call (7-arg)
+- `tests/discovery-phase-2.test.mjs` — updated constructor call (7-arg)
+
+### Key design decisions
+- `IProposalComposerAgent` takes the full `DiscoverySession` (not just context); the proposal composer has access to selected solution, answered clarifications, and confidence scores
+- `sendToEvaluation` auto-composes the proposal if not already done — callers can use it as a one-shot convenience
+- The returned `intakeRecord` is NOT persisted by the orchestrator — the caller (HTTP handler, composition root) owns persistence; this keeps the discovery layer free of intake store coupling
+- Completeness gate: `evaluation_ready` requires problemFrame.value, ≥1 functional requirement, ≥1 suggested epic; unknowns surface as notes but do not block
+
+## 2026-06-26 — Discovery Engine Phase 2: Solution Generation + Clarification + Direction Selection
+
+**Test count:** 638/638 pass (up from 616 after Phase 1)
+
+Added Phase 2 of the Discovery Engine: solution option generation, dimension-guided clarification planning, and direction selection.
+
+Files added: `mock-solution-generation-agent.ts`, `mock-clarification-agent.ts`, `tests/discovery-phase-2.test.mjs`, `docs/ai/tasks/TASK-DISCOVERY-PHASE2.md`
+
+Bug fixed: intent signal ordering — chatbot/llm signals now checked before automation signals to prevent "We need a chatbot to answer questions automatically" from being misclassified as `automation`.
+
+## 2026-06-26 — Discovery Engine Phase 1: Core Session + Intent + Problem Framing
+
+**Test count:** 616/616 pass
+
+Introduced the Discovery Engine — an ambiguity-resolution layer that sits before the existing evaluation orchestrator.
+
+Key design: `DimensionSlot<T>` pattern for the 12-dimension evaluation scaffold; nullable, confidence-scored, source-tagged. Evaluators use whichever dimensions are populated.
+
+Files added: `src/domain/discovery.ts`, `src/application/discovery/` (orchestrator, controller, session store, agent contract, 4 mock agents), `tests/discovery-phase-1.test.mjs`, `docs/ai/tasks/TASK-DISCOVERY-PHASE1.md`
+
+## 2026-06-24 — README full rewrite
+
+Rewrote `README.md` from the stale TASK-0012 state to the current feature-complete build.
+- Removed "Intentionally disabled" section (all features are now built, just awaiting credentials)
+- Updated test count to 592/592
+- Added full API endpoint table including assignment override, lifecycle, admin AI usage, intake sources
+- Updated repository map to reflect roster/, notifications/, provisioning/ subdirectories
+- Added build state table showing all 16 subsystems and their credential wait status
+- Added auth mode section covering `dev_headers` and `google` modes
+- Added reference to `docs/EXTERNAL-NEEDS.md`
+- Removed outdated "POC" and "TASK-0012" language
+
 ## 2026-06-24 — TASK-0034: Roster Integration + Refinement
 
 Roster API integration with graceful degradation, manual assignment override, and UI card.
@@ -1172,3 +1231,60 @@ Follow-up:
 - 582/582 tests pass (54 new tests added across TASK-0032 and TASK-0033)
 
 **Open blocker:** `AUTH_GOOGLE_CLIENT_ID` and `AUTH_GOOGLE_CLIENT_SECRET` still need to be provisioned in Google Cloud Console and added to `.env.server` before `AUTH_MODE=google` can be activated on oreochiserver.
+
+---
+
+## 2026-06-26 — Discovery Engine Phase 1
+
+**Session:** New session (Discovery Engine spec introduced)
+
+**Context:** `docs/discovery_engine_spec.pdf` specifies an ambiguity-resolution engine that sits before the existing evaluation orchestrator. Phase 1 builds the domain foundation, session management, mock agents, orchestrator, and controller — all without external dependencies.
+
+**Product decision:** The 12-dimension framework (Problem Framing, Requirements, System Design, Scalability, Reliability, Observability, Security, Infrastructure, Cost Engineering, Trade-offs, Documentation) is used as a suggestive coverage map — each dimension is a `DimensionSlot<T>` (nullable, confidence-scored, source-tagged). Multiple evaluation paths remain viable; not every dimension must be populated.
+
+**Files added:**
+- `src/domain/discovery.ts` — `DimensionSlot<T>`, `DiscoveryStatus`, `DiscoverySideStatus`, `IntentType`, `DiscoveryConfidence`, `confidenceTier()`, `overallConfidence()`, `ProblemFrame`, `IntentExtractionResult`, `ClarificationQuestion`, `SolutionOption`, `ProjectProposal` (12-dimension scaffold), `ProvisioningManifest`, `DiscoverySession`
+- `src/application/discovery/discovery-session-store.ts` — `IDiscoverySessionStore` + `InMemoryDiscoverySessionStore`
+- `src/application/discovery/agents/discovery-agent-contract.ts` — `IIntentExtractionAgent`, `IProblemFramingAgent`
+- `src/application/discovery/agents/mock-intent-extraction-agent.ts` — keyword-based mock; detects intent type and solution bias
+- `src/application/discovery/agents/mock-problem-framing-agent.ts` — per-dimension confidence scoring; extracts pain points, unknowns, affected users
+- `src/application/discovery/discovery-orchestrator.ts` — `DiscoveryOrchestrator` with `startDiscovery`, `addMessage`, `getSession`, `listSessions`; confidence-gated status transitions; never regresses status
+- `src/application/discovery/discovery-controller.ts` — `DiscoveryController` (framework-neutral)
+- `src/application/discovery/index.ts` — barrel export
+- `tests/discovery-phase-1.test.mjs` — 24 tests covering confidence domain, session store, orchestrator, controller, proposal scaffold
+
+**Files modified:**
+- `src/application/api-composition-root.ts` — wired `DiscoveryOrchestrator` + `DiscoveryController` into composition root
+- `src/index.ts` — added discovery exports
+
+**Tests:** 616/616 pass (24 new). Zero regressions.
+
+**Handoff:**
+- Phase 2 next: Solution generation agent, clarification agent (dimension-guided questions), direction selection, confidence recompute loop
+- Phase 3: Proposal composer, evaluation handoff adapter (maps 12-dimension proposal → `ProjectIntakeRecord`)
+- Live agents (OpenAI/Anthropic/Bedrock) for intent + framing come after mock path is stable
+
+---
+
+## 2026-06-26 — Discovery Engine Phase 2
+
+**Session:** Continued from Phase 1 (same session)
+
+**Changes:**
+
+- `src/application/discovery/agents/mock-solution-generation-agent.ts` — NEW: `MockSolutionGenerationAgent`; generates 2-4 ranked `SolutionOption[]` from intent-keyed template table (10 intent types covered); recommends low-complexity options when unknowns are high
+- `src/application/discovery/agents/mock-clarification-agent.ts` — NEW: `MockClarificationAgent`; scores each of the 6 confidence dimensions; selects up to 2 decision-changing questions per turn; skips dimensions already above 0.70 confidence; skips questions irrelevant to intent type (e.g. no disaster-recovery questions for microtasks)
+- `src/application/discovery/agents/discovery-agent-contract.ts` — MODIFIED: added `ISolutionGenerationAgent`, `IClarificationAgent`; added `existingQuestions?` to `DiscoveryAgentContext`
+- `src/application/discovery/discovery-orchestrator.ts` — MODIFIED: added `generateSolutions`, `answerClarification`, `selectDirection`; confidence recomputes after each clarification answer; blocking questions gate next clarification round; status never regresses
+- `src/application/discovery/discovery-controller.ts` — MODIFIED: added `generateSolutions`, `answerClarification`, `selectDirection` controller methods
+- `src/application/discovery/index.ts` — MODIFIED: exported new agents
+- `src/application/api-composition-root.ts` — MODIFIED: wired `MockSolutionGenerationAgent`, `MockClarificationAgent`
+- `tests/discovery-phase-2.test.mjs` — NEW: 22 tests (solution generation, clarification, direction selection, E2E happy path)
+- `tests/discovery-phase-1.test.mjs` — MODIFIED: updated `DiscoveryOrchestrator` constructor call to include new agents
+
+**Bug fixed:** Intent signal ordering — "chatbot" was being overridden by "automatically" because `automation` was first in the table. Reordered to put more specific signals (chatbot, llm, dashboard, bug) before general ones (automation, process).
+
+**Tests:** 638/638 pass (22 new Phase 2 tests). Zero regressions.
+
+**Handoff:**
+- Phase 3 next: Proposal composer agent, proposal completeness gate, evaluation handoff adapter (`ProjectProposal` → `ProjectIntakeRecord`), `POST /discovery/:id/send-to-evaluation`
