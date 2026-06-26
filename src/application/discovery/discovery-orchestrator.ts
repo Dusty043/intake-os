@@ -408,8 +408,18 @@ export class DiscoveryOrchestrator {
     const framingCtx = { ...agentCtx, intent };
     const { frame, confidence } = await this.framingAgent.frameProblem(framingCtx, agentOpts);
 
-    // Determine next status based on confidence tier
-    const tier = confidenceTier(confidence);
+    // Determine next status based on confidence tier.
+    // If the user's last message signals "proceed anyway / wing it", force
+    // propose_with_assumptions so the session doesn't loop asking questions.
+    const rawTier = confidenceTier(confidence);
+    const lastUserMsg = [...session.messages].reverse().find((m) => m.role === "user");
+    const userWantsToProceed =
+      rawTier === "rough_frame" &&
+      lastUserMsg !== undefined &&
+      /\b(wing\s*it|just\s*(do|go|proceed|start|pick)|go\s*ahead|make\s*(an?\s*)?assumption|proceed\s*(anyway|with)?|you\s*decide|figure\s*it\s*out|doesn'?t\s*matter|don'?t\s*care|whatever|sure|fine)\b/i.test(
+        lastUserMsg.content,
+      );
+    const tier = userWantsToProceed ? "propose_with_assumptions" : rawTier;
     const nextStatus = this.resolveStatus(session.status, tier);
 
     const newEvents: DiscoveryTimelineEvent[] = [];
@@ -481,7 +491,7 @@ export class DiscoveryOrchestrator {
       if (frame?.successCriteria && frame.successCriteria.length > 0) {
         parts.push(`\n\nSuccess looks like: ${frame.successCriteria[0]}`);
       }
-      parts.push("\n\nI'm generating solution options now — they'll appear in the panel on the right.");
+      parts.push("\n\nI have enough to move forward. Generating solution options now — check the right panel in a moment.");
     }
 
     return parts.join("") || "I'm processing your request — the analysis panel on the right shows what I've understood so far.";
