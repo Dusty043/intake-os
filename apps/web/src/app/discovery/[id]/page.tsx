@@ -72,7 +72,7 @@ export default function DiscoverySessionPage() {
     try {
       const data = await getDiscoverySession(id, actor);
       setSession(prev => {
-        if (prev?.status === data.status && prev?.messages.length === data.messages.length) return prev;
+        if (prev?.status === data.status && prev?.messages?.length === data.messages?.length) return prev;
         return data;
       });
       if (!AI_PROCESSING_STATUSES.has(data.status)) stopPolling();

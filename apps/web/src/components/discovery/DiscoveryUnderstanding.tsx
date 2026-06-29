@@ -169,7 +169,7 @@ export function DiscoveryUnderstanding({
           <p className="section-label">Confidence</p>
           <div className="space-y-2">
             {CONFIDENCE_DIMS.map(({ key, label }) => (
-              <ConfidenceBar key={key} label={label} value={confidence[key]} />
+              <ConfidenceBar key={key} label={label} value={confidence?.[key] ?? 0} />
             ))}
           </div>
         </section>

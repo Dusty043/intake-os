@@ -12,7 +12,7 @@ function formatTime(iso: string): string {
 
 type ClarificationCardProps = {
   question: ClarificationQuestion;
-  onAnswer: (questionId: string, answer: string) => void;
+  onAnswer: (questionId: string, answer: string) => Promise<void>;
   disabled: boolean;
 };
 
@@ -34,6 +34,8 @@ function ClarificationCard({ question, onAnswer, disabled }: ClarificationCardPr
       await onAnswer(question.id, answer.trim());
       setExpanded(false);
       setAnswer("");
+    } catch {
+      // errors are handled upstream by withBusy; don't propagate as unhandled rejection
     } finally {
       setSubmitting(false);
     }
