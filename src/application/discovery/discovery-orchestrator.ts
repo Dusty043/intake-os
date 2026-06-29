@@ -441,12 +441,12 @@ export class DiscoveryOrchestrator {
     // propose_with_assumptions so the session doesn't loop asking questions.
     const rawTier = confidenceTier(confidence, roughFrameMax);
     const lastUserMsg = [...session.messages].reverse().find((m) => m.role === "user");
+    const PROCEED_RE =
+      /\b(wing\s*it|just\s*(do|go|proceed|start|pick)|go\s*ahead|make\s*(an?\s*)?assumption|proceed\s*(anyway|with\s*that)?|let'?s\s*proceed|you\s*decide|figure\s*it\s*out|doesn'?t\s*matter|don'?t\s*care|whatever|sure|fine|yes\s*exactly|exactly\s*right)\b/i;
     const userWantsToProceed =
-      rawTier === "rough_frame" &&
+      (rawTier === "rough_frame" || rawTier === "keep_discovering") &&
       lastUserMsg !== undefined &&
-      /\b(wing\s*it|just\s*(do|go|proceed|start|pick)|go\s*ahead|make\s*(an?\s*)?assumption|proceed\s*(anyway|with)?|you\s*decide|figure\s*it\s*out|doesn'?t\s*matter|don'?t\s*care|whatever|sure|fine)\b/i.test(
-        lastUserMsg.content,
-      );
+      PROCEED_RE.test(lastUserMsg.content);
     const tier = userWantsToProceed ? "propose_with_assumptions" : rawTier;
     const nextStatus = this.resolveStatus(session.status, tier);
 
