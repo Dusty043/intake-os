@@ -1509,3 +1509,51 @@ Follow-up:
 - Monday manifest schema is aligned to real 6-board structure
 - Discovery Engine is 8-stage (intent → problem → solutions → clarification → direction → proposal → manifest → evaluation)
 - Evaluation Orchestrator receives populated 12-dimension proposals from Discovery Engine
+
+---
+
+## 2026-06-30 — TASK-0036: Org Baseline Context in Discovery AI
+
+### Summary
+Added the Simple.biz Dev Operations workspace structure as baseline assumptions injected into every discovery AI agent system prompt. The AI can now make informed assumptions about team structure, project types, story point scale, and sprint structure without needing to ask.
+
+### What Changed
+
+**New File**
+- `src/application/discovery/agents/org-context.ts` — `SIMPLEBIZ_ORG_CONTEXT` constant + `orgContextBlock()` helper
+
+**Updated: Contract**
+- `discovery-agent-contract.ts` — added `orgContext?: string` to `DiscoveryAgentOptions`
+
+**Updated: OpenAI Agents** (all 5 now receive org context via system prompt append)
+- `openai-intent-extraction-agent.ts` — intent types now include n8n workflow mapping; org context injected
+- `openai-problem-framing-agent.ts` — stakeholderClarity and downstreamMapping scoring guidance updated
+- `openai-solution-generation-agent.ts` — solutions framed using org's preferred tools
+- `openai-clarification-agent.ts` — explicitly told not to ask questions answered by workspace context
+- `openai-proposal-composer-agent.ts` — SP scale enforced (1/2/3/5/8/13), epics use org naming
+
+**Updated: Settings**
+- `global-settings.service.ts` — `SIMPLEBIZ_ORG_CONTEXT` as default for `discovery.org_context`; added `getOrgContext()`
+- `settings.controller.ts` — `orgContext` field on PATCH /admin/settings/discovery
+- `api-client.ts` — `DiscoverySettings.orgContext: string`
+- `settings/page.tsx` — monospace textarea for editing workspace context in admin UI
+
+**Updated: Orchestrator + Wiring**
+- `discovery-orchestrator.ts` — `getOrgContext` option; passed to all 5 `agentOpts` construction sites
+- `discovery.module.ts` — wires `settingsService.getOrgContext()` into orchestrator
+
+### Org Context Encoded
+Team: Simple.biz AI & Automation
+Project types: Web App, Chrome Extension, n8n Workflow, Dashboard, CRM, SaaS
+SP scale: 1, 2, 3, 5, 8, 13
+Sprint structure: Current Sprint / Next Sprint / Backlog
+GitHub repos: only for Web App, Chrome Extension, SaaS
+
+### Tests
+- `npm run typecheck` — pass
+- `npm run build` — pass
+
+**Handoff:**
+- Org context defaults from the constant; admin can override via Settings → Workspace Context textarea
+- All 5 OpenAI agents now receive the context — no mock agent changes needed (mocks use deterministic keyword logic)
+- `getOrgContext` and `getConfidenceThreshold` are fetched in parallel before analysis in `runAnalysis`

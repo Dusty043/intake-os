@@ -74,6 +74,9 @@ function buildOrchestrator(
       getConfidenceThreshold: settingsService
         ? () => settingsService.getConfidenceThreshold()
         : undefined,
+      getOrgContext: settingsService
+        ? () => settingsService.getOrgContext()
+        : undefined,
     },
   );
 

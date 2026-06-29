@@ -2,6 +2,7 @@ import OpenAI from "openai";
 import type { ClarificationQuestion } from "../../../../domain/discovery.js";
 import type { DiscoveryAgentContext, DiscoveryAgentOptions, IClarificationAgent } from "../discovery-agent-contract.js";
 import { callStructured, makeClient } from "./openai-discovery-client.js";
+import { orgContextBlock } from "../org-context.js";
 
 const DIMENSIONS = ["problemUnderstanding", "solutionFit", "scopeClarity", "technicalFeasibility", "stakeholderClarity", "downstreamMapping"] as const;
 
@@ -35,12 +36,14 @@ type QuestionRaw = {
 
 type Output = { questions: QuestionRaw[] };
 
-const SYSTEM = `You are a requirements analyst. Identify the most important missing information needed to confidently scope this project.
+const BASE_SYSTEM = `You are a requirements analyst. Identify the most important missing information needed to confidently scope this project.
 
 Return at most 2 questions. Fewer is better — only ask what is genuinely blocking.
 Prioritise blocking questions (without which the project cannot be scoped) over important or deferred ones.
 Do not ask questions that have already been answered in the conversation.
-Do not ask vague questions — each must be specific and answerable.`;
+Do not ask vague questions — each must be specific and answerable.
+
+NEVER ask questions already answered by the workspace context (e.g., team ownership, PM tool, SP scale, sprint length, deployment platform for internal tools).`;
 
 export class OpenAIClarificationAgent implements IClarificationAgent {
   private readonly client: OpenAI;
@@ -66,9 +69,10 @@ export class OpenAIClarificationAgent implements IClarificationAgent {
 
     const userPrompt = `${answeredBlock}Low-confidence dimensions: ${lowDims || "none"}\n\nConversation:\n${conversation}\n\nWhat clarifying questions are needed?`;
 
+    const system = BASE_SYSTEM + orgContextBlock(opts.orgContext);
     const out = await callStructured<Output>(
       this.client, this.model,
-      SYSTEM, userPrompt,
+      system, userPrompt,
       "clarification_planning", schema as unknown as Record<string, unknown>,
     );
 

@@ -2,6 +2,7 @@ import OpenAI from "openai";
 import type { DiscoveryConfidence, ProblemFrame } from "../../../../domain/discovery.js";
 import type { DiscoveryAgentContext, DiscoveryAgentOptions, IProblemFramingAgent } from "../discovery-agent-contract.js";
 import { callStructured, makeClient } from "./openai-discovery-client.js";
+import { orgContextBlock } from "../org-context.js";
 
 const schema = {
   type: "object",
@@ -44,15 +45,15 @@ type Output = {
   confidence: DiscoveryConfidence;
 };
 
-const SYSTEM = `You are a senior business analyst. Frame the problem clearly and score your confidence.
+const BASE_SYSTEM = `You are a senior business analyst. Frame the problem clearly and score your confidence.
 
 Score each confidence dimension 0.0–1.0:
 - problemUnderstanding: how well you understand the problem
 - solutionFit: how clear the solution direction is
 - scopeClarity: how well-defined the scope is
 - technicalFeasibility: how confident you are it's technically achievable
-- stakeholderClarity: how clear the stakeholders and ownership are
-- downstreamMapping: how clear the Monday/GitHub work items would be
+- stakeholderClarity: how clear the stakeholders and ownership are — score ≥ 0.7 for any clearly internal team request
+- downstreamMapping: how clear the Monday/GitHub work items would be — score ≥ 0.7 when the project type clearly maps to one of the known project types
 
 Score 0.3 when information is sparse. Score 0.8+ when the information is thorough.`;
 
@@ -65,14 +66,15 @@ export class OpenAIProblemFramingAgent implements IProblemFramingAgent {
     this.model = model;
   }
 
-  async frameProblem(ctx: DiscoveryAgentContext, _opts: DiscoveryAgentOptions): Promise<{ frame: ProblemFrame; confidence: DiscoveryConfidence }> {
+  async frameProblem(ctx: DiscoveryAgentContext, opts: DiscoveryAgentOptions): Promise<{ frame: ProblemFrame; confidence: DiscoveryConfidence }> {
+    const system = BASE_SYSTEM + orgContextBlock(opts.orgContext);
     const conversation = ctx.messages.map(m => `${m.role.toUpperCase()}: ${m.content}`).join("\n");
     const intentSummary = ctx.intent ? `Intent: ${ctx.intent.intentType} — ${ctx.intent.underlyingProblem}` : "";
     const userPrompt = `${intentSummary}\n\nConversation:\n${conversation}\n\nFrame this problem.`;
 
     const out = await callStructured<Output>(
       this.client, this.model,
-      SYSTEM, userPrompt,
+      system, userPrompt,
       "problem_framing", schema as unknown as Record<string, unknown>,
     );
 

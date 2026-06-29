@@ -57,6 +57,7 @@ export interface DiscoveryOrchestratorOptions {
   appBaseUrl?: string;
   intakeStore?: ProjectIntakeStore;
   getConfidenceThreshold?: () => Promise<number>;
+  getOrgContext?: () => Promise<string>;
 }
 
 // ─── Orchestrator ─────────────────────────────────────────────────────────────
@@ -68,6 +69,7 @@ export class DiscoveryOrchestrator {
   private readonly appBaseUrl: string | undefined;
   private readonly intakeStore: ProjectIntakeStore | undefined;
   private readonly getConfidenceThreshold: () => Promise<number>;
+  private readonly getOrgContext: () => Promise<string>;
 
   constructor(
     private readonly store: IDiscoverySessionStore,
@@ -85,6 +87,7 @@ export class DiscoveryOrchestrator {
     this.appBaseUrl = opts.appBaseUrl;
     this.intakeStore = opts.intakeStore;
     this.getConfidenceThreshold = opts.getConfidenceThreshold ?? (() => Promise.resolve(0.65));
+    this.getOrgContext = opts.getOrgContext ?? (() => Promise.resolve(""));
   }
 
   // ─── Start a new discovery session ───────────────────────────────────────
@@ -160,10 +163,13 @@ export class DiscoveryOrchestrator {
 
   async generateSolutions(sessionId: string): Promise<DiscoverySession> {
     const now = this.nowFn();
-    const session = await this.store.getById(sessionId);
+    const [session, orgContext] = await Promise.all([
+      this.store.getById(sessionId),
+      this.getOrgContext(),
+    ]);
     if (!session) throw new Error(`DiscoverySession not found: ${sessionId}`);
 
-    const agentOpts: DiscoveryAgentOptions = { provider: this.provider, idFactory: this.idFactory, now };
+    const agentOpts: DiscoveryAgentOptions = { provider: this.provider, idFactory: this.idFactory, now, orgContext };
     const ctx = {
       messages: session.messages,
       intent: session.intent,
@@ -231,7 +237,8 @@ export class DiscoveryOrchestrator {
     }
 
     // Plan next clarification round if confidence still low
-    const agentOpts: DiscoveryAgentOptions = { provider: this.provider, idFactory: this.idFactory, now };
+    const [orgContext] = await Promise.all([this.getOrgContext()]);
+    const agentOpts: DiscoveryAgentOptions = { provider: this.provider, idFactory: this.idFactory, now, orgContext };
     const ctx = {
       messages: reanalysed.messages,
       intent: reanalysed.intent,
@@ -309,7 +316,8 @@ export class DiscoveryOrchestrator {
       throw new Error(`No solution selected for session: ${sessionId} — call selectDirection first`);
     }
 
-    const agentOpts: DiscoveryAgentOptions = { provider: this.provider, idFactory: this.idFactory, now };
+    const orgContext = await this.getOrgContext();
+    const agentOpts: DiscoveryAgentOptions = { provider: this.provider, idFactory: this.idFactory, now, orgContext };
     const proposal = await this.proposalComposerAgent.composeProposal(session, agentOpts);
 
     const nextStatus = this.resolveStatus(
@@ -391,11 +399,13 @@ export class DiscoveryOrchestrator {
       throw new Error(`Proposal composition failed for session: ${sessionId}`);
     }
 
+    const orgContext = await this.getOrgContext();
     const agentOpts: DiscoveryAgentOptions = {
       provider: this.provider,
       idFactory: this.idFactory,
       now,
       appBaseUrl: this.appBaseUrl,
+      orgContext,
     };
     const manifest = await this.manifestGeneratorAgent.generateManifest(
       session.proposal,
@@ -413,13 +423,8 @@ export class DiscoveryOrchestrator {
 
   private async runAnalysis(session: DiscoverySession): Promise<DiscoverySession> {
     const now = this.nowFn();
-    const agentOpts: DiscoveryAgentOptions = {
-      provider: this.provider,
-      idFactory: this.idFactory,
-      now,
-    };
 
-    // Stage 1 — intent extraction
+    // Stage 1 — intent extraction (fetch config values in parallel — DB reads, not LLM-dependent)
     const agentCtx = {
       messages: session.messages,
       intent: session.intent,
@@ -427,11 +432,19 @@ export class DiscoveryOrchestrator {
       currentConfidence: session.confidence,
     };
 
-    // Fetch config threshold in parallel with the first LLM call — it's a DB read, not dependent on LLM results
-    const [intent, roughFrameMax] = await Promise.all([
-      this.intentAgent.extractIntent(agentCtx, agentOpts),
+    const [orgContext, roughFrameMax] = await Promise.all([
+      this.getOrgContext(),
       this.getConfidenceThreshold(),
     ]);
+
+    const agentOpts: DiscoveryAgentOptions = {
+      provider: this.provider,
+      idFactory: this.idFactory,
+      now,
+      orgContext,
+    };
+
+    const intent = await this.intentAgent.extractIntent(agentCtx, agentOpts);
 
     // Stage 2 — problem framing (uses intent result)
     const framingCtx = { ...agentCtx, intent };

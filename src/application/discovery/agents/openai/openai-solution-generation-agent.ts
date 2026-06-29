@@ -2,6 +2,7 @@ import OpenAI from "openai";
 import type { SolutionOption } from "../../../../domain/discovery.js";
 import type { DiscoveryAgentContext, DiscoveryAgentOptions, ISolutionGenerationAgent } from "../discovery-agent-contract.js";
 import { callStructured, makeClient } from "./openai-discovery-client.js";
+import { orgContextBlock } from "../org-context.js";
 
 const schema = {
   type: "object",
@@ -44,7 +45,7 @@ type SolutionRaw = {
 
 type Output = { solutions: SolutionRaw[] };
 
-const SYSTEM = `You are a solution architect. Generate 2–4 distinct solution approaches for the described problem.
+const BASE_SYSTEM = `You are a solution architect. Generate 2–4 distinct solution approaches for the described problem.
 
 Each solution should be meaningfully different in approach, complexity, or tradeoffs.
 Mark exactly one solution as isRecommended: true (the best fit given what's known).
@@ -60,13 +61,14 @@ export class OpenAISolutionGenerationAgent implements ISolutionGenerationAgent {
   }
 
   async generateSolutions(ctx: DiscoveryAgentContext, opts: DiscoveryAgentOptions): Promise<SolutionOption[]> {
+    const system = BASE_SYSTEM + orgContextBlock(opts.orgContext);
     const conversation = ctx.messages.map(m => `${m.role.toUpperCase()}: ${m.content}`).join("\n");
     const frame = ctx.problemFrame ? `Problem: ${ctx.problemFrame.problemStatement}` : "";
     const userPrompt = `${frame}\n\nConversation:\n${conversation}\n\nGenerate solution options.`;
 
     const out = await callStructured<Output>(
       this.client, this.model,
-      SYSTEM, userPrompt,
+      system, userPrompt,
       "solution_generation", schema as unknown as Record<string, unknown>,
     );
 

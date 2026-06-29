@@ -15,6 +15,7 @@ const ADMIN_ROLES = new Set(["admin", "devops_lead"]);
 
 interface UpdateDiscoverySettingsDto {
   confidenceThreshold?: number;
+  orgContext?: string;
 }
 
 @SkipThrottle()
@@ -45,6 +46,10 @@ export class SettingsController {
     if (body.confidenceThreshold !== undefined) {
       const clamped = Math.max(0.1, Math.min(0.9, Number(body.confidenceThreshold)));
       await this.settings.set("discovery.confidence_threshold", String(clamped));
+    }
+
+    if (body.orgContext !== undefined) {
+      await this.settings.set("discovery.org_context", body.orgContext);
     }
 
     return this.settings.getDiscoverySettings();

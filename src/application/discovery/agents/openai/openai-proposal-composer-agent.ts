@@ -4,6 +4,7 @@ import { emptyProjectProposal } from "../../../../domain/discovery.js";
 import type { DiscoveryAgentOptions, IProposalComposerAgent } from "../discovery-agent-contract.js";
 import type { DiscoverySession } from "../../../../domain/discovery.js";
 import { callStructured, makeClient } from "./openai-discovery-client.js";
+import { orgContextBlock } from "../org-context.js";
 
 const schema = {
   type: "object",
@@ -52,14 +53,15 @@ type Output = {
   status: "draft" | "evaluation_ready";
 };
 
-const SYSTEM = `You are a technical product manager. Compose a detailed project proposal from the discovery conversation.
+const BASE_SYSTEM = `You are a technical product manager. Compose a detailed project proposal from the discovery conversation.
 
 Guidelines:
-- suggestedEpics: 3–6 high-level chunks (e.g. "Requirements & Design", "Core Implementation", "Testing & QA")
+- suggestedEpics: 3–6 high-level chunks (e.g. "Requirements & Design", "Core Implementation", "Integration & Testing", "QA & Launch")
 - suggestedTasks: 5–15 concrete work items derived from the solution
 - status: use "evaluation_ready" if requirements are clear enough to evaluate; "draft" if key information is still missing
 - Be specific and actionable — avoid vague language
-- architectureRecommendation: choose "monolith" for most internal tools and dashboards; "microservices" only when independently deployable services are clearly needed`;
+- architectureRecommendation: choose "monolith" for most internal tools and dashboards; "microservices" only when independently deployable services are clearly needed
+- Story points: use only values 1, 2, 3, 5, 8, 13 (Fibonacci scale) — never other values`;
 
 export class OpenAIProposalComposerAgent implements IProposalComposerAgent {
   private readonly client: OpenAI;
@@ -94,9 +96,10 @@ export class OpenAIProposalComposerAgent implements IProposalComposerAgent {
 
     const userPrompt = `${frameBlock}${solutionBlock}${clarBlock}\nFull conversation:\n${conversation}\n\nCompose the project proposal.`;
 
+    const system = BASE_SYSTEM + orgContextBlock(opts.orgContext);
     const out = await callStructured<Output>(
       this.client, this.model,
-      SYSTEM, userPrompt,
+      system, userPrompt,
       "proposal_composition", schema as unknown as Record<string, unknown>,
       3000,
     );

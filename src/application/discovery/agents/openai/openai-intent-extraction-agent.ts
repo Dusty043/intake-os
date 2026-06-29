@@ -2,6 +2,7 @@ import OpenAI from "openai";
 import type { IntentExtractionResult, IntentType } from "../../../../domain/discovery.js";
 import type { DiscoveryAgentContext, DiscoveryAgentOptions, IIntentExtractionAgent } from "../discovery-agent-contract.js";
 import { callStructured, makeClient } from "./openai-discovery-client.js";
+import { orgContextBlock } from "../org-context.js";
 
 const INTENT_TYPES: IntentType[] = [
   "software_project", "automation", "dashboard_reporting", "ai_assistant",
@@ -32,12 +33,12 @@ type Output = {
   confidence: number;
 };
 
-const SYSTEM = `You are a project intake analyst. Classify the user's request and identify the true underlying problem.
+const BASE_SYSTEM = `You are a project intake analyst. Classify the user's request and identify the true underlying problem.
 
 Intent types:
 - software_project: new web/mobile/backend application
-- automation: workflow, script, or process automation
-- dashboard_reporting: analytics, metrics, reporting
+- automation: workflow, script, or process automation (e.g., n8n, Zapier, scheduled jobs)
+- dashboard_reporting: analytics, metrics, reporting dashboards
 - ai_assistant: LLM-powered tool or agent
 - process_improvement: change to how work is done (no software)
 - bug_fix: fix something broken in an existing system
@@ -57,13 +58,14 @@ export class OpenAIIntentExtractionAgent implements IIntentExtractionAgent {
     this.model = model;
   }
 
-  async extractIntent(ctx: DiscoveryAgentContext, _opts: DiscoveryAgentOptions): Promise<IntentExtractionResult> {
+  async extractIntent(ctx: DiscoveryAgentContext, opts: DiscoveryAgentOptions): Promise<IntentExtractionResult> {
+    const system = BASE_SYSTEM + orgContextBlock(opts.orgContext);
     const conversation = ctx.messages.map(m => `${m.role.toUpperCase()}: ${m.content}`).join("\n");
     const userPrompt = `Conversation:\n${conversation}\n\nClassify this request.`;
 
     const out = await callStructured<Output>(
       this.client, this.model,
-      SYSTEM, userPrompt,
+      system, userPrompt,
       "intent_extraction", schema as unknown as Record<string, unknown>,
     );
 

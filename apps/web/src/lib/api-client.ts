@@ -378,6 +378,7 @@ export async function listDistributedIntakes(actor: UiActor): Promise<ProjectInt
 
 export interface DiscoverySettings {
   confidenceThreshold: number;
+  orgContext: string;
 }
 
 export async function getDiscoverySettings(actor: UiActor): Promise<DiscoverySettings> {

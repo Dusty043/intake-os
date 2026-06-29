@@ -26,6 +26,8 @@ export interface DiscoveryAgentOptions {
   now: string;
   model?: string;
   appBaseUrl?: string;
+  /** Org-level workspace context injected into agent system prompts for baseline assumptions. */
+  orgContext?: string;
 }
 
 // ─── Intent extraction ────────────────────────────────────────────────────────
