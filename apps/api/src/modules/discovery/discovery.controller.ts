@@ -4,21 +4,29 @@ import {
   Get,
   HttpCode,
   Inject,
+  Logger,
   Param,
   Post,
   Query,
 } from "@nestjs/common";
 import { ApiOperation, ApiTags } from "@nestjs/swagger";
 import type { DiscoveryController } from "../../../../../src/application/discovery/index.js";
+import type { ProjectIntakeRecord } from "../../../../../src/application/types.js";
+import { IntakeWorkflowService } from "../../../../../src/application/intake-workflow-service.js";
 import { CurrentActor } from "../auth/auth.decorators.js";
 import type { AuthenticatedActor } from "../auth/auth.types.js";
+
+const DISCOVERY_SYSTEM_ACTOR = { id: "discovery-engine", role: "manager" as const, name: "Discovery Engine" };
 
 @ApiTags("discovery")
 @Controller("discovery")
 export class DiscoveryHttpController {
+  private readonly logger = new Logger(DiscoveryHttpController.name);
+
   constructor(
     @Inject("DISCOVERY_CONTROLLER")
     private readonly discovery: DiscoveryController,
+    private readonly workflowService: IntakeWorkflowService,
   ) {}
 
   // POST /discovery
@@ -105,7 +113,17 @@ export class DiscoveryHttpController {
   // POST /discovery/:id/send-to-evaluation
   @Post(":id/send-to-evaluation")
   @ApiOperation({ summary: "Send the discovery session to evaluation, returning session and intake record" })
-  sendToEvaluation(@Param("id") id: string) {
-    return this.discovery.sendToEvaluation(id);
+  async sendToEvaluation(@Param("id") id: string) {
+    const result = await this.discovery.sendToEvaluation(id);
+    const intake = result.intakeRecord as ProjectIntakeRecord | null;
+    if (intake?.id) {
+      // Fire evaluation in the background — don't block the response
+      this.workflowService
+        .generateMockAnalysisDraft(intake.id, {}, DISCOVERY_SYSTEM_ACTOR)
+        .catch((err: unknown) => {
+          this.logger.warn(`Auto-evaluation failed for intake ${intake.id}: ${String(err)}`);
+        });
+    }
+    return result;
   }
 }

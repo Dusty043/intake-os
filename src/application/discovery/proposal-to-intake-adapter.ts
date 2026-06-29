@@ -96,7 +96,7 @@ export function proposalToIntakeRecord(
     requester: session.userId,
     projectType,
     source,
-    status: "draft",
+    status: "submitted",
     createdAt: now,
     updatedAt: now,
     createdBy: { id: session.userId, role: "request_creator" },
