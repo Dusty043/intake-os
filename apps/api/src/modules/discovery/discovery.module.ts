@@ -1,7 +1,6 @@
 import { Module } from "@nestjs/common";
 import type { ProjectIntakeStore } from "../../../../../src/application/types.js";
 import {
-  InMemoryDiscoverySessionStore,
   DiscoveryOrchestrator,
   DiscoveryController,
   MockIntentExtractionAgent,
@@ -17,11 +16,14 @@ import {
   OpenAIProposalComposerAgent,
 } from "../../../../../src/application/discovery/index.js";
 import { PROJECT_INTAKE_STORE } from "../../persistence/store.token.js";
+import { PrismaDiscoverySessionStore } from "../../persistence/prisma-discovery-session-store.js";
+import { PrismaService } from "../../prisma/prisma.service.js";
 import { DiscoveryHttpController } from "./discovery.controller.js";
 import { GlobalSettingsService } from "../admin/global-settings.service.js";
 import { AdminModule } from "../admin/admin.module.js";
 
 function buildOrchestrator(
+  sessionStore: PrismaDiscoverySessionStore,
   intakeStore?: ProjectIntakeStore,
   settingsService?: GlobalSettingsService,
 ): DiscoveryController {
@@ -29,7 +31,7 @@ function buildOrchestrator(
   const idFactory = (prefix: string) =>
     `${prefix}-${Date.now().toString(36)}-${++_seq}`;
 
-  const store = new InMemoryDiscoverySessionStore();
+  const store = sessionStore;
 
   const apiKey = process.env["OPENAI_API_KEY"] ?? "";
   const model = process.env["OPENAI_MODEL"] ?? "gpt-4o-mini";
@@ -82,11 +84,15 @@ function buildOrchestrator(
   imports: [AdminModule],
   controllers: [DiscoveryHttpController],
   providers: [
+    PrismaDiscoverySessionStore,
     {
       provide: "DISCOVERY_CONTROLLER",
-      inject: [PROJECT_INTAKE_STORE, GlobalSettingsService],
-      useFactory: (intakeStore: ProjectIntakeStore, settings: GlobalSettingsService) =>
-        buildOrchestrator(intakeStore, settings),
+      inject: [PrismaDiscoverySessionStore, PROJECT_INTAKE_STORE, GlobalSettingsService],
+      useFactory: (
+        sessionStore: PrismaDiscoverySessionStore,
+        intakeStore: ProjectIntakeStore,
+        settings: GlobalSettingsService,
+      ) => buildOrchestrator(sessionStore, intakeStore, settings),
     },
   ],
 })

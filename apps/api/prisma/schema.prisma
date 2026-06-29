@@ -360,3 +360,15 @@ model GlobalSetting {
   value     String
   updatedAt DateTime @updatedAt
 }
+
+model DiscoverySessionRecord {
+  id        String   @id
+  userId    String
+  status    String
+  snapshot  Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, updatedAt])
+  @@index([status])
+}
