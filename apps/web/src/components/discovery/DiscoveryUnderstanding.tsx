@@ -420,7 +420,7 @@ export function DiscoveryUnderstanding({
           </button>
         )}
 
-        {proposal && !manifest && status !== "evaluation_ready" && status !== "sent_to_evaluation" && (
+        {proposal && !manifest && status !== "sent_to_evaluation" && (
           <button
             onClick={onGenerateManifest}
             disabled={busy}
