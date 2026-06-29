@@ -1,10 +1,11 @@
 import { Injectable } from "@nestjs/common";
+import type { Prisma } from "@prisma/client";
 import type { DiscoverySession } from "../../../../src/domain/discovery.js";
 import type { IDiscoverySessionStore } from "../../../../src/application/discovery/discovery-session-store.js";
 import { PrismaService } from "../prisma/prisma.service.js";
 
-function toJson(value: unknown): unknown {
-  return JSON.parse(JSON.stringify(value));
+function toJson(value: unknown): Prisma.InputJsonValue {
+  return JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue;
 }
 
 function fromJson<T>(value: unknown): T {
