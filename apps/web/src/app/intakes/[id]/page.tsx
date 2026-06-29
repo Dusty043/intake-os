@@ -34,6 +34,9 @@ import type { AgentRun, AuditEvent, IntakeEvaluation, ProjectIntakeRecord, Provi
 import { ClarificationPanel } from "@/components/ClarificationPanel";
 import { EvaluationPanel } from "@/components/EvaluationPanel";
 import { AssignmentCard } from "@/components/AssignmentCard";
+import { DraftReviseForm } from "@/components/DraftReviseForm";
+import type { DraftReviseValues } from "@/components/DraftReviseForm";
+import { Toast } from "@/components/Toast";
 
 const BASE_TABS = ["Overview", "AI Draft", "Evaluation", "Reviewed Package", "Approvals", "Distribution", "Audit Trail"] as const;
 const ADMIN_TABS = [...BASE_TABS, "Debug"] as const;
@@ -127,87 +130,114 @@ function OverviewTab({
   const gate1Done = ["devops_review", "approved", "provisioning", "distributed"].includes(s);
   const gate2Done = ["approved", "provisioning", "distributed"].includes(s);
 
+  type ActionTone = "urgent" | "action" | "ready";
+  const ZONE: Record<ActionTone, { wrap: string; label: string; text: string }> = {
+    urgent: { wrap: "bg-amber-50 border border-amber-200",   label: "text-amber-600",  text: "text-amber-900" },
+    action: { wrap: "bg-indigo-50 border border-indigo-200", label: "text-indigo-400", text: "text-indigo-900" },
+    ready:  { wrap: "bg-emerald-50 border border-emerald-200", label: "text-emerald-500", text: "text-emerald-900" },
+  };
+
+  const actionZone: { context: string; tone: ActionTone } | null = (() => {
+    if (s === "draft")
+      return { context: "Submit this intake to begin the AI evaluation pipeline.", tone: "action" };
+    if (s === "clarification_required")
+      return { context: "The AI needs more information before evaluation can continue.", tone: "urgent" };
+    if (["submitted", "intake_review"].includes(s) && !hasDraft && actor.role !== "request_creator")
+      return { context: "Evaluation is waiting. Generate a mock AI draft to continue.", tone: "action" };
+    if (hasDraft && !hasPkg)
+      return { context: "An AI draft is ready for your review.", tone: "action" };
+    if (hasPkg && !gate1Done)
+      return { context: "A reviewed package is ready. Approve Gate 1 to advance to DevOps review.", tone: "action" };
+    if (gate1Done && !gate2Done)
+      return { context: "Gate 1 approved. DevOps sign-off needed to complete governance.", tone: "action" };
+    if (gate2Done && !hasPlan)
+      return { context: "Both gates approved. Generate the distribution preview to prepare for execution.", tone: "action" };
+    if (gate2Done && hasPlan)
+      return { context: "Distribution preview ready. Open the Distribution tab to review and execute.", tone: "ready" };
+    return null;
+  })();
+
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-      <InfoCard title="Summary">
-        <dl className="space-y-3">
-          <KV label="Status" value={<StatusBadge label={getStatusInfo(s).label} variant={getStatusInfo(s).variant} />} />
-          <KV label="Project Type" value={formatProjectType(intake.projectType)} />
-          <KV label="Requester" value={intake.requester} />
-          <KV label="Department" value={intake.department} />
-          <KV label="Created" value={formatDate(intake.createdAt)} />
-          <KV label="Updated" value={formatDate(intake.updatedAt)} />
-          {intake.description && (
-            <div>
-              <dt className="section-label">Description</dt>
-              <dd className="text-sm text-brand-text leading-relaxed">{intake.description}</dd>
+    <div className="space-y-5">
+      {/* ── Action Zone ───────────────────────────────────────────────── */}
+      {actionZone && (
+        <div className={`rounded-xl px-5 py-4 ${ZONE[actionZone.tone].wrap}`}>
+          <p className={`text-xs font-semibold uppercase tracking-wide mb-1 ${ZONE[actionZone.tone].label}`}>
+            Required action
+          </p>
+          <p className={`text-sm mb-4 ${ZONE[actionZone.tone].text}`}>{actionZone.context}</p>
+          <ErrorBanner error={err} onDismiss={() => setErr(null)} />
+          <div className="space-y-3">
+            {s === "draft" && (
+              <ActionBtn onClick={() => { void run("submit"); }} loading={busy === "submit"} loadingLabel="Submitting intake…" label="Submit Intake" />
+            )}
+            {s === "clarification_required" && (
+              <ClarificationPanel
+                questions={intake.pendingClarification?.questions ?? []}
+                missingFields={intake.pendingClarification?.missingFields ?? []}
+                priorClarifications={intake.priorClarifications}
+                busy={busy === "resubmit"}
+                onResubmit={handleResubmitPanel}
+              />
+            )}
+            {["submitted", "intake_review"].includes(s) && !hasDraft && actor.role !== "request_creator" && (
+              <ActionBtn onClick={() => { void run("mock_draft"); }} loading={busy === "mock_draft"} loadingLabel="Generating mock AI draft…" label="Generate Mock AI Draft" variant="secondary" />
+            )}
+            {hasDraft && !hasPkg && (
+              <ActionBtn onClick={() => { void run("goto_draft"); }} loading={false} loadingLabel="" label="Review AI Draft" variant="secondary" />
+            )}
+            {hasPkg && !gate1Done && (
+              <ActionBtn onClick={() => { void run("approve_gate1"); }} loading={busy === "approve_gate1"} loadingLabel="Approving Gate 1…" label="Approve Gate 1" />
+            )}
+            {gate1Done && !gate2Done && (
+              <ActionBtn onClick={() => { void run("approve_gate2"); }} loading={busy === "approve_gate2"} loadingLabel="Approving Gate 2…" label="Approve Gate 2" />
+            )}
+            {gate2Done && !hasPlan && (
+              <ActionBtn onClick={() => { void run("gen_plan"); }} loading={busy === "gen_plan"} loadingLabel="Generating distribution preview…" label="Generate Distribution Preview" />
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Summary + Activity ────────────────────────────────────────── */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        <InfoCard title="Summary">
+          <dl className="space-y-3">
+            <KV label="Status" value={<StatusBadge label={getStatusInfo(s).label} variant={getStatusInfo(s).variant} />} />
+            <KV label="Project Type" value={formatProjectType(intake.projectType)} />
+            <KV label="Requester" value={intake.requester} />
+            <KV label="Department" value={intake.department} />
+            <KV label="Created" value={formatDate(intake.createdAt)} />
+            <KV label="Updated" value={formatDate(intake.updatedAt)} />
+            {intake.description && (
+              <div>
+                <dt className="section-label">Description</dt>
+                <dd className="text-sm text-brand-text leading-relaxed">{intake.description}</dd>
+              </div>
+            )}
+          </dl>
+        </InfoCard>
+
+        <InfoCard title="Latest Activity">
+          {audit.length === 0 ? (
+            <p className="text-sm text-gray-500">No audit events recorded yet.</p>
+          ) : (
+            <div className="space-y-2.5">
+              {[...audit].reverse().slice(0, 8).map((ev, i) => (
+                <div key={i} className="flex gap-2 text-xs">
+                  <div className="w-1.5 h-1.5 rounded-full bg-indigo-400 mt-1 shrink-0" />
+                  <div>
+                    <span className="font-medium text-gray-700">{ev.action}</span>
+                    <span className="text-gray-500 ml-1.5">
+                      {ev.actorId} · {formatDate(ev.timestamp ?? ev.createdAt)}
+                    </span>
+                  </div>
+                </div>
+              ))}
             </div>
           )}
-        </dl>
-      </InfoCard>
-
-      <InfoCard title="Required Actions">
-        <ErrorBanner error={err} onDismiss={() => setErr(null)} />
-        <div className="mt-3 space-y-3">
-          {s === "draft" && (
-            <ActionBtn onClick={() => { void run("submit"); }} loading={busy === "submit"} loadingLabel="Submitting intake…" label="Submit Intake" />
-          )}
-          {s === "clarification_required" && (
-            <ClarificationPanel
-              questions={intake.pendingClarification?.questions ?? []}
-              missingFields={intake.pendingClarification?.missingFields ?? []}
-              priorClarifications={intake.priorClarifications}
-              busy={busy === "resubmit"}
-              onResubmit={handleResubmitPanel}
-            />
-          )}
-          {["submitted", "intake_review"].includes(s) && !hasDraft && actor.role !== "request_creator" && (
-            <ActionBtn onClick={() => { void run("mock_draft"); }} loading={busy === "mock_draft"} loadingLabel="Generating mock AI draft…" label="Generate Mock AI Draft" variant="secondary" />
-          )}
-          {hasDraft && !hasPkg && (
-            <ActionBtn onClick={() => { void run("goto_draft"); }} loading={false} loadingLabel="" label="Review AI Draft" variant="secondary" />
-          )}
-          {hasPkg && !gate1Done && (
-            <ActionBtn onClick={() => { void run("approve_gate1"); }} loading={busy === "approve_gate1"} loadingLabel="Approving Gate 1…" label="Approve Gate 1" />
-          )}
-          {!hasPkg && hasDraft && !gate1Done && (
-            <p className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-              Gate 1 requires a reviewed project package.
-            </p>
-          )}
-          {gate1Done && !gate2Done && (
-            <ActionBtn onClick={() => { void run("approve_gate2"); }} loading={busy === "approve_gate2"} loadingLabel="Approving Gate 2…" label="Approve Gate 2" />
-          )}
-          {gate2Done && !hasPlan && (
-            <ActionBtn onClick={() => { void run("gen_plan"); }} loading={busy === "gen_plan"} loadingLabel="Generating distribution preview…" label="Generate Distribution Preview" />
-          )}
-          {gate2Done && hasPlan && (
-            <p className="text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
-              Distribution preview ready. Open the Distribution tab to review.
-            </p>
-          )}
-        </div>
-      </InfoCard>
-
-      <InfoCard title="Latest Activity">
-        {audit.length === 0 ? (
-          <p className="text-sm text-gray-400">No audit events recorded yet.</p>
-        ) : (
-          <div className="space-y-2.5">
-            {[...audit].reverse().slice(0, 8).map((ev, i) => (
-              <div key={i} className="flex gap-2 text-xs">
-                <div className="w-1.5 h-1.5 rounded-full bg-indigo-400 mt-1 shrink-0" />
-                <div>
-                  <span className="font-medium text-gray-700">{ev.action}</span>
-                  <span className="text-gray-400 ml-1.5">
-                    {ev.actorId} · {formatDate(ev.timestamp ?? ev.createdAt)}
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </InfoCard>
+        </InfoCard>
+      </div>
     </div>
   );
 }
@@ -227,10 +257,8 @@ function AiDraftTab({
   const [err, setErr] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState("");
   const [notes, setNotes] = useState("");
-  const [showRevise, setShowRevise] = useState(false);
-  const [reviseJson, setReviseJson] = useState("");
-  const [reviseErr, setReviseErr] = useState<string | null>(null);
   const [guidance, setGuidance] = useState("");
+  const [showRevise, setShowRevise] = useState(false);
   const regenCount = (intake.analysisDraftRegenerationCount as number) ?? 0;
   const regenLimit = 5;
   const regenExhausted = regenCount >= regenLimit;
@@ -326,7 +354,7 @@ function AiDraftTab({
                 {draft.brief.outOfScope && draft.brief.outOfScope.length > 0 && (
                   <div>
                     <p className="section-label">Out of Scope</p>
-                    <ul className="list-disc list-inside space-y-0.5 text-gray-400">
+                    <ul className="list-disc list-inside space-y-0.5 text-brand-muted">
                       {draft.brief.outOfScope.map((s, i) => <li key={i}>{s}</li>)}
                     </ul>
                   </div>
@@ -380,7 +408,7 @@ function AiDraftTab({
           )}
 
           {draft.definitionOfDone && (
-            <div className="card p-5 border-l-4 border-emerald-400">
+            <div className="card p-5 bg-emerald-50/60 border border-emerald-200">
               <h3 className="text-base font-semibold mb-2 text-brand-text">Definition of Done</h3>
               <p className="text-sm text-brand-muted leading-relaxed">{draft.definitionOfDone}</p>
             </div>
@@ -411,7 +439,7 @@ function AiDraftTab({
               <div className="space-y-2">
                 {draft.keyDependencies.map((dep, i) => (
                   <div key={i} className="flex items-start gap-3 text-sm">
-                    <span className={`shrink-0 mt-0.5 text-xs px-2 py-0.5 rounded-full font-medium ${dep.blocking ? "bg-red-100 text-red-700" : "bg-gray-100 text-gray-500"}`}>
+                    <span className={`shrink-0 mt-0.5 text-xs px-2 py-0.5 rounded-full font-medium ${dep.blocking ? "bg-red-100 text-red-700" : "bg-gray-100 text-gray-600"}`}>
                       {dep.blocking ? "blocking" : "needed"}
                     </span>
                     <div>
@@ -435,11 +463,11 @@ function AiDraftTab({
           <div className="space-y-2">
             {[...intake.analysisDrafts].reverse().map((d, i) => {
               const isCurrent = d.id === draft.id;
-              const statusColor =
-                d.reviewStatus === "accepted" ? "bg-green-100 text-green-700" :
-                d.reviewStatus === "rejected" ? "bg-red-100 text-red-700" :
-                d.reviewStatus === "superseded" ? "bg-gray-100 text-gray-400" :
-                "bg-violet-100 text-violet-700";
+              const statusVariant =
+                d.reviewStatus === "accepted" ? "success" as const :
+                d.reviewStatus === "rejected" ? "danger" as const :
+                d.reviewStatus === "superseded" ? "neutral" as const :
+                "ai" as const;
               const versionNum = intake.analysisDrafts!.length - i;
               return (
                 <div
@@ -450,9 +478,7 @@ function AiDraftTab({
                     <span className={`text-xs font-mono font-semibold ${isCurrent ? "text-violet-700" : "text-gray-400"}`}>
                       v{versionNum}
                     </span>
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${statusColor}`}>
-                      {d.reviewStatus ?? "draft"}
-                    </span>
+                    <StatusBadge label={d.reviewStatus ?? "draft"} variant={statusVariant} />
                     {isCurrent && (
                       <span className="text-xs text-violet-600 font-medium">current</span>
                     )}
@@ -506,55 +532,35 @@ function AiDraftTab({
             <div>
               <button
                 className="btn-secondary"
-                onClick={() => {
-                  if (!showRevise) {
-                    setReviseJson(JSON.stringify(
-                      {
-                        projectType: draft.projectType,
-                        complexity: draft.complexity,
-                        estimatedStoryPoints: draft.estimatedStoryPoints,
-                        brief: draft.brief,
-                        subtasks: draft.subtasks,
-                        recommendedTechStack: draft.recommendedTechStack,
-                        infrastructureRequirements: draft.infrastructureRequirements,
-                        missingInformation: draft.missingInformation,
-                        reviewerNotes: "",
-                      },
-                      null,
-                      2,
-                    ));
-                  }
-                  setShowRevise((v) => !v);
-                }}
+                onClick={() => setShowRevise((v) => !v)}
               >
                 {showRevise ? "Hide Revise Form" : "Revise Draft"}
               </button>
               {showRevise && (
-                <div className="mt-3 space-y-2">
-                  <p className="text-xs text-gray-500">
-                    Edit the JSON below to override AI estimates. Set <code>reviewerNotes</code> to describe changes.
-                  </p>
-                  <textarea
-                    className="form-textarea h-64 font-mono text-xs"
-                    value={reviseJson}
-                    onChange={(e) => { setReviseJson(e.target.value); setReviseErr(null); }}
-                  />
-                  {reviseErr && <p className="text-xs text-red-600">{reviseErr}</p>}
-                  <button
-                    className="btn-primary"
-                    disabled={!!busy}
-                    onClick={() => {
-                      try {
-                        const parsed = JSON.parse(reviseJson) as ReviseAnalysisDraftInput;
-                        void run("revise_draft", parsed);
-                      } catch {
-                        setReviseErr("Invalid JSON. Please fix before saving.");
-                      }
-                    }}
-                  >
-                    {busy === "revise_draft" ? "Saving reviewed package…" : "Save Reviewed Package"}
-                  </button>
-                </div>
+                <DraftReviseForm
+                  initialValues={{
+                    projectType: draft.projectType as DraftReviseValues["projectType"],
+                    complexity: draft.complexity as "low" | "medium" | "high",
+                    estimatedStoryPoints: draft.estimatedStoryPoints ?? 0,
+                    brief: {
+                      problem: draft.brief?.problem ?? "",
+                      solution: draft.brief?.solution ?? "",
+                      scope: (draft.brief?.scope ?? []) as string[],
+                      outOfScope: (draft.brief?.outOfScope ?? []) as string[],
+                    },
+                    subtasks: (draft.subtasks ?? []).map((t) => ({
+                      title: t.title ?? "",
+                      description: t.description ?? "",
+                      storyPoints: t.storyPoints ?? 1,
+                    })),
+                    recommendedTechStack: (draft.recommendedTechStack ?? []) as string[],
+                    infrastructureRequirements: (draft.infrastructureRequirements ?? []) as string[],
+                    missingInformation: (draft.missingInformation ?? []) as string[],
+                  }}
+                  busy={busy === "revise_draft"}
+                  onSave={(values) => { void run("revise_draft", values); setShowRevise(false); }}
+                  onCancel={() => setShowRevise(false)}
+                />
               )}
             </div>
 
@@ -599,7 +605,7 @@ function AiDraftTab({
             <h3 className="text-base font-semibold text-brand-text">
               {draft.reviewStatus === "rejected" ? "Send Back to AI" : "Steer & Regenerate"}
             </h3>
-            <span className={`text-xs px-2 py-0.5 rounded-full ${regenExhausted ? "bg-red-100 text-red-700" : "bg-gray-100 text-gray-500"}`}>
+            <span className={`text-xs px-2 py-0.5 rounded-full ${regenExhausted ? "bg-red-100 text-red-700" : "bg-gray-100 text-gray-600"}`}>
               {regenCount} / {regenLimit} regenerations used
             </span>
           </div>
@@ -828,7 +834,7 @@ function ApprovalsTab({
                 if (!g1Reject.trim()) { setErr("Rejection reason required."); return; }
                 void run("reject_gate1", g1Reject);
               }} disabled={!!busy}>
-                Reject
+                {busy === "reject_gate1" ? "Rejecting…" : "Reject"}
               </button>
             </div>
             <input type="text" value={g1Reject} onChange={(e) => setG1Reject(e.target.value)} className="form-input" placeholder="Rejection reason (if rejecting)…" />
@@ -877,7 +883,7 @@ function ApprovalsTab({
                 if (!g2Reject.trim()) { setErr("Rejection reason required."); return; }
                 void run("reject_gate2", g2Reject);
               }} disabled={!!busy || !gate1Done}>
-                Reject
+                {busy === "reject_gate2" ? "Rejecting…" : "Reject"}
               </button>
               <button className="btn-secondary" onClick={() => {
                 if (!g2ReqChanges.trim()) { setErr("Reason required to request changes."); return; }
@@ -1189,7 +1195,7 @@ function DistributionTab({
                     </summary>
                     <div className="border-t border-gray-200 px-4 py-3">
                       {a.idempotencyKey && (
-                        <p className="text-xs text-gray-400 mb-2 font-mono">Key: {a.idempotencyKey}</p>
+                        <p className="text-xs text-gray-500 mb-2 font-mono">Key: {a.idempotencyKey}</p>
                       )}
                       <pre className="text-xs bg-slate-900 text-green-400 rounded-lg p-3 overflow-x-auto font-mono">
                         {JSON.stringify(a.payload, null, 2)}
@@ -1241,7 +1247,7 @@ function AuditTrailTab({ audit }: { audit: AuditEvent[] }) {
           <thead>
             <tr className="border-b border-gray-100 bg-gray-50">
               {["Timestamp", "Actor", "Role", "Event", "Transition", "Details"].map((h) => (
-                <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">
+                <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-gray-600 uppercase tracking-wide whitespace-nowrap">
                   {h}
                 </th>
               ))}
@@ -1300,6 +1306,7 @@ function IntakeDetailContent() {
   const [evalError, setEvalError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
   const loadEvaluation = useCallback(async (intakeId: string) => {
     setEvalLoading(true);
@@ -1337,6 +1344,22 @@ function IntakeDetailContent() {
     router.push(`/intakes/${id}?tab=${tab}`, { scroll: false });
   }
 
+  const ACTION_SUCCESS: Record<string, string> = {
+    submit:          "Intake submitted. AI evaluation is in progress.",
+    resubmit:        "Clarifications submitted. Re-evaluation started.",
+    mock_draft:      "Mock AI draft generated. Review it in the AI Draft tab.",
+    accept_draft:    "Draft accepted. Reviewed package created and ready for Gate 1.",
+    reject_draft:    "Draft rejected.",
+    regen_draft:     "Draft regeneration queued.",
+    revise_draft:    "Revised package saved.",
+    approve_gate1:   "Gate 1 approved. Intake is now in DevOps review.",
+    approve_gate2:   "Gate 2 approved. Both gates complete — ready for distribution.",
+    reject_gate1:    "Intake rejected at Gate 1.",
+    reject_gate2:    "Intake rejected at Gate 2.",
+    request_changes: "Changes requested.",
+    gen_plan:        "Distribution preview generated. Open the Distribution tab to review.",
+  };
+
   async function handleAction(action: string, payload?: unknown) {
     if (!intake) return;
     const iid = intake.id;
@@ -1366,6 +1389,7 @@ function IntakeDetailContent() {
     if (["mock_draft", "regen_draft", "resubmit"].includes(action)) {
       void loadEvaluation(iid);
     }
+    if (ACTION_SUCCESS[action]) setSuccessMsg(ACTION_SUCCESS[action]);
   }
 
   if (loading) {
@@ -1383,6 +1407,31 @@ function IntakeDetailContent() {
   }
 
   const si = getStatusInfo(intake.status);
+
+  const s = intake.status;
+  const hasDraftPending = intake.latestAnalysisDraft?.reviewStatus === "draft";
+  const hasPkg = !!intake.reviewedProjectPackage;
+  const hasPlan = !!intake.provisioningPlan;
+  const gate1Done = ["devops_review", "approved", "provisioning", "distributed"].includes(s);
+  const gate2Done = ["approved", "provisioning", "distributed"].includes(s);
+  const approvalNeedsAction = (hasPkg && !gate1Done) || (gate1Done && !gate2Done);
+  const distributionReady = gate2Done && !["provisioning", "distributed"].includes(s);
+
+  function tabBadge(tab: string): React.ReactNode {
+    if (tab === "AI Draft" && hasDraftPending)
+      return <span className="ml-1.5 inline-flex items-center justify-center w-2 h-2 rounded-full bg-amber-400" aria-label="action needed" />;
+    if (tab === "Evaluation" && evaluation)
+      return <span className="ml-1.5 inline-flex items-center justify-center w-2 h-2 rounded-full bg-indigo-400" aria-label="has content" />;
+    if (tab === "Reviewed Package" && hasPkg)
+      return <span className="ml-1.5 inline-flex items-center justify-center w-2 h-2 rounded-full bg-indigo-400" aria-label="has content" />;
+    if (tab === "Approvals" && approvalNeedsAction)
+      return <span className="ml-1.5 inline-flex items-center justify-center w-2 h-2 rounded-full bg-amber-400" aria-label="action needed" />;
+    if (tab === "Distribution" && hasPlan)
+      return <span className={`ml-1.5 inline-flex items-center justify-center w-2 h-2 rounded-full ${distributionReady ? "bg-amber-400" : "bg-indigo-400"}`} aria-label={distributionReady ? "action needed" : "has content"} />;
+    if (tab === "Audit Trail" && audit.length > 0)
+      return <span className="ml-1.5 inline-flex items-center justify-center min-w-[1.1rem] h-4 px-1 rounded-full bg-gray-200 text-gray-600 text-[10px] font-medium tabular-nums">{audit.length}</span>;
+    return null;
+  }
 
   return (
     <div className="p-8 max-w-7xl">
@@ -1426,11 +1475,16 @@ function IntakeDetailContent() {
               onClick={() => setTab(tab)}
               className={`tab-btn ${activeTab === tab ? "tab-active" : "tab-inactive"}`}
             >
-              {tab}
+              <span className="inline-flex items-center">
+                {tab}
+                {tabBadge(tab)}
+              </span>
             </button>
           ))}
         </div>
       </div>
+
+      <Toast message={successMsg} onDismiss={() => setSuccessMsg(null)} />
 
       {/* Tab content */}
       {activeTab === "Overview" && (

@@ -1,5 +1,87 @@
 # Build Log
 
+## 2026-06-29 — TASK-0035: UX Friction Backlog — FP-001, FP-006, FP-007 + Governance Benchmark
+
+**Status:** Complete
+
+### FP-001 — Tab Badges on Intake Detail
+- `apps/web/src/app/intakes/[id]/page.tsx`: added `tabBadge(tab)` helper that returns small colored dot indicators or count chips per tab
+  - Amber dot on "AI Draft" when a pending draft awaits review (`hasDraftPending`)
+  - Indigo dot on "Evaluation" when evaluation data exists; on "Reviewed Package" when a package exists; on "Distribution" when plan exists (amber if distribution is ready to execute)
+  - Amber dot on "Approvals" when an approval gate needs action
+  - Count chip on "Audit Trail" showing total event count
+- Tab rendering updated to render `tabBadge(tab)` inline in each tab button
+
+### FP-006 — Search and Filter on Intakes List
+- `apps/web/src/app/intakes/page.tsx`: added `query` (free-text) and `statusFilter` state
+- `filtered` derived via `useMemo` — filters by case-insensitive substring on title/requester/id, and by exact status slug
+- Filter bar renders above the table: flex-1 text input + 180px status select with all status slugs via `getStatusInfo`
+- "Showing X of Y" count displayed when any filter is active; empty state has two variants ("No intakes match your filters." vs original "No intakes yet.")
+
+### FP-007 — Success Toasts on Governance Actions
+- `apps/web/src/components/Toast.tsx` (new): emerald-styled auto-dismiss banner (4000ms), manual dismiss button; timer resets on new message; renders nothing when message is null
+- `apps/web/src/app/intakes/[id]/page.tsx`: imported Toast; added `successMsg` state; added `ACTION_SUCCESS` map (submit, resubmit, mock_draft, accept_draft, reject_draft, regen_draft, revise_draft, approve_gate1, approve_gate2, reject_gate1, reject_gate2, request_changes, gen_plan); `handleAction` sets `successMsg` after each successful action; Toast rendered between tab strip and tab content
+
+### Governance Flow Benchmark
+- `scripts/benchmark-governance-flow.mjs` (new): 10-step in-process governance benchmark using mock providers (no running API/DB needed)
+  - All 10 steps complete in ~3.15ms total — confirms governance layer is in-memory-fast; no bottleneck
+  - All governance guards pass: correct status transitions (draft → submitted → devops_review → approved), approvals locked, provisioning plan is dry-run only
+  - 10 audit events recorded, 5 provisioning actions generated
+  - Supports `--runs=N` flag for averaged results with bar chart and bottleneck ranking
+- `package.json`: added `"bench:governance": "node scripts/benchmark-governance-flow.mjs"` script
+
+### Orchestrator Parallelism Analysis (P3 — deferred, unsafe)
+- Investigated parallelizing Stage 1 `clarification_questions` with `classification` in `EvaluationOrchestrator`
+- Confirmed UNSAFE: `classification` receives `sections` which includes `clarification_questions` (set at line 212, classification called at line 218)
+- Parallelizing would cause classification to run without clarification context — dropped
+
+### P1 (provisioning preview before Gate 2) — awaiting confirmation
+- Allowing `generateProvisioningPlan` during `devops_review` status requires changing a workflow state guard condition
+- CLAUDE.md mandates human confirmation before this change — not implemented
+
+### Checks
+- `npm run typecheck` — clean (all FP-001, FP-006, FP-007 changes)
+
+---
+
+## 2026-06-29 — TASK-0035: Discovery UX — FP-003 + FP-004
+
+**Status:** Complete
+
+### FP-003 — Discovery Session Identifiability
+- `apps/web/src/app/discovery/page.tsx`: replaced "ID / Status / Messages / Last Activity" columns with "Session / Status / Last Activity"
+- Session title derived from `problemFrame.problemStatement` (for framed sessions) or first user message content (truncated to 90 chars); falls back to ID slice only when no messages exist
+- Last Activity now shows relative time ("2h ago", "3d ago") with absolute date in tooltip via `title` attribute
+- Added `formatRelativeTime`, `getSessionTitle`, `getLinkedIntakeId` helpers
+
+### FP-004 — Discovery → Intake Handoff
+- `apps/web/src/app/discovery/[id]/page.tsx`: `handleSendToEvaluation` now stores intake ID in `localStorage` under key `pit:discovery:intake:{sessionId}` before navigating to the intake
+- On page load, if `status === "sent_to_evaluation"`, reads localStorage and sets `linkedIntakeId` state
+- Renders a green callout banner below the header: "✓ Sent to evaluation — View intake →" linking directly to the intake; falls back to "View in intakes list →" if localStorage key is absent (e.g. different browser/device)
+- Discovery list page: `sent_to_evaluation` rows show "View intake →" inline link when localStorage has the ID
+
+### Checks
+- `npm run typecheck` — clean
+
+---
+
+## 2026-06-29 — TASK-0032: Input Validation Hardening + UI Polish
+
+**Status:** Complete
+
+### TASK-0032: Input Validation Hardening
+All implementation was found already complete from a prior session. Verified and confirmed:
+- `apps/api/src/common/validation-constants.ts` — named length constants (title 200, description 5000, requester/department 100, reason 1000, comment 2000, note 500, discovery 2000)
+- `CreateIntakeDto`, `RequestChangesDto`, `ApprovalDecisionDto`, `RejectAnalysisDraftDto`, `RegenerateAnalysisDraftDto`, `CompleteDiscoveryDto`, `LifecycleTransitionDto` — all updated with `@MaxLength`
+- `apps/api/src/main.ts` — `ValidationPipe` confirmed with `whitelist: true`, `forbidNonWhitelisted: true`, `transform: true`
+- `tests/input-validation.test.mjs` — 34 tests, all passing. Coverage: all DTOs, boundary values (exact max passes, max+1 rejects), empty string rejection, whitelist/forbidNonWhitelisted behavior, constants sanity checks.
+
+### UI Polish Pass (Impeccable P1 fixes)
+- `animate-bounce` → `animate-typing-dot` in `DiscoveryChat.tsx` — smooth pulse, no bounce, reduced-motion safe
+- Removed `rounded-t-lg` from `.tab-btn` in `globals.css` — flat tabs, eliminates border-accent-on-rounded false positive
+- Discovery status constants consolidated: `getDiscoveryStatusInfo()` added to `status.ts`, removed divergent `STATUS_COLOR`/`STATUS_LABELS` from `discovery/page.tsx`
+- `intakes/[id]/page.tsx`: `text-gray-400` → `text-brand-muted` on out-of-scope list; draft history inline statusColor map → `StatusBadge` component; JSON hint `text-gray-500` → `text-gray-600`; idempotency key and audit table headers bumped from gray-400/gray-500 to gray-500/gray-600; Gate 1/Gate 2 Reject buttons now show "Rejecting…" loading state
+
 ## 2026-06-27 — Live Demo: Discovery Engine + OpenAI Agents (gpt-5.5 + gpt-5.4-mini)
 
 **Status:** Full end-to-end Discovery→Intake pipeline demonstrated live on oreochiserver

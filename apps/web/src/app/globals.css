@@ -14,6 +14,22 @@
   }
 }
 
+@keyframes typing-dot {
+  0%, 60%, 100% { opacity: 0.3; transform: scale(0.75); }
+  30% { opacity: 1; transform: scale(1); }
+}
+
+.animate-typing-dot {
+  animation: typing-dot 1.4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-typing-dot {
+    animation: none;
+    opacity: 0.6;
+  }
+}
+
 @layer components {
   .card {
     @apply bg-white rounded-xl border border-gray-200 shadow-sm;
@@ -56,7 +72,7 @@
   }
 
   .tab-btn {
-    @apply px-4 py-2.5 text-sm font-medium rounded-t-lg whitespace-nowrap transition-colors border-b-2;
+    @apply px-4 py-2.5 text-sm font-medium whitespace-nowrap transition-colors border-b-2;
   }
 
   .tab-active {

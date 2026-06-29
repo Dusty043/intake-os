@@ -1,6 +1,6 @@
 # TASK-0032 — Input Validation Hardening
 
-**Status:** READY — no credentials required  
+**Status:** COMPLETE  
 **Priority:** MEDIUM — required before email and Chat intake sources go live  
 **Estimated effort:** 1–2 hours  
 **Blocked on:** nothing
@@ -23,14 +23,14 @@ Additionally, several DTOs have fields that accept strings where more constraine
 
 ## Acceptance Criteria
 
-- [ ] `CreateIntakeDto`: all text fields have `@MaxLength` constraints
-- [ ] `RequestChangesDto`, `ApprovalDecisionDto`, `RejectAnalysisDraftDto`: `reason` and `comment` fields have `@MaxLength`
-- [ ] `RegenerateAnalysisDraftDto`: `reason` field has `@MaxLength`
+- [x] `CreateIntakeDto`: all text fields have `@MaxLength` constraints
+- [x] `RequestChangesDto`, `ApprovalDecisionDto`, `RejectAnalysisDraftDto`: `reason` and `comment` fields have `@MaxLength`
+- [x] `RegenerateAnalysisDraftDto`: `reason` field has `@MaxLength`
 - [ ] All new intake source DTOs (email, chat — when built) include `@MaxLength` on all string fields
-- [ ] API returns `HTTP 400` with a field-level validation error message when max length is exceeded
-- [ ] `class-validator` pipe is confirmed to be globally registered (not just per-route)
-- [ ] Unit tests confirm 400 is returned when max length is exceeded on key endpoints
-- [ ] Length constants are defined as named constants, not magic numbers scattered in decorators
+- [x] API returns `HTTP 400` with a field-level validation error message when max length is exceeded
+- [x] `class-validator` pipe is confirmed to be globally registered (not just per-route)
+- [x] Unit tests confirm 400 is returned when max length is exceeded on key endpoints
+- [x] Length constants are defined as named constants, not magic numbers scattered in decorators
 
 ---
 

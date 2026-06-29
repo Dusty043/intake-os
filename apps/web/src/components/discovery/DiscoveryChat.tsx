@@ -195,9 +195,9 @@ export function DiscoveryChat({
           <div className="flex justify-start">
             <div className="bg-gray-100 rounded-2xl rounded-tl-sm px-4 py-3">
               <div className="flex gap-1 items-center">
-                <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce [animation-delay:0ms]" />
-                <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce [animation-delay:150ms]" />
-                <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce [animation-delay:300ms]" />
+                <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-typing-dot [animation-delay:0ms]" />
+                <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-typing-dot [animation-delay:200ms]" />
+                <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-typing-dot [animation-delay:400ms]" />
               </div>
             </div>
           </div>

@@ -1,4 +1,5 @@
 import type { ProjectIntakeRecord } from "./types";
+import type { DiscoveryStatus } from "./discovery-types";
 
 export type BadgeVariant =
   | "neutral"
@@ -46,6 +47,23 @@ export function getComputedBadges(record: ProjectIntakeRecord): StatusInfo[] {
     badges.push({ label: "Distribution Preview Ready", variant: "preview" });
   }
   return badges;
+}
+
+const DISCOVERY_STATUS_MAP: Record<DiscoveryStatus, StatusInfo> = {
+  draft:                { label: "Draft",               variant: "neutral"  },
+  conversation_started: { label: "Conversation",        variant: "info"     },
+  intent_detected:      { label: "Intent Detected",     variant: "ai"       },
+  problem_framed:       { label: "Problem Framed",      variant: "ai"       },
+  solutions_generated:  { label: "Solutions Ready",     variant: "ai"       },
+  clarification_needed: { label: "Clarification Needed", variant: "warning" },
+  direction_selected:   { label: "Direction Selected",  variant: "reviewed" },
+  proposal_generated:   { label: "Proposal Ready",      variant: "reviewed" },
+  evaluation_ready:     { label: "Evaluation Ready",    variant: "preview"  },
+  sent_to_evaluation:   { label: "Sent to Evaluation",  variant: "info"     },
+};
+
+export function getDiscoveryStatusInfo(status: DiscoveryStatus): StatusInfo {
+  return DISCOVERY_STATUS_MAP[status] ?? { label: status, variant: "neutral" };
 }
 
 export const VARIANT_CLASSES: Record<BadgeVariant, string> = {

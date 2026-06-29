@@ -200,6 +200,16 @@ The numbers can be adjusted as the trace becomes more detailed.
 
 ---
 
+## Cross-Cutting — API Input Validation
+
+| ID | Requirement | Product Spec | Implementation Area | Related Tasks | Test Coverage | Status | Notes |
+|---|---|---|---|---|---|---|---|
+| CV-001 | All DTO string fields have `@MaxLength` constraints with named constants | `failure-and-recovery.md` (input validation category) | `apps/api/src/common/validation-constants.ts`, all intake DTOs | TASK-0032 | `tests/input-validation.test.mjs` (34 tests) | tested | Constants: title 200, description 5000, requester/department 100, reason 1000, comment 2000, note 500, discovery 2000 |
+| CV-002 | Global `ValidationPipe` enforces whitelist and forbidNonWhitelisted on all routes | — | `apps/api/src/main.ts` | TASK-0032 | `tests/input-validation.test.mjs` whitelist tests | tested | `whitelist: true`, `forbidNonWhitelisted: true`, `transform: true` confirmed |
+| CV-003 | Email and Chat intake DTOs must include `@MaxLength` when those sources are built | — | Future email/chat source DTOs | — | — | not_started | Constants pre-defined: `MAX_EMAIL_SUBJECT_LENGTH=500`, `MAX_EMAIL_BODY_LENGTH=50000`, `MAX_CHAT_MESSAGE_LENGTH=10000` |
+
+---
+
 ## Gap Register
 
 | Gap ID | Related Requirement | Gap | Owner | Status | Notes |

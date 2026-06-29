@@ -7,34 +7,9 @@ import { useActor } from "@/components/ActorProvider";
 import { ErrorBanner } from "@/components/ErrorBanner";
 import { DiscoveryStartModal } from "@/components/discovery/DiscoveryStartModal";
 import { listDiscoverySessions, startDiscovery } from "@/lib/discovery-client";
-import type { DiscoverySession, DiscoveryStatus } from "@/lib/discovery-types";
+import type { DiscoverySession } from "@/lib/discovery-types";
 import { useAuth } from "@/components/AuthProvider";
-
-const STATUS_LABELS: Record<DiscoveryStatus, string> = {
-  draft:                "Draft",
-  conversation_started: "Conversation",
-  intent_detected:      "Intent Detected",
-  problem_framed:       "Problem Framed",
-  solutions_generated:  "Solutions Ready",
-  clarification_needed: "Clarification Needed",
-  direction_selected:   "Direction Selected",
-  proposal_generated:   "Proposal Ready",
-  evaluation_ready:     "Evaluation Ready",
-  sent_to_evaluation:   "Sent to Evaluation",
-};
-
-const STATUS_COLOR: Record<DiscoveryStatus, string> = {
-  draft:                "bg-gray-100 text-gray-600",
-  conversation_started: "bg-blue-100 text-blue-700",
-  intent_detected:      "bg-indigo-100 text-indigo-700",
-  problem_framed:       "bg-indigo-100 text-indigo-700",
-  solutions_generated:  "bg-purple-100 text-purple-700",
-  clarification_needed: "bg-amber-100 text-amber-700",
-  direction_selected:   "bg-teal-100 text-teal-700",
-  proposal_generated:   "bg-green-100 text-green-700",
-  evaluation_ready:     "bg-green-100 text-green-700",
-  sent_to_evaluation:   "bg-emerald-100 text-emerald-700",
-};
+import { getDiscoveryStatusInfo, VARIANT_CLASSES } from "@/lib/status";
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString("en-AU", {
@@ -42,6 +17,39 @@ function formatDate(iso: string): string {
     month: "short",
     year: "numeric",
   });
+}
+
+function formatRelativeTime(iso: string): string {
+  const diffMs = Date.now() - new Date(iso).getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  if (diffMins < 1) return "just now";
+  if (diffMins < 60) return `${diffMins}m ago`;
+  const diffHours = Math.floor(diffMins / 60);
+  if (diffHours < 24) return `${diffHours}h ago`;
+  const diffDays = Math.floor(diffHours / 24);
+  if (diffDays < 7) return `${diffDays}d ago`;
+  return formatDate(iso);
+}
+
+function getSessionTitle(session: DiscoverySession): string | null {
+  if (session.problemFrame?.problemStatement) {
+    const s = session.problemFrame.problemStatement;
+    return s.length > 90 ? s.slice(0, 87) + "…" : s;
+  }
+  const firstMsg = session.messages.find((m) => m.role === "user");
+  if (firstMsg?.content) {
+    const s = firstMsg.content.trim();
+    return s.length > 90 ? s.slice(0, 87) + "…" : s;
+  }
+  return null;
+}
+
+function getLinkedIntakeId(sessionId: string): string | null {
+  try {
+    return localStorage.getItem(`pit:discovery:intake:${sessionId}`);
+  } catch {
+    return null;
+  }
 }
 
 export default function DiscoveryListPage() {
@@ -122,7 +130,7 @@ export default function DiscoveryListPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-gray-100 bg-gray-50">
-                  {["ID", "Status", "Messages", "Last Activity"].map((h) => (
+                  {["Session", "Status", "Last Activity"].map((h) => (
                     <th
                       key={h}
                       className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide"
@@ -138,34 +146,53 @@ export default function DiscoveryListPage() {
                   const lastMessage = session.messages[session.messages.length - 1];
                   const lastActivity =
                     lastEvent?.occurredAt ?? lastMessage?.createdAt ?? session.id;
+                  const title = getSessionTitle(session);
+                  const linkedIntakeId = session.status === "sent_to_evaluation"
+                    ? getLinkedIntakeId(session.id)
+                    : null;
 
                   return (
                     <tr
                       key={session.id}
                       className="border-b border-gray-50 hover:bg-gray-50 transition-colors"
                     >
-                      <td className="px-4 py-3 font-mono text-xs text-gray-500">
+                      <td className="px-4 py-3 max-w-md">
                         <Link
                           href={`/discovery/${session.id}`}
-                          className="hover:text-indigo-600 hover:underline"
+                          className="block text-brand-text hover:text-indigo-600 transition-colors font-medium leading-snug"
                         >
-                          {session.id.slice(0, 14)}…
+                          {title ?? (
+                            <span className="font-mono text-xs text-gray-400">
+                              {session.id.slice(0, 14)}…
+                            </span>
+                          )}
                         </Link>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <span className="font-mono text-xs text-gray-400">
+                            {session.id.slice(0, 10)}…
+                          </span>
+                          {linkedIntakeId && (
+                            <Link
+                              href={`/intakes/${linkedIntakeId}`}
+                              className="text-xs text-indigo-600 hover:text-indigo-800 hover:underline"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              View intake →
+                            </Link>
+                          )}
+                        </div>
                       </td>
                       <td className="px-4 py-3">
-                        <span
-                          className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-                            STATUS_COLOR[session.status]
-                          }`}
-                        >
-                          {STATUS_LABELS[session.status]}
+                        {(() => { const s = getDiscoveryStatusInfo(session.status); return (
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${VARIANT_CLASSES[s.variant]}`}>
+                            {s.label}
+                          </span>
+                        ); })()}
+                      </td>
+                      <td className="px-4 py-3 text-gray-500 whitespace-nowrap">
+                        <span title={formatDate(lastActivity)}>
+                          {formatRelativeTime(lastActivity)}
                         </span>
-                      </td>
-                      <td className="px-4 py-3 text-gray-600">
-                        {session.messages.length}
-                      </td>
-                      <td className="px-4 py-3 text-gray-500">
-                        {formatDate(lastActivity)}
                       </td>
                     </tr>
                   );

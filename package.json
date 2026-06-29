@@ -41,6 +41,7 @@
     "demo:guided-regen": "npm run build:core && node scripts/demo-guided-regeneration.mjs",
     "demo:evaluation-orchestrator": "npm run build:core && node scripts/demo-evaluation-orchestrator.mjs",
     "smoke:ai-provider": "npm run build:core && node scripts/smoke-ai-provider.mjs",
+    "bench:governance": "node scripts/benchmark-governance-flow.mjs",
     "web:dev": "npm --prefix apps/web run dev",
     "web:build": "npm --prefix apps/web run build",
     "web:start": "npm --prefix apps/web run start",

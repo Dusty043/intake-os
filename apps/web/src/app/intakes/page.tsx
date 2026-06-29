@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useActor } from "@/components/ActorProvider";
 import { ErrorBanner } from "@/components/ErrorBanner";
 import { StatusBadge } from "@/components/StatusBadge";
@@ -10,15 +10,33 @@ import { formatDate, formatProjectType } from "@/lib/formatting";
 import { getStatusInfo } from "@/lib/status";
 import type { ProjectIntakeRecord } from "@/lib/types";
 
+const STATUS_SLUGS = [
+  "draft",
+  "submitted",
+  "intake_review",
+  "clarification_required",
+  "evaluating",
+  "devops_review",
+  "approved",
+  "provisioning",
+  "distributed",
+  "rejected",
+  "archived",
+] as const;
+
 export default function IntakesPage() {
   const { actor } = useActor();
   const [intakes, setIntakes] = useState<ProjectIntakeRecord[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
+    setQuery("");
+    setStatusFilter("");
     try {
       const data = await listIntakes(actor);
       setIntakes(data);
@@ -30,6 +48,22 @@ export default function IntakesPage() {
   }, [actor]);
 
   useEffect(() => { void load(); }, [load]);
+
+  const filtered = useMemo(() => {
+    if (!intakes) return intakes;
+    const q = query.trim().toLowerCase();
+    return intakes.filter((i) => {
+      const matchesQuery =
+        !q ||
+        i.title.toLowerCase().includes(q) ||
+        (i.requester ?? "").toLowerCase().includes(q) ||
+        i.id.toLowerCase().includes(q);
+      const matchesStatus = !statusFilter || i.status === statusFilter;
+      return matchesQuery && matchesStatus;
+    });
+  }, [intakes, query, statusFilter]);
+
+  const filtersActive = query.trim() !== "" || statusFilter !== "";
 
   return (
     <div className="p-8 max-w-7xl">
@@ -53,20 +87,55 @@ export default function IntakesPage() {
 
       <ErrorBanner error={error} onDismiss={() => setError(null)} />
 
-      <div className="card overflow-hidden mt-4">
+      {/* Filter bar */}
+      <div className="flex gap-2 mb-4 mt-4">
+        <input
+          type="text"
+          className="form-input flex-1"
+          placeholder="Search by title or requester…"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+        />
+        <select
+          className="form-input"
+          style={{ width: 180 }}
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+        >
+          <option value="">All Statuses</option>
+          {STATUS_SLUGS.map((slug) => (
+            <option key={slug} value={slug}>
+              {getStatusInfo(slug).label}
+            </option>
+          ))}
+        </select>
+      </div>
+      {filtersActive && !loading && filtered !== null && (
+        <p className="text-xs text-brand-muted mb-3">
+          Showing {filtered.length} of {intakes?.length ?? 0}
+        </p>
+      )}
+
+      <div className="card overflow-hidden">
         {loading ? (
           <div className="p-12 text-center text-brand-muted text-sm">
             Loading intakes…
           </div>
-        ) : intakes && intakes.length === 0 ? (
+        ) : filtered && filtered.length === 0 ? (
           <div className="p-12 text-center">
-            <p className="text-brand-muted text-sm font-medium">No intakes yet.</p>
-            <p className="text-gray-400 text-sm mt-1">
-              Create the first project intake to begin the review workflow.
-            </p>
-            <Link href="/intakes/new" className="btn-primary mt-4 inline-flex">
-              Create Intake
-            </Link>
+            {filtersActive ? (
+              <p className="text-brand-muted text-sm font-medium">No intakes match your filters.</p>
+            ) : (
+              <>
+                <p className="text-brand-muted text-sm font-medium">No intakes yet.</p>
+                <p className="text-gray-400 text-sm mt-1">
+                  Create the first project intake to begin the review workflow.
+                </p>
+                <Link href="/intakes/new" className="btn-primary mt-4 inline-flex">
+                  Create Intake
+                </Link>
+              </>
+            )}
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -86,7 +155,7 @@ export default function IntakesPage() {
                 </tr>
               </thead>
               <tbody>
-                {intakes?.map((intake) => {
+                {filtered?.map((intake) => {
                   const si = getStatusInfo(intake.status);
                   return (
                     <tr
