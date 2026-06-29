@@ -128,6 +128,7 @@ export default function DiscoverySessionPage() {
 
   const handleAnswerClarification = async (questionId: string, answer: string) => {
     await withBusy(() => answerClarification(id, questionId, answer, actor));
+    startPolling();
   };
 
   const handleSelectDirection = async (solutionId: string) => {

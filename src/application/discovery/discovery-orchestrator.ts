@@ -405,15 +405,15 @@ export class DiscoveryOrchestrator {
       currentConfidence: session.confidence,
     };
 
-    const intent = await this.intentAgent.extractIntent(agentCtx, agentOpts);
+    // Fetch config threshold in parallel with the first LLM call — it's a DB read, not dependent on LLM results
+    const [intent, roughFrameMax] = await Promise.all([
+      this.intentAgent.extractIntent(agentCtx, agentOpts),
+      this.getConfidenceThreshold(),
+    ]);
 
     // Stage 2 — problem framing (uses intent result)
     const framingCtx = { ...agentCtx, intent };
     const { frame, confidence } = await this.framingAgent.frameProblem(framingCtx, agentOpts);
-
-    // Determine next status based on confidence tier.
-    // Load the admin-configurable threshold fresh each analysis run.
-    const roughFrameMax = await this.getConfidenceThreshold();
 
     // If the user's last message signals "proceed anyway / wing it", force
     // propose_with_assumptions so the session doesn't loop asking questions.

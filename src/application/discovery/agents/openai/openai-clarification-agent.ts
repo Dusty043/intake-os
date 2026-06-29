@@ -12,6 +12,7 @@ const schema = {
   properties: {
     questions: {
       type: "array",
+      maxItems: 2,
       items: {
         type: "object",
         required: ["question", "impact", "affectedDimensions"],
@@ -36,7 +37,8 @@ type Output = { questions: QuestionRaw[] };
 
 const SYSTEM = `You are a requirements analyst. Identify the most important missing information needed to confidently scope this project.
 
-Return at most 3 questions. Prioritise blocking questions (without which the project cannot be scoped) over important or deferred ones.
+Return at most 2 questions. Fewer is better — only ask what is genuinely blocking.
+Prioritise blocking questions (without which the project cannot be scoped) over important or deferred ones.
 Do not ask questions that have already been answered in the conversation.
 Do not ask vague questions — each must be specific and answerable.`;
 
