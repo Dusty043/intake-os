@@ -358,10 +358,14 @@ export class IntakeWorkflowService {
 
     let record = await this.requireIntake(id);
     const now = this.clock();
-    record = await this.applyTransitionToRecord(record, "generate_evaluation", actor, now, {
-      reason: "AI analysis started.",
-      metadata: { provider: this.analysisProvider.name, draftOnly: true },
-    });
+    // If the intake is already at "evaluating" (e.g. a prior attempt transitioned the status
+    // but crashed before writing the draft), skip the transition and resume from where it left off.
+    if (record.status !== "evaluating") {
+      record = await this.applyTransitionToRecord(record, "generate_evaluation", actor, now, {
+        reason: "AI analysis started.",
+        metadata: { provider: this.analysisProvider.name, draftOnly: true },
+      });
+    }
 
     const result = await this.analysisProvider.generateDraft(record, {
       actor,
