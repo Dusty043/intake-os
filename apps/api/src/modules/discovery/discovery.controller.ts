@@ -16,7 +16,7 @@ import { IntakeWorkflowService } from "../../../../../src/application/intake-wor
 import { CurrentActor } from "../auth/auth.decorators.js";
 import type { AuthenticatedActor } from "../auth/auth.types.js";
 
-const DISCOVERY_SYSTEM_ACTOR = { id: "discovery-engine", role: "manager" as const, name: "Discovery Engine" };
+const DISCOVERY_SYSTEM_ACTOR = { id: "discovery-engine", role: "intake_owner" as const, name: "Discovery Engine" };
 
 @ApiTags("discovery")
 @Controller("discovery")
