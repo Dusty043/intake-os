@@ -255,6 +255,28 @@ export class DiscoveryOrchestrator {
     });
   }
 
+  // ─── Skip remaining clarifications ───────────────────────────────────────
+
+  async skipClarifications(sessionId: string): Promise<DiscoverySession> {
+    const now = this.nowFn();
+    const session = await this.store.getById(sessionId);
+    if (!session) throw new Error(`DiscoverySession not found: ${sessionId}`);
+
+    const pending = session.clarificationQuestions.filter((q) => !q.answered);
+    if (pending.length === 0) return session;
+
+    const updatedQuestions = session.clarificationQuestions.map((q) =>
+      q.answered ? q : { ...q, answered: true, answer: "Skipped — proceeding with current understanding" },
+    );
+
+    const withAnswers = await this.store.update(session.id, {
+      clarificationQuestions: updatedQuestions,
+      updatedAt: now,
+    });
+
+    return this.runAnalysis(withAnswers);
+  }
+
   // ─── Select direction ─────────────────────────────────────────────────────
 
   async selectDirection(input: SelectDirectionInput): Promise<DiscoverySession> {

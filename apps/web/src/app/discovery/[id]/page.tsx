@@ -18,6 +18,7 @@ import {
   selectDirection,
   sendMessage,
   sendToEvaluation,
+  skipClarifications,
 } from "@/lib/discovery-client";
 import type { DiscoverySession } from "@/lib/discovery-types";
 
@@ -128,6 +129,11 @@ export default function DiscoverySessionPage() {
 
   const handleAnswerClarification = async (questionId: string, answer: string) => {
     await withBusy(() => answerClarification(id, questionId, answer, actor));
+    startPolling();
+  };
+
+  const handleSkipClarifications = async () => {
+    await withBusy(() => skipClarifications(id, actor));
     startPolling();
   };
 
@@ -263,9 +269,11 @@ export default function DiscoverySessionPage() {
             <DiscoveryChat
               messages={session.messages}
               clarificationQuestions={session.clarificationQuestions}
+              confidence={session.confidence}
               busy={busy}
               onSendMessage={handleSendMessage}
               onAnswerClarification={handleAnswerClarification}
+              onSkipClarifications={handleSkipClarifications}
             />
           }
           right={

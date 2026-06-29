@@ -1,7 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { ClarificationQuestion, DiscoveryMessage } from "@/lib/discovery-types";
+import type { ClarificationQuestion, DiscoveryConfidence, DiscoveryMessage } from "@/lib/discovery-types";
+
+function overallConfidence(c: DiscoveryConfidence): number {
+  const vals = Object.values(c) as number[];
+  return vals.reduce((a, b) => a + b, 0) / vals.length;
+}
 
 function formatTime(iso: string): string {
   return new Date(iso).toLocaleTimeString("en-AU", {
@@ -104,17 +109,21 @@ function ClarificationCard({ question, onAnswer, disabled }: ClarificationCardPr
 type Props = {
   messages: DiscoveryMessage[];
   clarificationQuestions: ClarificationQuestion[];
+  confidence: DiscoveryConfidence;
   busy: boolean;
   onSendMessage: (text: string) => Promise<void>;
   onAnswerClarification: (questionId: string, answer: string) => Promise<void>;
+  onSkipClarifications: () => Promise<void>;
 };
 
 export function DiscoveryChat({
   messages,
   clarificationQuestions,
+  confidence,
   busy,
   onSendMessage,
   onAnswerClarification,
+  onSkipClarifications,
 }: Props) {
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
@@ -146,6 +155,7 @@ export function DiscoveryChat({
 
   const pendingQuestions = clarificationQuestions.filter((q) => !q.answered);
   const answeredQuestions = clarificationQuestions.filter((q) => q.answered);
+  const canProceed = pendingQuestions.length > 0 && overallConfidence(confidence) >= 0.5;
 
   return (
     <div className="flex flex-col h-full">
@@ -210,24 +220,37 @@ export function DiscoveryChat({
 
       {/* Clarification questions */}
       {clarificationQuestions.length > 0 && (
-        <div className="border-t border-gray-100 px-4 py-3 space-y-2 bg-gray-50">
-          <p className="section-label mb-1">Clarification Questions</p>
-          {pendingQuestions.map((q) => (
-            <ClarificationCard
-              key={q.id}
-              question={q}
-              onAnswer={onAnswerClarification}
-              disabled={busy || sending}
-            />
-          ))}
-          {answeredQuestions.map((q) => (
-            <ClarificationCard
-              key={q.id}
-              question={q}
-              onAnswer={onAnswerClarification}
-              disabled={true}
-            />
-          ))}
+        <div className="border-t border-gray-100 bg-gray-50 shrink-0">
+          <div className="px-4 pt-3 pb-2 flex items-center justify-between gap-3">
+            <p className="section-label mb-0">Clarification Questions</p>
+            {canProceed && (
+              <button
+                onClick={onSkipClarifications}
+                disabled={busy || sending}
+                className="shrink-0 text-xs font-medium text-indigo-600 hover:text-indigo-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              >
+                Proceed with assumptions →
+              </button>
+            )}
+          </div>
+          <div className="px-4 pb-3 space-y-2 max-h-56 overflow-y-auto">
+            {pendingQuestions.map((q) => (
+              <ClarificationCard
+                key={q.id}
+                question={q}
+                onAnswer={onAnswerClarification}
+                disabled={busy || sending}
+              />
+            ))}
+            {answeredQuestions.map((q) => (
+              <ClarificationCard
+                key={q.id}
+                question={q}
+                onAnswer={onAnswerClarification}
+                disabled={true}
+              />
+            ))}
+          </div>
         </div>
       )}
 

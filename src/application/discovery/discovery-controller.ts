@@ -63,6 +63,10 @@ export class DiscoveryController {
     });
   }
 
+  skipClarifications(sessionId: string) {
+    return this.orchestrator.skipClarifications(sessionId);
+  }
+
   selectDirection(sessionId: string, body: SelectDirectionRequest) {
     return this.orchestrator.selectDirection({
       sessionId,

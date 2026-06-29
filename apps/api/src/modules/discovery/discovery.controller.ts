@@ -73,6 +73,14 @@ export class DiscoveryHttpController {
     });
   }
 
+  // POST /discovery/:id/clarifications/skip
+  @Post(":id/clarifications/skip")
+  @HttpCode(200)
+  @ApiOperation({ summary: "Skip remaining clarification questions and proceed with current confidence" })
+  skipClarifications(@Param("id") id: string) {
+    return this.discovery.skipClarifications(id);
+  }
+
   // POST /discovery/:id/direction
   @Post(":id/direction")
   @ApiOperation({ summary: "Select a solution direction for a discovery session" })

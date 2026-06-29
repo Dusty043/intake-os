@@ -80,6 +80,17 @@ export async function answerClarification(
   });
 }
 
+export async function skipClarifications(
+  id: string,
+  actor: UiActor,
+): Promise<DiscoverySession> {
+  return request(`/discovery/${id}/clarifications/skip`, {
+    method: "POST",
+    headers: actorHeaders(actor),
+    body: JSON.stringify({}),
+  });
+}
+
 export async function selectDirection(
   id: string,
   solutionId: string,
