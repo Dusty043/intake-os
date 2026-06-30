@@ -182,11 +182,12 @@ export async function rejectGate(
 export async function generateProvisioningPlan(
   id: string,
   actor: UiActor,
+  teamPrefix: string,
 ): Promise<ProjectIntakeRecord> {
   return request(`/intakes/${id}/provisioning-plan`, {
     method: "POST",
     headers: actorHeaders(actor),
-    body: JSON.stringify({}),
+    body: JSON.stringify({ teamPrefix }),
   });
 }
 

@@ -1007,6 +1007,7 @@ function DistributionTab({
   const plan = intake.provisioningPlan;
   const [busy, setBusy] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  const [teamPrefix, setTeamPrefix] = useState("sb");
   const [runs, setRuns] = useState<ProvisioningRun[] | null>(null);
   const [runsLoading, setRunsLoading] = useState(false);
   const [retryingRunId, setRetryingRunId] = useState<string | null>(null);
@@ -1022,7 +1023,7 @@ function DistributionTab({
   async function doGenPlan() {
     setBusy("gen_plan"); setErr(null);
     try {
-      const updated = await generateProvisioningPlan(intake.id, actor);
+      const updated = await generateProvisioningPlan(intake.id, actor, teamPrefix);
       onIntakeUpdate(updated);
     } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
     finally { setBusy(null); }
@@ -1107,9 +1108,21 @@ function DistributionTab({
             </p>
           )}
           {gate2Done && (
-            <button className="btn-primary" onClick={() => { void doGenPlan(); }} disabled={!!busy}>
-              {busy === "gen_plan" ? "Generating…" : "Generate Distribution Preview"}
-            </button>
+            <div className="flex flex-col items-center gap-3">
+              <div className="flex items-center gap-2">
+                <label className="text-xs text-brand-muted font-medium whitespace-nowrap">Team prefix</label>
+                <input
+                  type="text"
+                  value={teamPrefix}
+                  onChange={(e) => setTeamPrefix(e.target.value.trim())}
+                  placeholder="sb"
+                  className="border border-brand-border rounded px-2 py-1 text-sm w-24 text-center"
+                />
+              </div>
+              <button className="btn-primary" onClick={() => { void doGenPlan(); }} disabled={!!busy || !teamPrefix}>
+                {busy === "gen_plan" ? "Generating…" : "Generate Distribution Preview"}
+              </button>
+            </div>
           )}
         </div>
       )}
@@ -1379,7 +1392,7 @@ function IntakeDetailContent() {
       case "reject_gate1":  updated = await rejectGate(iid, actor, payload as string); break;
       case "reject_gate2":  updated = await rejectGate(iid, actor, payload as string); break;
       case "request_changes": updated = await requestChanges(iid, actor, payload as string); break;
-      case "gen_plan":      updated = await generateProvisioningPlan(iid, actor); break;
+      case "gen_plan":      setTab("Distribution"); return;
       case "goto_draft":    setTab("AI Draft"); return;
       default: return;
     }
