@@ -1452,7 +1452,7 @@ function IntakeDetailContent() {
       <nav className="text-sm text-gray-400 mb-4">
         <Link href="/intakes" className="hover:text-indigo-600">Intakes</Link>
         <span className="mx-2">/</span>
-        <span className="text-brand-text font-medium font-mono">{intake.id.slice(0, 20)}…</span>
+        <span className="text-brand-text font-medium">{intake.title.length > 50 ? `${intake.title.slice(0, 50)}…` : intake.title}</span>
       </nav>
 
       <div className="flex items-start justify-between mb-2">
