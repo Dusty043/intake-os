@@ -1,6 +1,6 @@
 import type { EvaluationAgent, AgentOutput, AgentRunContext, AgentRunOptions } from "../agent-contract.js";
 import type { LowCodePathSectionContent } from "../../intake-evaluation.js";
-import { callEvalStructured } from "./openai-eval-client.js";
+import type { LlmClient } from "../../llm-client.js";
 
 const schema = {
   type: "object",
@@ -24,14 +24,14 @@ const SYSTEM = `You are a no-code/low-code specialist. Assess whether this proje
 
 export class OpenAILowCodePathAgent implements EvaluationAgent<LowCodePathSectionContent> {
   readonly role = "low_code_path" as const;
-  constructor(private readonly apiKey: string, private readonly model: string) {}
+  constructor(private readonly client: LlmClient, private readonly model: string) {}
 
   async run(ctx: AgentRunContext, opts: AgentRunOptions): Promise<AgentOutput<LowCodePathSectionContent>> {
     const { intake } = ctx;
     const userPrompt = `Title: ${intake.title}\nDescription:\n${intake.description}`;
-    const out = await callEvalStructured<LowCodePathSectionContent>(
-      this.apiKey, this.model, SYSTEM, userPrompt, "low_code_path", schema as unknown as Record<string,unknown>,
-    );
+    const { content: out } = await this.client.completeStructured<LowCodePathSectionContent>({
+      model: this.model, systemPrompt: SYSTEM, userPrompt: userPrompt, schemaName: "low_code_path", schema: schema as unknown as Record<string,unknown>,
+    });
     return { sectionKind: "low_code_path", content: out, confidence: 0.78, warnings: [] };
   }
 }

@@ -1,6 +1,6 @@
 import type { EvaluationAgent, AgentOutput, AgentRunContext, AgentRunOptions } from "../agent-contract.js";
 import type { ClassificationSectionContent } from "../../intake-evaluation.js";
-import { callEvalStructured } from "./openai-eval-client.js";
+import type { LlmClient } from "../../llm-client.js";
 
 const PROJECT_TYPES = ["web_app","mobile_app","automation","dashboard","ai_assistant","api_service","data_pipeline","infrastructure","process_improvement","other"] as const;
 const DEPTHS = ["light","standard","full"] as const;
@@ -33,14 +33,14 @@ signals: 3-6 keywords or phrases from the intake that drove the classification`;
 
 export class OpenAIProjectClassifierAgent implements EvaluationAgent<ClassificationSectionContent> {
   readonly role = "classification" as const;
-  constructor(private readonly apiKey: string, private readonly model: string) {}
+  constructor(private readonly client: LlmClient, private readonly model: string) {}
 
   async run(ctx: AgentRunContext, opts: AgentRunOptions): Promise<AgentOutput<ClassificationSectionContent>> {
     const { intake } = ctx;
     const userPrompt = `Title: ${intake.title}\nDescription:\n${intake.description}`;
-    const out = await callEvalStructured<ClassificationSectionContent>(
-      this.apiKey, this.model, SYSTEM, userPrompt, "classification", schema as unknown as Record<string,unknown>,
-    );
+    const { content: out } = await this.client.completeStructured<ClassificationSectionContent>({
+      model: this.model, systemPrompt: SYSTEM, userPrompt: userPrompt, schemaName: "classification", schema: schema as unknown as Record<string,unknown>,
+    });
     return { sectionKind: "classification", content: { ...out, confidence: Math.max(0, Math.min(1, out.confidence)) }, confidence: out.confidence, warnings: [] };
   }
 }

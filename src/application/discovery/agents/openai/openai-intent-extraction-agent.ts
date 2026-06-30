@@ -1,7 +1,6 @@
-import OpenAI from "openai";
 import type { IntentExtractionResult, IntentType } from "../../../../domain/discovery.js";
 import type { DiscoveryAgentContext, DiscoveryAgentOptions, IIntentExtractionAgent } from "../discovery-agent-contract.js";
-import { callStructured, makeClient } from "./openai-discovery-client.js";
+import type { LlmClient } from "../../../llm-client.js";
 import { orgContextBlock } from "../org-context.js";
 
 const INTENT_TYPES: IntentType[] = [
@@ -50,24 +49,16 @@ Intent types:
 Solution bias = user describes HOW to solve it rather than WHAT problem they have.`;
 
 export class OpenAIIntentExtractionAgent implements IIntentExtractionAgent {
-  private readonly client: OpenAI;
-  private readonly model: string;
-
-  constructor(apiKey: string, model: string) {
-    this.client = makeClient({ apiKey, model });
-    this.model = model;
-  }
+  constructor(private readonly client: LlmClient, private readonly model: string) {}
 
   async extractIntent(ctx: DiscoveryAgentContext, opts: DiscoveryAgentOptions): Promise<IntentExtractionResult> {
     const system = BASE_SYSTEM + orgContextBlock(opts.orgContext);
     const conversation = ctx.messages.map(m => `${m.role.toUpperCase()}: ${m.content}`).join("\n");
     const userPrompt = `Conversation:\n${conversation}\n\nClassify this request.`;
 
-    const out = await callStructured<Output>(
-      this.client, this.model,
-      system, userPrompt,
-      "intent_extraction", schema as unknown as Record<string, unknown>,
-    );
+    const { content: out } = await this.client.completeStructured<Output>({
+      model: this.model, systemPrompt: system, userPrompt: userPrompt, schemaName: "intent_extraction", schema: schema as unknown as Record<string, unknown>,
+    });
 
     return {
       intentType: out.intentType,

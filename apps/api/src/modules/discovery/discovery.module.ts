@@ -15,6 +15,8 @@ import {
   OpenAIClarificationAgent,
   OpenAIProposalComposerAgent,
 } from "../../../../../src/application/discovery/index.js";
+import { loadAnalysisProviderConfig } from "../../../../../src/application/providers/analysis-provider-config.js";
+import { createLlmClient, resolveModel } from "../../../../../src/application/providers/llm-client-factory.js";
 import { PROJECT_INTAKE_STORE } from "../../persistence/store.token.js";
 import { PrismaDiscoverySessionStore } from "../../persistence/prisma-discovery-session-store.js";
 import { PrismaService } from "../../prisma/prisma.service.js";
@@ -33,28 +35,29 @@ function buildOrchestrator(
 
   const store = sessionStore;
 
-  const apiKey = process.env["OPENAI_API_KEY"] ?? "";
-  const model = process.env["OPENAI_MODEL"] ?? "gpt-4o-mini";
-  const useOpenAI = process.env["AI_PROVIDER"] === "openai" && !!apiKey;
+  const config = loadAnalysisProviderConfig();
+  const isMock = config.provider === "mock";
+  const model = resolveModel(config);
+  const llmClient = isMock ? null : createLlmClient(config);
 
-  const intentAgent = useOpenAI
-    ? new OpenAIIntentExtractionAgent(apiKey, model)
+  const intentAgent = llmClient
+    ? new OpenAIIntentExtractionAgent(llmClient, model)
     : new MockIntentExtractionAgent();
 
-  const framingAgent = useOpenAI
-    ? new OpenAIProblemFramingAgent(apiKey, model)
+  const framingAgent = llmClient
+    ? new OpenAIProblemFramingAgent(llmClient, model)
     : new MockProblemFramingAgent();
 
-  const solutionAgent = useOpenAI
-    ? new OpenAISolutionGenerationAgent(apiKey, model)
+  const solutionAgent = llmClient
+    ? new OpenAISolutionGenerationAgent(llmClient, model)
     : new MockSolutionGenerationAgent();
 
-  const clarificationAgent = useOpenAI
-    ? new OpenAIClarificationAgent(apiKey, model)
+  const clarificationAgent = llmClient
+    ? new OpenAIClarificationAgent(llmClient, model)
     : new MockClarificationAgent();
 
-  const proposalAgent = useOpenAI
-    ? new OpenAIProposalComposerAgent(apiKey, model)
+  const proposalAgent = llmClient
+    ? new OpenAIProposalComposerAgent(llmClient, model)
     : new MockProposalComposerAgent();
 
   const manifestAgent = new MockManifestGeneratorAgent();

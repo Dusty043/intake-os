@@ -1,7 +1,6 @@
-import OpenAI from "openai";
 import type { SolutionOption } from "../../../../domain/discovery.js";
 import type { DiscoveryAgentContext, DiscoveryAgentOptions, ISolutionGenerationAgent } from "../discovery-agent-contract.js";
-import { callStructured, makeClient } from "./openai-discovery-client.js";
+import type { LlmClient } from "../../../llm-client.js";
 import { orgContextBlock } from "../org-context.js";
 
 const schema = {
@@ -52,13 +51,7 @@ Mark exactly one solution as isRecommended: true (the best fit given what's know
 Order solutions from simplest to most complex.`;
 
 export class OpenAISolutionGenerationAgent implements ISolutionGenerationAgent {
-  private readonly client: OpenAI;
-  private readonly model: string;
-
-  constructor(apiKey: string, model: string) {
-    this.client = makeClient({ apiKey, model });
-    this.model = model;
-  }
+  constructor(private readonly client: LlmClient, private readonly model: string) {}
 
   async generateSolutions(ctx: DiscoveryAgentContext, opts: DiscoveryAgentOptions): Promise<SolutionOption[]> {
     const system = BASE_SYSTEM + orgContextBlock(opts.orgContext);
@@ -66,11 +59,9 @@ export class OpenAISolutionGenerationAgent implements ISolutionGenerationAgent {
     const frame = ctx.problemFrame ? `Problem: ${ctx.problemFrame.problemStatement}` : "";
     const userPrompt = `${frame}\n\nConversation:\n${conversation}\n\nGenerate solution options.`;
 
-    const out = await callStructured<Output>(
-      this.client, this.model,
-      system, userPrompt,
-      "solution_generation", schema as unknown as Record<string, unknown>,
-    );
+    const { content: out } = await this.client.completeStructured<Output>({
+      model: this.model, systemPrompt: system, userPrompt: userPrompt, schemaName: "solution_generation", schema: schema as unknown as Record<string, unknown>,
+    });
 
     return out.solutions.map((s, i) => ({
       id: opts.idFactory("sol"),

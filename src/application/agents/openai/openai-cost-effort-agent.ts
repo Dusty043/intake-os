@@ -1,6 +1,6 @@
 import type { EvaluationAgent, AgentOutput, AgentRunContext, AgentRunOptions } from "../agent-contract.js";
 import type { CostEffortSectionContent } from "../../intake-evaluation.js";
-import { callEvalStructured } from "./openai-eval-client.js";
+import type { LlmClient } from "../../llm-client.js";
 
 const schema = {
   type: "object",
@@ -26,16 +26,16 @@ const SYSTEM = `You are a project estimation specialist using story points (Fibo
 
 export class OpenAICostEffortAgent implements EvaluationAgent<CostEffortSectionContent> {
   readonly role = "cost_effort" as const;
-  constructor(private readonly apiKey: string, private readonly model: string) {}
+  constructor(private readonly client: LlmClient, private readonly model: string) {}
 
   async run(ctx: AgentRunContext, opts: AgentRunOptions): Promise<AgentOutput<CostEffortSectionContent>> {
     const { intake } = ctx;
     const arch = ctx.sections.architecture?.content as { recommendedTechStack?: string[] } | undefined;
     const stackNote = arch?.recommendedTechStack ? `Tech stack: ${arch.recommendedTechStack.join(", ")}\n` : "";
     const userPrompt = `${stackNote}Title: ${intake.title}\nDescription:\n${intake.description}`;
-    const out = await callEvalStructured<CostEffortSectionContent>(
-      this.apiKey, this.model, SYSTEM, userPrompt, "cost_effort", schema as unknown as Record<string,unknown>,
-    );
+    const { content: out } = await this.client.completeStructured<CostEffortSectionContent>({
+      model: this.model, systemPrompt: SYSTEM, userPrompt: userPrompt, schemaName: "cost_effort", schema: schema as unknown as Record<string,unknown>,
+    });
     return { sectionKind: "cost_effort", content: { ...out, estimatedStoryPoints: Math.max(1, out.estimatedStoryPoints) }, confidence: 0.70, warnings: [] };
   }
 }

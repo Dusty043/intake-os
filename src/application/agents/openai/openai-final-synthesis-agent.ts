@@ -1,6 +1,6 @@
 import type { EvaluationAgent, AgentOutput, AgentRunContext, AgentRunOptions } from "../agent-contract.js";
 import type { SynthesisSectionContent } from "../../intake-evaluation.js";
-import { callEvalStructured } from "./openai-eval-client.js";
+import type { LlmClient } from "../../llm-client.js";
 
 const schema = {
   type: "object",
@@ -24,7 +24,7 @@ const SYSTEM = `You are a technical director synthesizing all evaluation section
 
 export class OpenAIFinalSynthesisAgent implements EvaluationAgent<SynthesisSectionContent> {
   readonly role = "synthesis" as const;
-  constructor(private readonly apiKey: string, private readonly model: string) {}
+  constructor(private readonly client: LlmClient, private readonly model: string) {}
 
   async run(ctx: AgentRunContext, opts: AgentRunOptions): Promise<AgentOutput<SynthesisSectionContent>> {
     const { intake, sections } = ctx;
@@ -32,9 +32,9 @@ export class OpenAIFinalSynthesisAgent implements EvaluationAgent<SynthesisSecti
       .map(([kind, s]) => `[${kind}]: ${JSON.stringify(s?.content).slice(0, 400)}`)
       .join("\n");
     const userPrompt = `Title: ${intake.title}\nDescription:\n${intake.description}\n\nEvaluation sections:\n${sectionSummary}`;
-    const out = await callEvalStructured<SynthesisSectionContent>(
-      this.apiKey, this.model, SYSTEM, userPrompt, "synthesis", schema as unknown as Record<string,unknown>, 2000,
-    );
+    const { content: out } = await this.client.completeStructured<SynthesisSectionContent>({
+      model: this.model, systemPrompt: SYSTEM, userPrompt: userPrompt, schemaName: "synthesis", schema: schema as unknown as Record<string,unknown>, maxTokens: 2000,
+    });
     const isBlocking = out.approvalReadinessSummary.startsWith("NOT READY");
     return { sectionKind: "synthesis", content: out, confidence: isBlocking ? 0.55 : 0.85, warnings: isBlocking ? ["Evaluation is not ready for approval."] : [] };
   }

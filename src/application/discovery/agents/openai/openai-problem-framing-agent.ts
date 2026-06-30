@@ -1,7 +1,6 @@
-import OpenAI from "openai";
 import type { DiscoveryConfidence, ProblemFrame } from "../../../../domain/discovery.js";
 import type { DiscoveryAgentContext, DiscoveryAgentOptions, IProblemFramingAgent } from "../discovery-agent-contract.js";
-import { callStructured, makeClient } from "./openai-discovery-client.js";
+import type { LlmClient } from "../../../llm-client.js";
 import { orgContextBlock } from "../org-context.js";
 
 const schema = {
@@ -58,13 +57,7 @@ Score each confidence dimension 0.0–1.0:
 Score 0.3 when information is sparse. Score 0.8+ when the information is thorough.`;
 
 export class OpenAIProblemFramingAgent implements IProblemFramingAgent {
-  private readonly client: OpenAI;
-  private readonly model: string;
-
-  constructor(apiKey: string, model: string) {
-    this.client = makeClient({ apiKey, model });
-    this.model = model;
-  }
+  constructor(private readonly client: LlmClient, private readonly model: string) {}
 
   async frameProblem(ctx: DiscoveryAgentContext, opts: DiscoveryAgentOptions): Promise<{ frame: ProblemFrame; confidence: DiscoveryConfidence }> {
     const system = BASE_SYSTEM + orgContextBlock(opts.orgContext);
@@ -72,11 +65,9 @@ export class OpenAIProblemFramingAgent implements IProblemFramingAgent {
     const intentSummary = ctx.intent ? `Intent: ${ctx.intent.intentType} — ${ctx.intent.underlyingProblem}` : "";
     const userPrompt = `${intentSummary}\n\nConversation:\n${conversation}\n\nFrame this problem.`;
 
-    const out = await callStructured<Output>(
-      this.client, this.model,
-      system, userPrompt,
-      "problem_framing", schema as unknown as Record<string, unknown>,
-    );
+    const { content: out } = await this.client.completeStructured<Output>({
+      model: this.model, systemPrompt: system, userPrompt: userPrompt, schemaName: "problem_framing", schema: schema as unknown as Record<string, unknown>,
+    });
 
     const clamp = (v: number) => Math.max(0, Math.min(1, v));
     const confidence: DiscoveryConfidence = {

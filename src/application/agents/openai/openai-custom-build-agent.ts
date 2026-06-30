@@ -1,6 +1,6 @@
 import type { EvaluationAgent, AgentOutput, AgentRunContext, AgentRunOptions } from "../agent-contract.js";
 import type { CustomBuildSectionContent } from "../../intake-evaluation.js";
-import { callEvalStructured } from "./openai-eval-client.js";
+import type { LlmClient } from "../../llm-client.js";
 
 const schema = {
   type: "object",
@@ -26,14 +26,14 @@ const SYSTEM = `You are a senior full-stack engineer. Assess whether this projec
 
 export class OpenAICustomBuildAgent implements EvaluationAgent<CustomBuildSectionContent> {
   readonly role = "custom_build" as const;
-  constructor(private readonly apiKey: string, private readonly model: string) {}
+  constructor(private readonly client: LlmClient, private readonly model: string) {}
 
   async run(ctx: AgentRunContext, opts: AgentRunOptions): Promise<AgentOutput<CustomBuildSectionContent>> {
     const { intake } = ctx;
     const userPrompt = `Title: ${intake.title}\nDescription:\n${intake.description}`;
-    const out = await callEvalStructured<CustomBuildSectionContent>(
-      this.apiKey, this.model, SYSTEM, userPrompt, "custom_build", schema as unknown as Record<string,unknown>,
-    );
+    const { content: out } = await this.client.completeStructured<CustomBuildSectionContent>({
+      model: this.model, systemPrompt: SYSTEM, userPrompt: userPrompt, schemaName: "custom_build", schema: schema as unknown as Record<string,unknown>,
+    });
     return { sectionKind: "custom_build", content: out, confidence: 0.80, warnings: [] };
   }
 }

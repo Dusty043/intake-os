@@ -1,6 +1,6 @@
 import type { EvaluationAgent, AgentOutput, AgentRunContext, AgentRunOptions } from "../agent-contract.js";
 import type { ArchitectureSectionContent } from "../../intake-evaluation.js";
-import { callEvalStructured } from "./openai-eval-client.js";
+import type { LlmClient } from "../../llm-client.js";
 
 const schema = {
   type: "object",
@@ -28,16 +28,16 @@ const SYSTEM = `You are a solutions architect. Recommend a technical approach fo
 
 export class OpenAISolutionsArchitectAgent implements EvaluationAgent<ArchitectureSectionContent> {
   readonly role = "architecture" as const;
-  constructor(private readonly apiKey: string, private readonly model: string) {}
+  constructor(private readonly client: LlmClient, private readonly model: string) {}
 
   async run(ctx: AgentRunContext, opts: AgentRunOptions): Promise<AgentOutput<ArchitectureSectionContent>> {
     const { intake } = ctx;
     const classification = ctx.projectTypeClassification;
     const classNote = classification ? `Classified as: ${classification.projectType}\n` : "";
     const userPrompt = `${classNote}Title: ${intake.title}\nDescription:\n${intake.description}`;
-    const out = await callEvalStructured<ArchitectureSectionContent>(
-      this.apiKey, this.model, SYSTEM, userPrompt, "architecture", schema as unknown as Record<string,unknown>,
-    );
+    const { content: out } = await this.client.completeStructured<ArchitectureSectionContent>({
+      model: this.model, systemPrompt: SYSTEM, userPrompt: userPrompt, schemaName: "architecture", schema: schema as unknown as Record<string,unknown>,
+    });
     return { sectionKind: "architecture", content: out, confidence: 0.75, warnings: [] };
   }
 }

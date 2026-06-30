@@ -1,9 +1,8 @@
-import OpenAI from "openai";
 import type { ProjectProposal } from "../../../../domain/discovery.js";
 import { emptyProjectProposal } from "../../../../domain/discovery.js";
 import type { DiscoveryAgentOptions, IProposalComposerAgent } from "../discovery-agent-contract.js";
 import type { DiscoverySession } from "../../../../domain/discovery.js";
-import { callStructured, makeClient } from "./openai-discovery-client.js";
+import type { LlmClient } from "../../../llm-client.js";
 import { orgContextBlock } from "../org-context.js";
 
 const schema = {
@@ -64,13 +63,7 @@ Guidelines:
 - Story points: use only values 1, 2, 3, 5, 8, 13 (Fibonacci scale) — never other values`;
 
 export class OpenAIProposalComposerAgent implements IProposalComposerAgent {
-  private readonly client: OpenAI;
-  private readonly model: string;
-
-  constructor(apiKey: string, model: string) {
-    this.client = makeClient({ apiKey, model });
-    this.model = model;
-  }
+  constructor(private readonly client: LlmClient, private readonly model: string) {}
 
   async composeProposal(session: DiscoverySession, opts: DiscoveryAgentOptions): Promise<ProjectProposal> {
     const conversation = session.messages.map(m => `${m.role.toUpperCase()}: ${m.content}`).join("\n");
@@ -97,12 +90,9 @@ export class OpenAIProposalComposerAgent implements IProposalComposerAgent {
     const userPrompt = `${frameBlock}${solutionBlock}${clarBlock}\nFull conversation:\n${conversation}\n\nCompose the project proposal.`;
 
     const system = BASE_SYSTEM + orgContextBlock(opts.orgContext);
-    const out = await callStructured<Output>(
-      this.client, this.model,
-      system, userPrompt,
-      "proposal_composition", schema as unknown as Record<string, unknown>,
-      3000,
-    );
+    const { content: out } = await this.client.completeStructured<Output>({
+      model: this.model, systemPrompt: system, userPrompt: userPrompt, schemaName: "proposal_composition", schema: schema as unknown as Record<string, unknown>, maxTokens: 3000,
+    });
 
     const now = opts.now;
     const proposal = emptyProjectProposal(opts.idFactory("proposal"), session.id, now);

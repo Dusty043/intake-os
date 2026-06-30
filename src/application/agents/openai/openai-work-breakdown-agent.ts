@@ -1,6 +1,6 @@
 import type { EvaluationAgent, AgentOutput, AgentRunContext, AgentRunOptions } from "../agent-contract.js";
 import type { WorkBreakdownSectionContent } from "../../intake-evaluation.js";
-import { callEvalStructured } from "./openai-eval-client.js";
+import type { LlmClient } from "../../llm-client.js";
 
 const schema = {
   type: "object",
@@ -35,16 +35,16 @@ const SYSTEM = `You are a technical project manager. Break this project into con
 
 export class OpenAIWorkBreakdownAgent implements EvaluationAgent<WorkBreakdownSectionContent> {
   readonly role = "work_breakdown" as const;
-  constructor(private readonly apiKey: string, private readonly model: string) {}
+  constructor(private readonly client: LlmClient, private readonly model: string) {}
 
   async run(ctx: AgentRunContext, opts: AgentRunOptions): Promise<AgentOutput<WorkBreakdownSectionContent>> {
     const { intake } = ctx;
     const arch = ctx.sections.architecture?.content as { recommendedTechStack?: string[] } | undefined;
     const stackNote = arch?.recommendedTechStack ? `Tech stack: ${arch.recommendedTechStack.join(", ")}\n` : "";
     const userPrompt = `${stackNote}Title: ${intake.title}\nDescription:\n${intake.description}`;
-    const out = await callEvalStructured<WorkBreakdownSectionContent>(
-      this.apiKey, this.model, SYSTEM, userPrompt, "work_breakdown", schema as unknown as Record<string,unknown>, 3000,
-    );
+    const { content: out } = await this.client.completeStructured<WorkBreakdownSectionContent>({
+      model: this.model, systemPrompt: SYSTEM, userPrompt: userPrompt, schemaName: "work_breakdown", schema: schema as unknown as Record<string,unknown>, maxTokens: 3000,
+    });
     return { sectionKind: "work_breakdown", content: out, confidence: 0.75, warnings: [] };
   }
 }

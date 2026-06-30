@@ -1,6 +1,6 @@
 import type { EvaluationAgent, AgentOutput, AgentRunContext, AgentRunOptions } from "../agent-contract.js";
 import type { RiskSecuritySectionContent } from "../../intake-evaluation.js";
-import { callEvalStructured } from "./openai-eval-client.js";
+import type { LlmClient } from "../../llm-client.js";
 
 const schema = {
   type: "object",
@@ -35,14 +35,14 @@ const SYSTEM = `You are a security and risk analyst. Identify risks for this pro
 
 export class OpenAIRiskSecurityAgent implements EvaluationAgent<RiskSecuritySectionContent> {
   readonly role = "risk_security" as const;
-  constructor(private readonly apiKey: string, private readonly model: string) {}
+  constructor(private readonly client: LlmClient, private readonly model: string) {}
 
   async run(ctx: AgentRunContext, opts: AgentRunOptions): Promise<AgentOutput<RiskSecuritySectionContent>> {
     const { intake } = ctx;
     const userPrompt = `Title: ${intake.title}\nDescription:\n${intake.description}`;
-    const out = await callEvalStructured<RiskSecuritySectionContent>(
-      this.apiKey, this.model, SYSTEM, userPrompt, "risk_security", schema as unknown as Record<string,unknown>,
-    );
+    const { content: out } = await this.client.completeStructured<RiskSecuritySectionContent>({
+      model: this.model, systemPrompt: SYSTEM, userPrompt: userPrompt, schemaName: "risk_security", schema: schema as unknown as Record<string,unknown>,
+    });
     const warnings = out.securityReviewRequired ? ["Security review required before distribution approval."] : [];
     return { sectionKind: "risk_security", content: out, confidence: 0.82, warnings };
   }

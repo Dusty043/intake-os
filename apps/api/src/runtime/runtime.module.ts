@@ -5,9 +5,10 @@ import type { JobStatusStore } from "../../../../src/application/job-status-stor
 import { EvaluationOrchestrator } from "../../../../src/application/evaluation-orchestrator.js";
 import { IntakeWorkflowService } from "../../../../src/application/intake-workflow-service.js";
 import { createAllMockEvaluationAgents } from "../../../../src/application/agents/mock/index.js";
-import { createAllOpenAIEvaluationAgents } from "../../../../src/application/agents/openai/index.js";
+import { createAllEvaluationAgents } from "../../../../src/application/agents/openai/index.js";
 import { loadAnalysisProviderConfig } from "../../../../src/application/providers/analysis-provider-config.js";
 import { AnalysisProviderRouter } from "../../../../src/application/providers/analysis-provider-router.js";
+import { createLlmClient, resolveModel } from "../../../../src/application/providers/llm-client-factory.js";
 import { ProvisioningRegistry } from "../../../../src/application/provisioning/provisioning-executor.js";
 import { createMockRegistry } from "../../../../src/application/provisioning/mock-executor.js";
 import type { MockExecutorMode } from "../../../../src/application/provisioning/mock-executor.js";
@@ -96,19 +97,15 @@ const logger = new Logger("RuntimeModule");
         const idFactory = (prefix: string) =>
           `${prefix}-${Date.now().toString(36).toUpperCase()}-${String(++_seq).padStart(6, "0")}`;
 
-        const apiKey = process.env["OPENAI_API_KEY"] ?? "";
-        const model = process.env["OPENAI_TASKS_MODEL"] ?? process.env["OPENAI_MODEL"] ?? "gpt-4o-mini";
-        const useOpenAI = process.env["AI_PROVIDER"] === "openai" && !!apiKey;
+        const config = loadAnalysisProviderConfig();
+        const isMock = config.provider === "mock";
+        const model = resolveModel(config);
 
-        const agents = useOpenAI
-          ? createAllOpenAIEvaluationAgents(apiKey, model)
-          : createAllMockEvaluationAgents();
+        const agents = isMock
+          ? createAllMockEvaluationAgents()
+          : createAllEvaluationAgents(createLlmClient(config), model);
 
-        if (useOpenAI) {
-          logger.log(`Evaluation orchestrator: openai (${model})`);
-        } else {
-          logger.log("Evaluation orchestrator: mock agents");
-        }
+        logger.log(`Evaluation orchestrator: ${isMock ? "mock agents" : `${config.provider} (${model})`}`);
 
         return new EvaluationOrchestrator({
           agents,
