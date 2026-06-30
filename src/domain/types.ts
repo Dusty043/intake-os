@@ -70,6 +70,7 @@ export interface ApprovalRecord {
   status: ApprovalStatus;
   actorId: string;
   actorRole: UserRole;
+  actorName?: string;
   completedAt: string;
   locked: true;
   reason?: string;

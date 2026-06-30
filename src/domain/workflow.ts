@@ -195,6 +195,7 @@ function createApprovalRecord(
     status: "approved",
     actorId: actor.id,
     actorRole: actor.role,
+    actorName: actor.displayName ?? actor.id,
     completedAt,
     locked: true,
   };
