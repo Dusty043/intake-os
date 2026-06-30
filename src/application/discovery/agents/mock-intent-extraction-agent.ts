@@ -67,10 +67,12 @@ export class MockIntentExtractionAgent implements IIntentExtractionAgent {
     ctx: DiscoveryAgentContext,
     _opts: DiscoveryAgentOptions,
   ): Promise<IntentExtractionResult> {
-    const rawText = ctx.messages
-      .filter((m) => m.role === "user")
-      .map((m) => m.content)
-      .join(" ");
+    const userMessages = ctx.messages.filter((m) => m.role === "user");
+    // Only use substantive messages (>15 chars) so short conversational turns
+    // ("yes", "exactly", "ok let's go") don't pollute the extracted problem.
+    const substantiveMessages = userMessages.filter((m) => m.content.trim().length > 15);
+    const sourceMessages = substantiveMessages.length > 0 ? substantiveMessages : userMessages;
+    const rawText = sourceMessages.map((m) => m.content).join(" ");
 
     const text = normalize(rawText);
     const intentType = detectIntent(text);

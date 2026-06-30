@@ -117,8 +117,9 @@ export class MockProblemFramingAgent implements IProblemFramingAgent {
     ctx: DiscoveryAgentContext,
     _opts: DiscoveryAgentOptions,
   ): Promise<{ frame: ProblemFrame; confidence: DiscoveryConfidence }> {
-    const rawText = ctx.messages
-      .filter((m) => m.role === "user")
+    const userMessages = ctx.messages.filter((m) => m.role === "user");
+    const substantiveMessages = userMessages.filter((m) => m.content.trim().length > 15);
+    const rawText = (substantiveMessages.length > 0 ? substantiveMessages : userMessages)
       .map((m) => m.content)
       .join(" ");
 
