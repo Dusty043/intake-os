@@ -784,8 +784,8 @@ function ApprovalsTab({
 
   const s = intake.status;
   const hasPkg = !!intake.reviewedProjectPackage;
-  const gate1 = (intake.approvals as { gate_1?: { status?: string; actorName?: string; completedAt?: string; comment?: string } } | undefined)?.gate_1;
-  const gate2 = (intake.approvals as { gate_2?: { status?: string; actorName?: string; completedAt?: string; comment?: string } } | undefined)?.gate_2;
+  const gate1 = (intake.approvals as { gate_1?: { status?: string; actorId?: string; actorName?: string; completedAt?: string; comment?: string } } | undefined)?.gate_1;
+  const gate2 = (intake.approvals as { gate_2?: { status?: string; actorId?: string; actorName?: string; completedAt?: string; comment?: string } } | undefined)?.gate_2;
   const gate1Done = gate1?.status === "approved" || ["devops_review", "approved", "provisioning", "distributed"].includes(s);
   const gate2Done = gate2?.status === "approved" || ["approved", "provisioning", "distributed"].includes(s);
 
@@ -807,7 +807,7 @@ function ApprovalsTab({
         </div>
         {gate1 && (
           <dl className="grid grid-cols-2 gap-2 text-sm mb-3">
-            <KV label="Approved By" value={gate1.actorName} />
+            <KV label="Approved By" value={gate1.actorName ?? gate1.actorId} />
             <KV label="Approved At" value={formatDate(gate1.completedAt)} />
             {gate1.comment && <KV label="Comment" value={gate1.comment} />}
           </dl>
@@ -856,7 +856,7 @@ function ApprovalsTab({
         </div>
         {gate2 && (
           <dl className="grid grid-cols-2 gap-2 text-sm mb-3">
-            <KV label="Approved By" value={gate2.actorName} />
+            <KV label="Approved By" value={gate2.actorName ?? gate2.actorId} />
             <KV label="Approved At" value={formatDate(gate2.completedAt)} />
             {gate2.comment && <KV label="Comment" value={gate2.comment} />}
           </dl>
