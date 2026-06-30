@@ -27,6 +27,7 @@ async function bootstrap(): Promise<void> {
   app.enableCors({
     origin: webOrigins,
     credentials: true,
+    allowedHeaders: ["Content-Type", "Authorization", "x-actor-id", "x-actor-role", "x-actor-name"],
   });
 
   app.use(cookieParser());
