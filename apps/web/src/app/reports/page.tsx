@@ -181,7 +181,7 @@ export default function ReportsPage() {
                       <th className="px-4 py-3 text-left">Title</th>
                       <th className="px-4 py-3 text-left">Type</th>
                       <th className="px-4 py-3 text-left">Status</th>
-                      <th className="px-4 py-3 text-left">Submitted</th>
+                      <th className="px-4 py-3 text-left">Created</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-brand-border">
@@ -201,8 +201,8 @@ export default function ReportsPage() {
                           </span>
                         </td>
                         <td className="px-4 py-3 text-brand-muted text-xs">
-                          {typeof intake.submittedAt === "string"
-                            ? new Date(intake.submittedAt).toLocaleDateString()
+                          {typeof intake.createdAt === "string"
+                            ? new Date(intake.createdAt).toLocaleDateString()
                             : "—"}
                         </td>
                       </tr>
