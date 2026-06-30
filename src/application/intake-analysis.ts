@@ -282,7 +282,6 @@ function buildBrief(input: {
       "Confirm functional requirements and success criteria.",
       "Produce implementation-ready task breakdown with story point estimates.",
       "Identify infrastructure and downstream provisioning requirements.",
-      ...(input.guidance ? [`Steering guidance applied: ${summarize(input.guidance, 200)}`] : []),
     ],
     deliverables: [
       "Reviewed project brief",
@@ -298,6 +297,7 @@ function buildBrief(input: {
       "The submitted inquiry is the primary source of truth until a reviewer edits the draft.",
       "Generated tasks and estimates require human approval before execution.",
       ...(input.reviewerContext ? [`Reviewer context: ${summarize(input.reviewerContext, 160)}`] : []),
+      ...(input.guidance ? [`Steering guidance applied: ${summarize(input.guidance, 200)}`] : []),
     ],
     complianceNotes: input.missingInformation.includes("data sensitivity")
       ? ["Data sensitivity is not confirmed. Treat the intake as review-required before external AI or provisioning use."]
