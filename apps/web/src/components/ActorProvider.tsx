@@ -4,7 +4,6 @@ import {
   createContext,
   useCallback,
   useContext,
-  useEffect,
   useState,
 } from "react";
 import { ACTOR_STORAGE_KEY, ACTORS, DEFAULT_ACTOR } from "@/lib/actors";
@@ -21,20 +20,22 @@ const ActorContext = createContext<ActorContextValue>({
 });
 
 export function ActorProvider({ children }: { children: React.ReactNode }) {
-  const [actor, setActorState] = useState<UiActor>(DEFAULT_ACTOR);
-
-  useEffect(() => {
+  const [actor, setActorState] = useState<UiActor>(() => {
+    // Synchronous read so children see the correct actor on first render.
+    // Guard for SSR — localStorage is unavailable on the server.
+    if (typeof window === "undefined") return DEFAULT_ACTOR;
     try {
       const raw = localStorage.getItem(ACTOR_STORAGE_KEY);
       if (raw) {
         const parsed = JSON.parse(raw) as UiActor;
         const valid = ACTORS.find((a) => a.id === parsed.id);
-        if (valid) setActorState(valid);
+        if (valid) return valid;
       }
     } catch {
       // keep default
     }
-  }, []);
+    return DEFAULT_ACTOR;
+  });
 
   const setActor = useCallback((a: UiActor) => {
     setActorState(a);
