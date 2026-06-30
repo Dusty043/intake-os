@@ -460,7 +460,19 @@ export class DiscoveryOrchestrator {
       (rawTier === "rough_frame" || rawTier === "keep_discovering") &&
       lastUserMsg !== undefined &&
       PROCEED_RE.test(lastUserMsg.content);
-    const tier = userWantsToProceed ? "propose_with_assumptions" : rawTier;
+
+    // After 2+ substantive user messages, never stay in keep_discovering — advance
+    // to rough_frame so the response shows targeted unknowns rather than repeating
+    // the same generic opening question indefinitely.
+    const substantiveUserMsgs = session.messages.filter(
+      (m) => m.role === "user" && m.content.trim().length > 15,
+    );
+    const tieredUp =
+      rawTier === "keep_discovering" && substantiveUserMsgs.length >= 2
+        ? "rough_frame"
+        : rawTier;
+
+    const tier = userWantsToProceed ? "propose_with_assumptions" : tieredUp;
     const nextStatus = this.resolveStatus(session.status, tier);
 
     const newEvents: DiscoveryTimelineEvent[] = [];
