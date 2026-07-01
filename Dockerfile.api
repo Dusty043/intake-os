@@ -37,6 +37,8 @@ COPY --from=build /app/scripts ./scripts
 
 EXPOSE 3000
 
-# Push schema to database then start the compiled API.
-# Uses db push because no migration files exist — this project uses schema-first dev flow.
-CMD ["sh", "-c", "npx prisma db push --schema apps/api/prisma/schema.prisma && node dist/apps/api/src/main.js"]
+# Apply tracked migrations (apps/api/prisma/migrations/), then start the compiled API.
+# `migrate deploy` only applies migrations already committed to the repo — it never generates
+# or edits one, so it's safe to run unattended on every container start. Generate new migrations
+# locally with `npm run prisma:migrate` and commit the result before this ever sees them.
+CMD ["sh", "-c", "npm run prisma:migrate:deploy && node dist/apps/api/src/main.js"]

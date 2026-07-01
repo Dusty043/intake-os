@@ -12,10 +12,11 @@ coverage/
 # Server runtime — never commit
 .env.server
 
-# Postgres backups
-backups/
-*.sql
-*.dump
+# Postgres backups (scoped to the backups/ dir — an unanchored `*.sql` here was also
+# swallowing every Prisma migration.sql file under apps/api/prisma/migrations/, so none of
+# them were ever actually tracked in git; found and fixed in TASK-0040)
+backups/*.sql
+backups/*.dump
 
 # Next.js build output
 apps/web/.next/

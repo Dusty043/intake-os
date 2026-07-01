@@ -24,6 +24,7 @@ import type {
 import { proposalToIntakeRecord } from "./proposal-to-intake-adapter.js";
 import { loadModelCostConfig } from "../providers/model-cost-registry.js";
 import { estimateCost } from "../providers/token-cost.js";
+import { NotFoundError, ValidationError } from "../errors.js";
 
 // ─── Public input/output types ────────────────────────────────────────────────
 
@@ -134,7 +135,7 @@ export class DiscoveryOrchestrator {
   async addMessage(input: AddMessageInput): Promise<DiscoverySession> {
     const now = this.nowFn();
     const session = await this.store.getById(input.sessionId);
-    if (!session) throw new Error(`DiscoverySession not found: ${input.sessionId}`);
+    if (!session) throw new NotFoundError("DiscoverySession", input.sessionId);
 
     const newMessage: ConversationMessage = {
       id: this.idFactory("msg"),
@@ -155,7 +156,7 @@ export class DiscoveryOrchestrator {
 
   async getSession(sessionId: string) {
     const session = await this.store.getById(sessionId);
-    if (!session) throw new Error(`DiscoverySession not found: ${sessionId}`);
+    if (!session) throw new NotFoundError("DiscoverySession", sessionId);
     return session;
   }
 
@@ -171,7 +172,7 @@ export class DiscoveryOrchestrator {
       this.store.getById(sessionId),
       this.getOrgContext(),
     ]);
-    if (!session) throw new Error(`DiscoverySession not found: ${sessionId}`);
+    if (!session) throw new NotFoundError("DiscoverySession", sessionId);
 
     const { opts: agentOpts, events: usageEvents } = this.trackUsage({
       provider: this.provider,
@@ -210,10 +211,10 @@ export class DiscoveryOrchestrator {
   async answerClarification(input: AnswerClarificationInput): Promise<DiscoverySession> {
     const now = this.nowFn();
     const session = await this.store.getById(input.sessionId);
-    if (!session) throw new Error(`DiscoverySession not found: ${input.sessionId}`);
+    if (!session) throw new NotFoundError("DiscoverySession", input.sessionId);
 
     const question = session.clarificationQuestions.find((q) => q.id === input.questionId);
-    if (!question) throw new Error(`ClarificationQuestion not found: ${input.questionId}`);
+    if (!question) throw new NotFoundError("ClarificationQuestion", input.questionId);
 
     // Mark the question answered
     const updatedQuestions = session.clarificationQuestions.map((q) =>
@@ -284,7 +285,7 @@ export class DiscoveryOrchestrator {
   async skipClarifications(sessionId: string): Promise<DiscoverySession> {
     const now = this.nowFn();
     const session = await this.store.getById(sessionId);
-    if (!session) throw new Error(`DiscoverySession not found: ${sessionId}`);
+    if (!session) throw new NotFoundError("DiscoverySession", sessionId);
 
     const pending = session.clarificationQuestions.filter((q) => !q.answered);
     if (pending.length === 0) return session;
@@ -306,10 +307,10 @@ export class DiscoveryOrchestrator {
   async selectDirection(input: SelectDirectionInput): Promise<DiscoverySession> {
     const now = this.nowFn();
     const session = await this.store.getById(input.sessionId);
-    if (!session) throw new Error(`DiscoverySession not found: ${input.sessionId}`);
+    if (!session) throw new NotFoundError("DiscoverySession", input.sessionId);
 
     const solution = session.solutionOptions.find((s) => s.id === input.solutionId);
-    if (!solution) throw new Error(`SolutionOption not found: ${input.solutionId}`);
+    if (!solution) throw new NotFoundError("SolutionOption", input.solutionId);
 
     const nextStatus = this.resolveStatus(session.status, "direction_selected");
     const newEvents: DiscoveryTimelineEvent[] = [];
@@ -328,9 +329,9 @@ export class DiscoveryOrchestrator {
   async composeProposal(sessionId: string): Promise<DiscoverySession> {
     const now = this.nowFn();
     const session = await this.store.getById(sessionId);
-    if (!session) throw new Error(`DiscoverySession not found: ${sessionId}`);
+    if (!session) throw new NotFoundError("DiscoverySession", sessionId);
     if (!session.selectedSolutionId) {
-      throw new Error(`No solution selected for session: ${sessionId} — call selectDirection first`);
+      throw new ValidationError(`No solution selected for session: ${sessionId} — call selectDirection first`);
     }
 
     const orgContext = await this.getOrgContext();
@@ -364,9 +365,9 @@ export class DiscoveryOrchestrator {
     const now = this.nowFn();
 
     let session = await this.store.getById(sessionId);
-    if (!session) throw new Error(`DiscoverySession not found: ${sessionId}`);
+    if (!session) throw new NotFoundError("DiscoverySession", sessionId);
     if (!session.selectedSolutionId) {
-      throw new Error(`No solution selected for session: ${sessionId} — call selectDirection first`);
+      throw new ValidationError(`No solution selected for session: ${sessionId} — call selectDirection first`);
     }
 
     // Compose proposal if not yet done
@@ -408,9 +409,9 @@ export class DiscoveryOrchestrator {
     const now = this.nowFn();
 
     let session = await this.store.getById(sessionId);
-    if (!session) throw new Error(`DiscoverySession not found: ${sessionId}`);
+    if (!session) throw new NotFoundError("DiscoverySession", sessionId);
     if (!session.selectedSolutionId) {
-      throw new Error(`No solution selected for session: ${sessionId} — call selectDirection first`);
+      throw new ValidationError(`No solution selected for session: ${sessionId} — call selectDirection first`);
     }
 
     // Auto-compose proposal if not yet done

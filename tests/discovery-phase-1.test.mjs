@@ -21,6 +21,7 @@ import {
   DiscoveryController,
   MockIntentExtractionAgent,
   MockProblemFramingAgent,
+  NotFoundError,
 } from "../dist/src/index.js";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -325,6 +326,16 @@ describe("DiscoveryOrchestrator.getSession", () => {
   test("throws for unknown id", async () => {
     const { orchestrator } = makeOrchestrator();
     await assert.rejects(() => orchestrator.getSession("nope"), /not found/i);
+  });
+
+  // TASK-0040: not-found cases now throw the application's NotFoundError (mapped to a
+  // clean 404 by the API's exception filter) instead of a raw Error (generic 500).
+  test("throws NotFoundError, not a generic Error, for unknown id", async () => {
+    const { orchestrator } = makeOrchestrator();
+    await assert.rejects(() => orchestrator.getSession("nope"), (err) => {
+      assert.ok(err instanceof NotFoundError, `expected NotFoundError, got ${err.constructor.name}`);
+      return true;
+    });
   });
 });
 

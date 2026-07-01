@@ -40,6 +40,12 @@ export function validateAuthConfig(): AuthConfig {
     );
   }
 
+  if (raw === "google" && !process.env.AUTH_GOOGLE_CLIENT_SECRET) {
+    throw new Error(
+      "[Auth] AUTH_MODE=google requires AUTH_GOOGLE_CLIENT_SECRET to be set.",
+    );
+  }
+
   if (raw === "google" && !process.env.AUTH_SESSION_COOKIE_NAME) {
     throw new Error(
       "[Auth] AUTH_MODE=google requires AUTH_SESSION_COOKIE_NAME to be set. " +

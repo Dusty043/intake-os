@@ -1,4 +1,5 @@
 import type { DiscoveryAgentUsageRecord, DiscoverySession } from "../../domain/discovery.js";
+import { NotFoundError } from "../errors.js";
 
 // ─── Interface ────────────────────────────────────────────────────────────────
 
@@ -34,7 +35,7 @@ export class InMemoryDiscoverySessionStore implements IDiscoverySessionStore {
 
   async update(id: string, patch: Partial<DiscoverySession>): Promise<DiscoverySession> {
     const existing = this.sessions.get(id);
-    if (!existing) throw new Error(`DiscoverySession not found: ${id}`);
+    if (!existing) throw new NotFoundError("DiscoverySession", id);
     const updated: DiscoverySession = { ...existing, ...patch };
     this.sessions.set(id, updated);
     return updated;
