@@ -111,7 +111,7 @@ Checks: web through proxy, API liveness, DB readiness, OpenAPI (non-fatal if dis
 |----------|---------|-------|
 | `NODE_ENV` | `production` | |
 | `API_HOST` | `0.0.0.0` | |
-| `API_PORT` | `3000` | Internal only |
+| `PORT` | `3000` | Internal only — `apps/api/src/main.ts` reads `PORT`, not `API_PORT` |
 | `WEB_PORT` | `3001` | Internal only — never publish to host |
 | `PROXY_PORT` | `8080` | Host-bound to 127.0.0.1 |
 | `NEXT_PUBLIC_API_BASE_URL` | `/api` | Baked into web build — rebuild if changed |

@@ -1,22 +1,25 @@
 # External Needs — Project Intake OS
 
-Pre-production activation brief. Everything the OS needs from outside the codebase,
-ordered by effort. The first item takes two minutes and the code is already waiting.
+Pre-production activation brief. Items 1–3 are **credential-only activation** — the code exists
+and is just waiting for a value. Items 4–7 are **not implemented in code yet** — only a spec
+and (for provisioning) a mock executor exist; getting the credential does not activate anything
+until the corresponding adapter/route is actually built. Item 8 is blocked on an unverified
+upstream contract, not credentials.
 
 ---
 
 ## Summary
 
-| # | Integration | Effort | Status |
-|---|-------------|--------|--------|
-| 1 | [Google Chat Notifications](#1-google-chat-notifications) | 2 min | Blocked on webhook URL |
-| 2 | [AI Provider](#2-ai-provider) | 5 min | Blocked on API key + provider choice |
-| 3 | [Google Sign-In (OAuth)](#3-google-sign-in-oauth-20) | 15 min | Blocked on GCP credentials |
-| 4 | [GitHub Provisioning](#4-github-provisioning) | 15 min | Blocked on PAT + org decisions |
-| 5 | [Monday Provisioning](#5-monday-provisioning) | 30–45 min | Blocked on API token + board schema |
-| 6 | [Email Intake](#6-email-intake) | 30 min + DNS | Blocked on service choice |
-| 7 | [Google Chat Slash Command](#7-google-chat-slash-command) | 90 min + admin | Blocked on GCP project + Workspace admin |
-| 8 | [Roster API](#8-roster-api) | unknown | Blocked on contract verification |
+| # | Integration | Code status | Effort once unblocked | Status |
+|---|-------------|-------------|------------------------|--------|
+| 1 | [Google Chat Notifications](#1-google-chat-notifications) | Built | 2 min | Blocked on webhook URL |
+| 2 | [AI Provider](#2-ai-provider) | Built | 5 min | Blocked on API key + provider choice |
+| 3 | [Google Sign-In (OAuth)](#3-google-sign-in-oauth-20) | Built | 15 min | Blocked on GCP credentials |
+| 4 | [GitHub Provisioning](#4-github-provisioning) | **Spec-ready, not implemented** | code + 15 min creds | Needs a live executor built first, then PAT + org decisions |
+| 5 | [Monday Provisioning](#5-monday-provisioning) | **Spec-ready, not implemented** | code + 30–45 min creds | Needs a live executor built first, then API token + board schema |
+| 6 | [Email Intake](#6-email-intake) | **Spec-ready, not implemented** | code + 30 min + DNS | Needs the `/intake-sources/email` route built first, then service choice |
+| 7 | [Google Chat Slash Command](#7-google-chat-slash-command) | **Spec-ready, not implemented** | code + 90 min + admin | Needs the `/intake-sources/chat` route built first, then GCP project + Workspace admin |
+| 8 | [Roster API](#8-roster-api) | Built (client + scorer) | unknown | Blocked on contract verification |
 
 ---
 
@@ -116,10 +119,13 @@ The full implementation is live (built in TASK-0027/TASK-0033). The server curre
 
 ## 4. GitHub Provisioning
 
-Creates repos with generated names, README built from the distribution package, standard labels,
-and optional subtask issues. Idempotent — retries won't duplicate repos.
+**Not implemented in code.** No `GitHubProvisioningExecutor` exists — only mock executors and a
+spec (`docs/ai/tasks/TASK-0023E-github-adapter.md`) describing what a real one should do: create
+repos with generated names, a README built from the distribution package, standard labels, and
+optional subtask issues, idempotently. Providing these credentials does not activate anything by
+itself; the executor has to be built and registered first.
 
-**Credentials needed**
+**Credentials needed once the executor is built**
 
 | Env var | Source | Notes |
 |---------|--------|-------|
@@ -148,10 +154,13 @@ and optional subtask issues. Idempotent — retries won't duplicate repos.
 
 ## 5. Monday Provisioning
 
-Creates a Monday item for each approved distribution. Needs board inspection to map column IDs
-before the executor can register. Idempotent — retries use a stable `Idempotency-Key`.
+**Not implemented in code.** No `MondayProvisioningExecutor` exists — only mock executors and a
+spec (`docs/ai/tasks/TASK-0023D-monday-adapter.md`) describing what a real one should do: create
+a Monday item for each approved distribution, idempotently. Providing these credentials does not
+activate anything by itself; the executor has to be built and registered first, and board
+inspection (below) is needed either way to map column IDs.
 
-**Credentials needed**
+**Credentials needed once the executor is built**
 
 | Env var | Source | Notes |
 |---------|--------|-------|
@@ -192,10 +201,13 @@ before the executor can register. Idempotent — retries use a stable `Idempoten
 
 ## 6. Email Intake
 
-Someone emails a request → OS creates a draft intake automatically. An intake owner reviews
-and promotes it — email intakes do not auto-submit.
+**Not implemented in code.** No `/intake-sources/email` route exists — only a spec
+(`docs/ai/tasks/TASK-0025-email-intake.md`) describing the intended behavior: someone emails a
+request, the OS creates a draft intake automatically, and an intake owner reviews and promotes
+it (email intakes would not auto-submit). The route needs to be built before any of the service
+choices below matter.
 
-Pick one inbound email service. All four are supported.
+Pick one inbound email service once the route exists. All four are supported by the spec.
 
 | Service | Notes |
 |---------|-------|
@@ -224,8 +236,10 @@ Pick one inbound email service. All four are supported.
 
 ## 7. Google Chat Slash Command
 
-Type `/intake` in any Chat space → fill a dialog → creates a draft.
-Requires a Google Cloud project and a Workspace admin for domain-wide install.
+**Not implemented in code.** No `/intake-sources/chat` route exists — only a spec
+(`docs/ai/tasks/TASK-0026-google-chat-intake.md`) describing the intended behavior: type
+`/intake` in any Chat space, fill a dialog, create a draft. The route needs to be built first;
+a Google Cloud project and a Workspace admin for domain-wide install are needed either way.
 
 **Credentials needed**
 

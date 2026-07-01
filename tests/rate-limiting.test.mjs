@@ -162,3 +162,40 @@ describe("loadRateLimitConfig — env-var overrides", () => {
     assert.equal(cfg.aiEvaluation.limit, 1);
   });
 });
+
+// ---------------------------------------------------------------------------
+// TASK-0040: invalid values fall back to the default instead of reaching
+// ThrottlerModule as NaN/0/negative
+// ---------------------------------------------------------------------------
+
+describe("loadRateLimitConfig — invalid values fall back to defaults", () => {
+  afterEach(() => {
+    delete process.env.RATE_LIMIT_GLOBAL_LIMIT;
+    delete process.env.RATE_LIMIT_GLOBAL_TTL;
+    delete process.env.RATE_LIMIT_AI_LIMIT;
+  });
+
+  test("non-numeric value falls back to default", () => {
+    process.env.RATE_LIMIT_GLOBAL_LIMIT = "not-a-number";
+    const cfg = loadRateLimitConfig();
+    assert.equal(cfg.global.limit, 60);
+  });
+
+  test("zero falls back to default", () => {
+    process.env.RATE_LIMIT_GLOBAL_TTL = "0";
+    const cfg = loadRateLimitConfig();
+    assert.equal(cfg.global.ttl, 60);
+  });
+
+  test("negative value falls back to default", () => {
+    process.env.RATE_LIMIT_AI_LIMIT = "-5";
+    const cfg = loadRateLimitConfig();
+    assert.equal(cfg.aiEvaluation.limit, 5);
+  });
+
+  test("empty string is treated as unset (falls back to default, not NaN)", () => {
+    process.env.RATE_LIMIT_GLOBAL_LIMIT = "";
+    const cfg = loadRateLimitConfig();
+    assert.equal(cfg.global.limit, 60);
+  });
+});

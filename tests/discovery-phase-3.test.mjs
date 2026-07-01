@@ -18,6 +18,7 @@ import {
   proposalToIntakeRecord,
   emptyConfidence,
   emptyProjectProposal,
+  ValidationError,
 } from "../dist/src/index.js";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -353,6 +354,20 @@ describe("DiscoveryOrchestrator.composeProposal", () => {
       () => orchestrator.composeProposal(session.id),
       /no solution selected/i,
     );
+  });
+
+  // TASK-0040: invalid-state cases now throw the application's ValidationError (mapped to a
+  // clean 400 by the API's exception filter) instead of a raw Error (generic 500).
+  test("throws ValidationError, not a generic Error, when no solution is selected", async () => {
+    const { orchestrator } = makeOrchestrator();
+    const session = await orchestrator.startDiscovery({
+      userId: "u1",
+      rawMessage: "Something is slow.",
+    });
+    await assert.rejects(() => orchestrator.composeProposal(session.id), (err) => {
+      assert.ok(err instanceof ValidationError, `expected ValidationError, got ${err.constructor.name}`);
+      return true;
+    });
   });
 
   test("throws for unknown session id", async () => {

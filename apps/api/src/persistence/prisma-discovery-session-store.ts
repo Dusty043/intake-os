@@ -4,6 +4,7 @@ import type { DiscoveryAgentUsageRecord, DiscoverySession } from "../../../../sr
 import type { DiscoveryUsageFilters, IDiscoverySessionStore } from "../../../../src/application/discovery/discovery-session-store.js";
 import { flattenDiscoveryUsage } from "../../../../src/application/discovery/discovery-session-store.js";
 import { PrismaService } from "../prisma/prisma.service.js";
+import { NotFoundError } from "../../../../src/application/errors.js";
 
 function toJson(value: unknown): Prisma.InputJsonValue {
   return JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue;
@@ -44,7 +45,7 @@ export class PrismaDiscoverySessionStore implements IDiscoverySessionStore {
       where: { id },
       select: { snapshot: true },
     });
-    if (!row) throw new Error(`DiscoverySession not found: ${id}`);
+    if (!row) throw new NotFoundError("DiscoverySession", id);
 
     const existing = fromJson<DiscoverySession>(row.snapshot);
     const updated: DiscoverySession = { ...existing, ...patch };
