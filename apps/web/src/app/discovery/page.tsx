@@ -9,15 +9,9 @@ import { DiscoveryStartModal } from "@/components/discovery/DiscoveryStartModal"
 import { listDiscoverySessions, startDiscovery } from "@/lib/discovery-client";
 import type { DiscoverySession } from "@/lib/discovery-types";
 import { useAuth } from "@/components/AuthProvider";
-import { getDiscoveryStatusInfo, VARIANT_CLASSES } from "@/lib/status";
-
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString("en-AU", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  });
-}
+import { getDiscoveryStatusInfo } from "@/lib/status";
+import { formatDateOnly } from "@/lib/formatting";
+import { StatusBadge } from "@/components/StatusBadge";
 
 function formatRelativeTime(iso: string): string {
   const diffMs = Date.now() - new Date(iso).getTime();
@@ -28,7 +22,7 @@ function formatRelativeTime(iso: string): string {
   if (diffHours < 24) return `${diffHours}h ago`;
   const diffDays = Math.floor(diffHours / 24);
   if (diffDays < 7) return `${diffDays}d ago`;
-  return formatDate(iso);
+  return formatDateOnly(iso);
 }
 
 function getSessionTitle(session: DiscoverySession): string | null {
@@ -184,13 +178,11 @@ export default function DiscoveryListPage() {
                       </td>
                       <td className="px-4 py-3">
                         {(() => { const s = getDiscoveryStatusInfo(session.status); return (
-                          <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${VARIANT_CLASSES[s.variant]}`}>
-                            {s.label}
-                          </span>
+                          <StatusBadge label={s.label} variant={s.variant} />
                         ); })()}
                       </td>
                       <td className="px-4 py-3 text-gray-500 whitespace-nowrap">
-                        <span title={formatDate(lastActivity)}>
+                        <span title={formatDateOnly(lastActivity)}>
                           {formatRelativeTime(lastActivity)}
                         </span>
                       </td>

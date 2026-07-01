@@ -449,6 +449,29 @@ export interface ProvisioningManifest {
   generatedAt: string;
 }
 
+// ─── Discovery Agent Usage ─────────────────────────────────────────────────────
+
+export type DiscoveryAgentRole =
+  | "intent_extraction"
+  | "problem_framing"
+  | "solution_generation"
+  | "clarification"
+  | "proposal_composition"
+  | "manifest_generation";
+
+export interface DiscoveryAgentUsageRecord {
+  id: string;
+  agentRole: DiscoveryAgentRole;
+  provider: "mock" | "openai" | "anthropic" | "bedrock";
+  model?: string;
+  inputTokens?: number;
+  outputTokens?: number;
+  totalTokens?: number;
+  latencyMs?: number;
+  estimatedCostUsd?: number | null;
+  createdAt: string;
+}
+
 // ─── Discovery Session ────────────────────────────────────────────────────────
 
 export interface DiscoverySession {
@@ -470,6 +493,9 @@ export interface DiscoverySession {
   manifest: ProvisioningManifest | null;
 
   confidence: DiscoveryConfidence;
+
+  /** AI usage emitted by real (non-mock) discovery agents, for cost reporting. */
+  usageRecords?: DiscoveryAgentUsageRecord[];
 
   createdAt: string;
   updatedAt: string;

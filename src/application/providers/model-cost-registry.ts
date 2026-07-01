@@ -14,6 +14,12 @@ import type { TokenCostConfig } from "./token-cost.js";
 // These are estimates — not exact billing data. Actual billing may differ.
 
 const KNOWN_MODEL_COSTS: Record<string, TokenCostConfig> = {
+  // Per developers.openai.com/api/docs/models/compare (checked 2026-07-01).
+  // Cached-input pricing (gpt-5.5 $0.50, gpt-5.4-mini $0.08, gpt-5.4-nano $0.02
+  // per 1M tokens) isn't tracked here — this registry only covers input/output.
+  "gpt-5.5":                      { inputCostPer1MTokens: 5.00,  outputCostPer1MTokens: 30.00 },
+  "gpt-5.4-mini":                 { inputCostPer1MTokens: 0.75,  outputCostPer1MTokens: 4.50  },
+  "gpt-5.4-nano":                 { inputCostPer1MTokens: 0.20,  outputCostPer1MTokens: 1.25  },
   "gpt-4o":                       { inputCostPer1MTokens: 2.50,  outputCostPer1MTokens: 10.00 },
   "gpt-4o-mini":                  { inputCostPer1MTokens: 0.15,  outputCostPer1MTokens: 0.60  },
   "gpt-4-turbo":                  { inputCostPer1MTokens: 10.00, outputCostPer1MTokens: 30.00 },

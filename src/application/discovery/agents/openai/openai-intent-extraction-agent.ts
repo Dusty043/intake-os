@@ -1,5 +1,6 @@
 import type { IntentExtractionResult, IntentType } from "../../../../domain/discovery.js";
 import type { DiscoveryAgentContext, DiscoveryAgentOptions, IIntentExtractionAgent } from "../discovery-agent-contract.js";
+import { completeWithUsage } from "../discovery-agent-contract.js";
 import type { LlmClient } from "../../../llm-client.js";
 import { orgContextBlock } from "../org-context.js";
 
@@ -56,8 +57,8 @@ export class OpenAIIntentExtractionAgent implements IIntentExtractionAgent {
     const conversation = ctx.messages.map(m => `${m.role.toUpperCase()}: ${m.content}`).join("\n");
     const userPrompt = `Conversation:\n${conversation}\n\nClassify this request.`;
 
-    const { content: out } = await this.client.completeStructured<Output>({
-      model: this.model, systemPrompt: system, userPrompt: userPrompt, schemaName: "intent_extraction", schema: schema as unknown as Record<string, unknown>,
+    const out = await completeWithUsage<Output>(this.client, opts, "intent_extraction", this.model, {
+      systemPrompt: system, userPrompt: userPrompt, schemaName: "intent_extraction", schema: schema as unknown as Record<string, unknown>,
     });
 
     return {

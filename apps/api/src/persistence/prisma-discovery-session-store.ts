@@ -1,7 +1,8 @@
 import { Injectable } from "@nestjs/common";
 import type { Prisma } from "@prisma/client";
-import type { DiscoverySession } from "../../../../src/domain/discovery.js";
-import type { IDiscoverySessionStore } from "../../../../src/application/discovery/discovery-session-store.js";
+import type { DiscoveryAgentUsageRecord, DiscoverySession } from "../../../../src/domain/discovery.js";
+import type { DiscoveryUsageFilters, IDiscoverySessionStore } from "../../../../src/application/discovery/discovery-session-store.js";
+import { flattenDiscoveryUsage } from "../../../../src/application/discovery/discovery-session-store.js";
 import { PrismaService } from "../prisma/prisma.service.js";
 
 function toJson(value: unknown): Prisma.InputJsonValue {
@@ -67,5 +68,19 @@ export class PrismaDiscoverySessionStore implements IDiscoverySessionStore {
       select: { snapshot: true },
     });
     return rows.map((row) => fromJson<DiscoverySession>(row.snapshot));
+  }
+
+  async listAllUsageRecords(
+    filters?: DiscoveryUsageFilters,
+  ): Promise<Array<DiscoveryAgentUsageRecord & { sessionId: string }>> {
+    // Sessions are stored as opaque JSON snapshots, so usage records can't be
+    // filtered in SQL — this loads every session and filters in memory, same
+    // tradeoff as InMemoryProjectIntakeStore.listAllAgentRuns. Fine for an
+    // admin-only report at current volume; revisit if session count grows large.
+    const rows = await this.prisma.discoverySessionRecord.findMany({
+      select: { snapshot: true },
+    });
+    const sessions = rows.map((row) => fromJson<DiscoverySession>(row.snapshot));
+    return flattenDiscoveryUsage(sessions, filters);
   }
 }

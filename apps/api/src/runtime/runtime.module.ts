@@ -1,7 +1,5 @@
 import { Global, Logger, Module } from "@nestjs/common";
 import { APP_FILTER } from "@nestjs/core";
-import { DynamoJobStatusStore } from "../../../../src/infrastructure/dynamo-job-status-store.js";
-import type { JobStatusStore } from "../../../../src/application/job-status-store.js";
 import { EvaluationOrchestrator } from "../../../../src/application/evaluation-orchestrator.js";
 import { IntakeWorkflowService } from "../../../../src/application/intake-workflow-service.js";
 import { createAllMockEvaluationAgents } from "../../../../src/application/agents/mock/index.js";
@@ -18,7 +16,8 @@ import { RosterApiClient } from "../../../../src/application/roster/index.js";
 import { ANALYSIS_PROVIDER } from "../ai/provider.token.js";
 import { ApplicationExceptionFilter } from "../common/application-exception.filter.js";
 import { PrismaProjectIntakeStore } from "../persistence/prisma-project-intake-store.js";
-import { PROJECT_INTAKE_STORE } from "../persistence/store.token.js";
+import { PrismaDiscoverySessionStore } from "../persistence/prisma-discovery-session-store.js";
+import { DISCOVERY_SESSION_STORE, PROJECT_INTAKE_STORE } from "../persistence/store.token.js";
 import { PrismaService } from "../prisma/prisma.service.js";
 
 const logger = new Logger("RuntimeModule");
@@ -30,6 +29,10 @@ const logger = new Logger("RuntimeModule");
     {
       provide: PROJECT_INTAKE_STORE,
       useClass: PrismaProjectIntakeStore,
+    },
+    {
+      provide: DISCOVERY_SESSION_STORE,
+      useClass: PrismaDiscoverySessionStore,
     },
     {
       provide: ANALYSIS_PROVIDER,
@@ -115,22 +118,10 @@ const logger = new Logger("RuntimeModule");
       },
     },
     {
-      provide: "JOB_STATUS_STORE",
-      useFactory: (): JobStatusStore | null => {
-        const tableName = process.env["DYNAMODB_JOB_STATUS_TABLE"];
-        if (!tableName) {
-          logger.log("Job status store: disabled (DYNAMODB_JOB_STATUS_TABLE not set)");
-          return null;
-        }
-        logger.log(`Job status store: DynamoDB table="${tableName}"`);
-        return new DynamoJobStatusStore(tableName);
-      },
-    },
-    {
       provide: APP_FILTER,
       useClass: ApplicationExceptionFilter,
     },
   ],
-  exports: [PrismaService, PROJECT_INTAKE_STORE, IntakeWorkflowService, ANALYSIS_PROVIDER, EvaluationOrchestrator, "JOB_STATUS_STORE"],
+  exports: [PrismaService, PROJECT_INTAKE_STORE, DISCOVERY_SESSION_STORE, IntakeWorkflowService, ANALYSIS_PROVIDER, EvaluationOrchestrator],
 })
 export class RuntimeModule {}

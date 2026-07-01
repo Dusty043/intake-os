@@ -33,5 +33,5 @@ export function createLlmClient(config: AnalysisProviderConfig): LlmClient {
 
 /** Extract the configured model name from any provider config. */
 export function resolveModel(config: AnalysisProviderConfig): string {
-  return config.openai?.model ?? config.anthropic?.model ?? config.bedrock?.modelId ?? "gpt-4o-mini";
+  return config.openai?.model ?? config.anthropic?.model ?? config.bedrock?.modelId ?? "gpt-5.5";
 }

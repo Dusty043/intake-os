@@ -1,6 +1,7 @@
 import type { ProjectProposal } from "../../../../domain/discovery.js";
 import { emptyProjectProposal } from "../../../../domain/discovery.js";
 import type { DiscoveryAgentOptions, IProposalComposerAgent } from "../discovery-agent-contract.js";
+import { completeWithUsage } from "../discovery-agent-contract.js";
 import type { DiscoverySession } from "../../../../domain/discovery.js";
 import type { LlmClient } from "../../../llm-client.js";
 import { orgContextBlock } from "../org-context.js";
@@ -90,8 +91,8 @@ export class OpenAIProposalComposerAgent implements IProposalComposerAgent {
     const userPrompt = `${frameBlock}${solutionBlock}${clarBlock}\nFull conversation:\n${conversation}\n\nCompose the project proposal.`;
 
     const system = BASE_SYSTEM + orgContextBlock(opts.orgContext);
-    const { content: out } = await this.client.completeStructured<Output>({
-      model: this.model, systemPrompt: system, userPrompt: userPrompt, schemaName: "proposal_composition", schema: schema as unknown as Record<string, unknown>, maxTokens: 3000,
+    const out = await completeWithUsage<Output>(this.client, opts, "proposal_composition", this.model, {
+      systemPrompt: system, userPrompt: userPrompt, schemaName: "proposal_composition", schema: schema as unknown as Record<string, unknown>, maxTokens: 3000,
     });
 
     const now = opts.now;

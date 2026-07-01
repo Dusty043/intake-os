@@ -2,12 +2,23 @@ import { Controller, ForbiddenException, Get, Query } from "@nestjs/common";
 import { ApiOperation, ApiQuery, ApiTags } from "@nestjs/swagger";
 import { SkipThrottle } from "@nestjs/throttler";
 import type { ProjectIntakeStore } from "../../../../../src/application/types.js";
-import { PROJECT_INTAKE_STORE } from "../../persistence/store.token.js";
+import type { IDiscoverySessionStore } from "../../../../../src/application/discovery/discovery-session-store.js";
+import { DISCOVERY_SESSION_STORE, PROJECT_INTAKE_STORE } from "../../persistence/store.token.js";
 import { Inject } from "@nestjs/common";
 import { CurrentActor } from "../auth/auth.decorators.js";
 import type { AuthenticatedActor } from "../auth/auth.types.js";
 
 const ADMIN_ROLES = new Set(["admin", "devops_lead"]);
+
+interface NormalizedUsageRun {
+  source: "evaluation" | "discovery";
+  /** Only present for evaluation runs — discovery sessions precede intake creation. */
+  intakeId?: string;
+  model?: string;
+  agentRole: string;
+  totalTokens?: number;
+  estimatedCostUsd?: number | null;
+}
 
 @SkipThrottle()
 @ApiTags("admin")
@@ -15,10 +26,11 @@ const ADMIN_ROLES = new Set(["admin", "devops_lead"]);
 export class AiUsageController {
   constructor(
     @Inject(PROJECT_INTAKE_STORE) private readonly store: ProjectIntakeStore,
+    @Inject(DISCOVERY_SESSION_STORE) private readonly discoveryStore: IDiscoverySessionStore,
   ) {}
 
   @Get()
-  @ApiOperation({ summary: "List all AI agent runs with optional filters — admin/devops_lead only" })
+  @ApiOperation({ summary: "List all AI agent runs (intake evaluation + discovery) with optional filters — admin/devops_lead only" })
   @ApiQuery({ name: "intakeId", required: false })
   @ApiQuery({ name: "startDate", required: false, description: "ISO date string, inclusive" })
   @ApiQuery({ name: "endDate", required: false, description: "ISO date string, inclusive" })
@@ -32,45 +44,19 @@ export class AiUsageController {
       throw new ForbiddenException("admin or devops_lead role required.");
     }
 
-    const runs = await this.store.listAllAgentRuns({
-      intakeId: intakeId || undefined,
-      startDate: startDate || undefined,
-      endDate: endDate || undefined,
-    });
+    const filters = { startDate: startDate || undefined, endDate: endDate || undefined };
+    const evaluationRuns = await this.store.listAllAgentRuns({ intakeId: intakeId || undefined, ...filters });
+    // Discovery sessions precede intake creation, so they have no intakeId to filter by —
+    // intakeId filtering only narrows evaluation runs.
+    const discoveryRuns = intakeId ? [] : await this.discoveryStore.listAllUsageRecords(filters);
 
-    const totalCostUsd = runs.reduce((sum, r) => sum + (r.estimatedCostUsd ?? 0), 0);
-    const totalTokens = runs.reduce((sum, r) => sum + (r.totalTokens ?? 0), 0);
-
-    const byModel: Record<string, { count: number; costUsd: number; tokens: number }> = {};
-    const byAgentRole: Record<string, { count: number; costUsd: number; tokens: number }> = {};
-    const byIntake: Record<string, { count: number; costUsd: number; tokens: number }> = {};
-
-    for (const run of runs) {
-      const model = run.model ?? "unknown";
-      byModel[model] ??= { count: 0, costUsd: 0, tokens: 0 };
-      byModel[model].count++;
-      byModel[model].costUsd += run.estimatedCostUsd ?? 0;
-      byModel[model].tokens += run.totalTokens ?? 0;
-
-      byAgentRole[run.agentRole] ??= { count: 0, costUsd: 0, tokens: 0 };
-      byAgentRole[run.agentRole].count++;
-      byAgentRole[run.agentRole].costUsd += run.estimatedCostUsd ?? 0;
-      byAgentRole[run.agentRole].tokens += run.totalTokens ?? 0;
-
-      byIntake[run.intakeId] ??= { count: 0, costUsd: 0, tokens: 0 };
-      byIntake[run.intakeId].count++;
-      byIntake[run.intakeId].costUsd += run.estimatedCostUsd ?? 0;
-      byIntake[run.intakeId].tokens += run.totalTokens ?? 0;
-    }
+    const normalized = mergeUsageRuns(evaluationRuns, discoveryRuns);
+    const aggregates = aggregateUsage(normalized);
 
     return {
-      runs,
-      totalCostUsd: Number(totalCostUsd.toFixed(6)),
-      totalTokens,
-      runCount: runs.length,
-      byModel,
-      byAgentRole,
-      byIntake,
+      runs: evaluationRuns,
+      discoveryRuns,
+      ...aggregates,
     };
   }
 
@@ -91,32 +77,74 @@ export class AiUsageController {
     const lastDay = new Date(year, mon, 0).getDate();
     const endDate = `${target}-${String(lastDay).padStart(2, "0")}T23:59:59.999Z`;
 
-    const runs = await this.store.listAllAgentRuns({ startDate, endDate });
+    const [evaluationRuns, discoveryRuns] = await Promise.all([
+      this.store.listAllAgentRuns({ startDate, endDate }),
+      this.discoveryStore.listAllUsageRecords({ startDate, endDate }),
+    ]);
 
-    const grandTotal = runs.reduce((sum, r) => sum + (r.estimatedCostUsd ?? 0), 0);
-    const totalTokens = runs.reduce((sum, r) => sum + (r.totalTokens ?? 0), 0);
-
-    const byModel: Record<string, { count: number; costUsd: number }> = {};
-    const byAgentRole: Record<string, { count: number; costUsd: number }> = {};
-
-    for (const run of runs) {
-      const model = run.model ?? "unknown";
-      byModel[model] ??= { count: 0, costUsd: 0 };
-      byModel[model].count++;
-      byModel[model].costUsd += run.estimatedCostUsd ?? 0;
-
-      byAgentRole[run.agentRole] ??= { count: 0, costUsd: 0 };
-      byAgentRole[run.agentRole].count++;
-      byAgentRole[run.agentRole].costUsd += run.estimatedCostUsd ?? 0;
-    }
+    const normalized = mergeUsageRuns(evaluationRuns, discoveryRuns);
+    const aggregates = aggregateUsage(normalized);
 
     return {
       month: target,
-      totalCostUsd: Number(grandTotal.toFixed(6)),
-      totalTokens,
-      runCount: runs.length,
-      byModel,
-      byAgentRole,
+      ...aggregates,
     };
   }
+}
+
+// ─── Shared aggregation helpers ────────────────────────────────────────────────
+
+function mergeUsageRuns(
+  evaluationRuns: Array<{ intakeId: string; model?: string; agentRole: string; totalTokens?: number; estimatedCostUsd?: number | null }>,
+  discoveryRuns: Array<{ model?: string; agentRole: string; totalTokens?: number; estimatedCostUsd?: number | null }>,
+): NormalizedUsageRun[] {
+  return [
+    ...evaluationRuns.map((r) => ({ source: "evaluation" as const, intakeId: r.intakeId, model: r.model, agentRole: r.agentRole, totalTokens: r.totalTokens, estimatedCostUsd: r.estimatedCostUsd })),
+    ...discoveryRuns.map((r) => ({ source: "discovery" as const, model: r.model, agentRole: r.agentRole, totalTokens: r.totalTokens, estimatedCostUsd: r.estimatedCostUsd })),
+  ];
+}
+
+function aggregateUsage(runs: NormalizedUsageRun[]) {
+  const totalCostUsd = runs.reduce((sum, r) => sum + (r.estimatedCostUsd ?? 0), 0);
+  const totalTokens = runs.reduce((sum, r) => sum + (r.totalTokens ?? 0), 0);
+
+  const byModel: Record<string, { count: number; costUsd: number; tokens: number }> = {};
+  const byAgentRole: Record<string, { count: number; costUsd: number; tokens: number }> = {};
+  const bySource: Record<string, { count: number; costUsd: number; tokens: number }> = {};
+  const byIntake: Record<string, { count: number; costUsd: number; tokens: number }> = {};
+
+  for (const run of runs) {
+    const model = run.model ?? "unknown";
+    byModel[model] ??= { count: 0, costUsd: 0, tokens: 0 };
+    byModel[model].count++;
+    byModel[model].costUsd += run.estimatedCostUsd ?? 0;
+    byModel[model].tokens += run.totalTokens ?? 0;
+
+    byAgentRole[run.agentRole] ??= { count: 0, costUsd: 0, tokens: 0 };
+    byAgentRole[run.agentRole].count++;
+    byAgentRole[run.agentRole].costUsd += run.estimatedCostUsd ?? 0;
+    byAgentRole[run.agentRole].tokens += run.totalTokens ?? 0;
+
+    bySource[run.source] ??= { count: 0, costUsd: 0, tokens: 0 };
+    bySource[run.source].count++;
+    bySource[run.source].costUsd += run.estimatedCostUsd ?? 0;
+    bySource[run.source].tokens += run.totalTokens ?? 0;
+
+    if (run.intakeId) {
+      byIntake[run.intakeId] ??= { count: 0, costUsd: 0, tokens: 0 };
+      byIntake[run.intakeId].count++;
+      byIntake[run.intakeId].costUsd += run.estimatedCostUsd ?? 0;
+      byIntake[run.intakeId].tokens += run.totalTokens ?? 0;
+    }
+  }
+
+  return {
+    totalCostUsd: Number(totalCostUsd.toFixed(6)),
+    totalTokens,
+    runCount: runs.length,
+    byModel,
+    byAgentRole,
+    bySource,
+    byIntake,
+  };
 }

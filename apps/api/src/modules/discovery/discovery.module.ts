@@ -1,5 +1,6 @@
 import { Module } from "@nestjs/common";
 import type { ProjectIntakeStore } from "../../../../../src/application/types.js";
+import type { IDiscoverySessionStore } from "../../../../../src/application/discovery/discovery-session-store.js";
 import {
   DiscoveryOrchestrator,
   DiscoveryController,
@@ -17,15 +18,13 @@ import {
 } from "../../../../../src/application/discovery/index.js";
 import { loadAnalysisProviderConfig } from "../../../../../src/application/providers/analysis-provider-config.js";
 import { createLlmClient, resolveModel } from "../../../../../src/application/providers/llm-client-factory.js";
-import { PROJECT_INTAKE_STORE } from "../../persistence/store.token.js";
-import { PrismaDiscoverySessionStore } from "../../persistence/prisma-discovery-session-store.js";
-import { PrismaService } from "../../prisma/prisma.service.js";
+import { DISCOVERY_SESSION_STORE, PROJECT_INTAKE_STORE } from "../../persistence/store.token.js";
 import { DiscoveryHttpController } from "./discovery.controller.js";
 import { GlobalSettingsService } from "../admin/global-settings.service.js";
 import { AdminModule } from "../admin/admin.module.js";
 
 function buildOrchestrator(
-  sessionStore: PrismaDiscoverySessionStore,
+  sessionStore: IDiscoverySessionStore,
   intakeStore?: ProjectIntakeStore,
   settingsService?: GlobalSettingsService,
 ): DiscoveryController {
@@ -71,6 +70,7 @@ function buildOrchestrator(
     proposalAgent,
     manifestAgent,
     {
+      provider: isMock ? "mock" : config.provider,
       idFactory,
       appBaseUrl: process.env["INTAKE_APP_URL"],
       intakeStore,
@@ -90,12 +90,11 @@ function buildOrchestrator(
   imports: [AdminModule],
   controllers: [DiscoveryHttpController],
   providers: [
-    PrismaDiscoverySessionStore,
     {
       provide: "DISCOVERY_CONTROLLER",
-      inject: [PrismaDiscoverySessionStore, PROJECT_INTAKE_STORE, GlobalSettingsService],
+      inject: [DISCOVERY_SESSION_STORE, PROJECT_INTAKE_STORE, GlobalSettingsService],
       useFactory: (
-        sessionStore: PrismaDiscoverySessionStore,
+        sessionStore: IDiscoverySessionStore,
         intakeStore: ProjectIntakeStore,
         settings: GlobalSettingsService,
       ) => buildOrchestrator(sessionStore, intakeStore, settings),

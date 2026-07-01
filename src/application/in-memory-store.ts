@@ -14,42 +14,42 @@ export class InMemoryProjectIntakeStore implements ProjectIntakeStore {
   private readonly provisioningRuns = new Map<string, ProvisioningRun>();
 
   async listIntakes(): Promise<readonly ProjectIntakeRecord[]> {
-    return Array.from(this.intakes.values()).map(cloneRecord);
+    return Array.from(this.intakes.values()).map((r) => structuredClone(r));
   }
 
   async getIntake(id: string): Promise<ProjectIntakeRecord | null> {
     const record = this.intakes.get(id);
-    return record ? cloneRecord(record) : null;
+    return record ? structuredClone(record) : null;
   }
 
   async saveIntake(record: ProjectIntakeRecord): Promise<ProjectIntakeRecord> {
-    const copy = cloneRecord(record);
+    const copy = structuredClone(record);
     this.intakes.set(record.id, copy);
-    return cloneRecord(copy);
+    return structuredClone(copy);
   }
 
   async listAuditEvents(intakeId: string): Promise<readonly AuditEvent[]> {
-    return (this.auditEvents.get(intakeId) ?? []).map(cloneAuditEvent);
+    return (this.auditEvents.get(intakeId) ?? []).map((e) => structuredClone(e));
   }
 
   async appendAuditEvent(event: AuditEvent): Promise<AuditEvent> {
-    const copy = cloneAuditEvent(event);
+    const copy = structuredClone(event);
     const existing = this.auditEvents.get(event.requestId) ?? [];
     this.auditEvents.set(event.requestId, [...existing, copy]);
-    return cloneAuditEvent(copy);
+    return structuredClone(copy);
   }
 
   async saveEvaluation(bundle: EvaluationPersistenceBundle): Promise<void> {
     validateIntakeEvaluation(bundle.evaluation);
-    this.evaluations.set(bundle.evaluation.id, clone<IntakeEvaluation>(bundle.evaluation));
+    this.evaluations.set(bundle.evaluation.id, structuredClone(bundle.evaluation));
     const runs = bundle.agentRuns ?? agentRunsFromEvaluation(bundle.evaluation);
-    this.agentRunsByEvaluationId.set(bundle.evaluation.id, runs.map((r) => clone<AgentRunRecord>(r)));
+    this.agentRunsByEvaluationId.set(bundle.evaluation.id, runs.map((r) => structuredClone(r)));
   }
 
   async getEvaluation(intakeId: string, evaluationId: string): Promise<IntakeEvaluation | undefined> {
     const ev = this.evaluations.get(evaluationId);
     if (!ev || ev.intakeId !== intakeId) return undefined;
-    const result = clone<IntakeEvaluation>(ev);
+    const result = structuredClone(ev);
     validateIntakeEvaluation(result);
     return result;
   }
@@ -58,7 +58,7 @@ export class InMemoryProjectIntakeStore implements ProjectIntakeStore {
     return Array.from(this.evaluations.values())
       .filter((ev) => ev.intakeId === intakeId)
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-      .map((ev) => clone<IntakeEvaluation>(ev));
+      .map((ev) => structuredClone(ev));
   }
 
   async getLatestEvaluationForIntake(intakeId: string): Promise<IntakeEvaluation | undefined> {
@@ -67,7 +67,7 @@ export class InMemoryProjectIntakeStore implements ProjectIntakeStore {
   }
 
   async listAgentRuns(evaluationId: string): Promise<AgentRunRecord[]> {
-    return (this.agentRunsByEvaluationId.get(evaluationId) ?? []).map((r) => clone<AgentRunRecord>(r));
+    return (this.agentRunsByEvaluationId.get(evaluationId) ?? []).map((r) => structuredClone(r));
   }
 
   async listAllAgentRuns(
@@ -81,7 +81,7 @@ export class InMemoryProjectIntakeStore implements ProjectIntakeStore {
       for (const run of runs) {
         if (filters?.startDate && run.createdAt < filters.startDate) continue;
         if (filters?.endDate && run.createdAt > filters.endDate) continue;
-        results.push({ ...clone<AgentRunRecord>(run), intakeId: ev.intakeId });
+        results.push({ ...structuredClone(run), intakeId: ev.intakeId });
       }
     }
     return results;
@@ -90,15 +90,15 @@ export class InMemoryProjectIntakeStore implements ProjectIntakeStore {
   async getEvaluationById(evaluationId: string): Promise<IntakeEvaluation | undefined> {
     const ev = this.evaluations.get(evaluationId);
     if (!ev) return undefined;
-    const result = clone<IntakeEvaluation>(ev);
+    const result = structuredClone(ev);
     validateIntakeEvaluation(result);
     return result;
   }
 
   async saveProvisioningRun(run: ProvisioningRun): Promise<ProvisioningRun> {
-    const copy = clone<ProvisioningRun>(run);
+    const copy = structuredClone(run);
     this.provisioningRuns.set(run.id, copy);
-    return clone<ProvisioningRun>(copy);
+    return structuredClone(copy);
   }
 
   async listProvisioningRuns(intakeId: string): Promise<ProvisioningRun[]> {
@@ -110,7 +110,7 @@ export class InMemoryProjectIntakeStore implements ProjectIntakeStore {
   async getProvisioningRun(intakeId: string, runId: string): Promise<ProvisioningRun | undefined> {
     const run = this.provisioningRuns.get(runId);
     if (!run || run.intakeId !== intakeId) return undefined;
-    return clone<ProvisioningRun>(run);
+    return structuredClone(run);
   }
 
   async updateProvisioningTargetResult(
@@ -125,16 +125,4 @@ export class InMemoryProjectIntakeStore implements ProjectIntakeStore {
       }
     }
   }
-}
-
-function clone<T>(value: T): T {
-  return JSON.parse(JSON.stringify(value)) as T;
-}
-
-function cloneRecord(record: ProjectIntakeRecord): ProjectIntakeRecord {
-  return clone<ProjectIntakeRecord>(record);
-}
-
-function cloneAuditEvent(event: AuditEvent): AuditEvent {
-  return clone<AuditEvent>(event);
 }

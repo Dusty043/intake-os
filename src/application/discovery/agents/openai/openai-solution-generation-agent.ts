@@ -1,5 +1,6 @@
 import type { SolutionOption } from "../../../../domain/discovery.js";
 import type { DiscoveryAgentContext, DiscoveryAgentOptions, ISolutionGenerationAgent } from "../discovery-agent-contract.js";
+import { completeWithUsage } from "../discovery-agent-contract.js";
 import type { LlmClient } from "../../../llm-client.js";
 import { orgContextBlock } from "../org-context.js";
 
@@ -59,8 +60,8 @@ export class OpenAISolutionGenerationAgent implements ISolutionGenerationAgent {
     const frame = ctx.problemFrame ? `Problem: ${ctx.problemFrame.problemStatement}` : "";
     const userPrompt = `${frame}\n\nConversation:\n${conversation}\n\nGenerate solution options.`;
 
-    const { content: out } = await this.client.completeStructured<Output>({
-      model: this.model, systemPrompt: system, userPrompt: userPrompt, schemaName: "solution_generation", schema: schema as unknown as Record<string, unknown>,
+    const out = await completeWithUsage<Output>(this.client, opts, "solution_generation", this.model, {
+      systemPrompt: system, userPrompt: userPrompt, schemaName: "solution_generation", schema: schema as unknown as Record<string, unknown>,
     });
 
     return out.solutions.map((s, i) => ({

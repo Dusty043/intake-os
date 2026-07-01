@@ -1,5 +1,6 @@
 import type { ClarificationQuestion } from "../../../../domain/discovery.js";
 import type { DiscoveryAgentContext, DiscoveryAgentOptions, IClarificationAgent } from "../discovery-agent-contract.js";
+import { completeWithUsage } from "../discovery-agent-contract.js";
 import type { LlmClient } from "../../../llm-client.js";
 import { orgContextBlock } from "../org-context.js";
 
@@ -63,8 +64,8 @@ export class OpenAIClarificationAgent implements IClarificationAgent {
     const userPrompt = `${answeredBlock}Low-confidence dimensions: ${lowDims || "none"}\n\nConversation:\n${conversation}\n\nWhat clarifying questions are needed?`;
 
     const system = BASE_SYSTEM + orgContextBlock(opts.orgContext);
-    const { content: out } = await this.client.completeStructured<Output>({
-      model: this.model, systemPrompt: system, userPrompt: userPrompt, schemaName: "clarification_planning", schema: schema as unknown as Record<string, unknown>,
+    const out = await completeWithUsage<Output>(this.client, opts, "clarification", this.model, {
+      systemPrompt: system, userPrompt: userPrompt, schemaName: "clarification_planning", schema: schema as unknown as Record<string, unknown>,
     });
 
     return out.questions.map(q => ({

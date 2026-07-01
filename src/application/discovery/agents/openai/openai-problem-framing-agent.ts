@@ -1,5 +1,6 @@
 import type { DiscoveryConfidence, ProblemFrame } from "../../../../domain/discovery.js";
 import type { DiscoveryAgentContext, DiscoveryAgentOptions, IProblemFramingAgent } from "../discovery-agent-contract.js";
+import { completeWithUsage } from "../discovery-agent-contract.js";
 import type { LlmClient } from "../../../llm-client.js";
 import { orgContextBlock } from "../org-context.js";
 
@@ -65,8 +66,8 @@ export class OpenAIProblemFramingAgent implements IProblemFramingAgent {
     const intentSummary = ctx.intent ? `Intent: ${ctx.intent.intentType} — ${ctx.intent.underlyingProblem}` : "";
     const userPrompt = `${intentSummary}\n\nConversation:\n${conversation}\n\nFrame this problem.`;
 
-    const { content: out } = await this.client.completeStructured<Output>({
-      model: this.model, systemPrompt: system, userPrompt: userPrompt, schemaName: "problem_framing", schema: schema as unknown as Record<string, unknown>,
+    const out = await completeWithUsage<Output>(this.client, opts, "problem_framing", this.model, {
+      systemPrompt: system, userPrompt: userPrompt, schemaName: "problem_framing", schema: schema as unknown as Record<string, unknown>,
     });
 
     const clamp = (v: number) => Math.max(0, Math.min(1, v));
