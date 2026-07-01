@@ -1,5 +1,6 @@
 import type {
   ConversationMessage,
+  DiscoveryAgentUsageRecord,
   DiscoverySession,
   DiscoveryStatus,
   DiscoveryTimelineEvent,
@@ -18,8 +19,11 @@ import type {
   IProposalComposerAgent,
   ISolutionGenerationAgent,
   DiscoveryAgentOptions,
+  DiscoveryAgentUsageEvent,
 } from "./agents/discovery-agent-contract.js";
 import { proposalToIntakeRecord } from "./proposal-to-intake-adapter.js";
+import { loadModelCostConfig } from "../providers/model-cost-registry.js";
+import { estimateCost } from "../providers/token-cost.js";
 
 // ─── Public input/output types ────────────────────────────────────────────────
 
@@ -169,7 +173,12 @@ export class DiscoveryOrchestrator {
     ]);
     if (!session) throw new Error(`DiscoverySession not found: ${sessionId}`);
 
-    const agentOpts: DiscoveryAgentOptions = { provider: this.provider, idFactory: this.idFactory, now, orgContext };
+    const { opts: agentOpts, events: usageEvents } = this.trackUsage({
+      provider: this.provider,
+      idFactory: this.idFactory,
+      now,
+      orgContext,
+    });
     const ctx = {
       messages: session.messages,
       intent: session.intent,
@@ -191,6 +200,7 @@ export class DiscoveryOrchestrator {
       clarificationQuestions: [...session.clarificationQuestions, ...clarifications],
       status: clarifications.length > 0 ? "clarification_needed" : nextStatus,
       timeline: [...session.timeline, ...newEvents],
+      usageRecords: this.appendUsage(session, usageEvents, now),
       updatedAt: now,
     });
   }
@@ -238,7 +248,12 @@ export class DiscoveryOrchestrator {
 
     // Plan next clarification round if confidence still low
     const [orgContext] = await Promise.all([this.getOrgContext()]);
-    const agentOpts: DiscoveryAgentOptions = { provider: this.provider, idFactory: this.idFactory, now, orgContext };
+    const { opts: agentOpts, events: usageEvents } = this.trackUsage({
+      provider: this.provider,
+      idFactory: this.idFactory,
+      now,
+      orgContext,
+    });
     const ctx = {
       messages: reanalysed.messages,
       intent: reanalysed.intent,
@@ -251,6 +266,7 @@ export class DiscoveryOrchestrator {
     if (newClarifications.length === 0) {
       return this.store.update(reanalysed.id, {
         status: this.resolveStatus(reanalysed.status, confidenceTier(reanalysed.confidence)),
+        usageRecords: this.appendUsage(reanalysed, usageEvents, now),
         updatedAt: now,
       });
     }
@@ -258,6 +274,7 @@ export class DiscoveryOrchestrator {
     return this.store.update(reanalysed.id, {
       clarificationQuestions: [...reanalysed.clarificationQuestions, ...newClarifications],
       status: "clarification_needed",
+      usageRecords: this.appendUsage(reanalysed, usageEvents, now),
       updatedAt: now,
     });
   }
@@ -317,7 +334,12 @@ export class DiscoveryOrchestrator {
     }
 
     const orgContext = await this.getOrgContext();
-    const agentOpts: DiscoveryAgentOptions = { provider: this.provider, idFactory: this.idFactory, now, orgContext };
+    const { opts: agentOpts, events: usageEvents } = this.trackUsage({
+      provider: this.provider,
+      idFactory: this.idFactory,
+      now,
+      orgContext,
+    });
     const proposal = await this.proposalComposerAgent.composeProposal(session, agentOpts);
 
     const nextStatus = this.resolveStatus(
@@ -331,6 +353,7 @@ export class DiscoveryOrchestrator {
       proposal,
       status: nextStatus,
       timeline: [...session.timeline, ...newEvents],
+      usageRecords: this.appendUsage(session, usageEvents, now),
       updatedAt: now,
     });
   }
@@ -400,13 +423,13 @@ export class DiscoveryOrchestrator {
     }
 
     const orgContext = await this.getOrgContext();
-    const agentOpts: DiscoveryAgentOptions = {
+    const { opts: agentOpts, events: usageEvents } = this.trackUsage({
       provider: this.provider,
       idFactory: this.idFactory,
       now,
       appBaseUrl: this.appBaseUrl,
       orgContext,
-    };
+    });
     const manifest = await this.manifestGeneratorAgent.generateManifest(
       session.proposal,
       session,
@@ -415,6 +438,7 @@ export class DiscoveryOrchestrator {
 
     return this.store.update(session.id, {
       manifest,
+      usageRecords: this.appendUsage(session, usageEvents, now),
       updatedAt: now,
     });
   }
@@ -437,12 +461,12 @@ export class DiscoveryOrchestrator {
       this.getConfidenceThreshold(),
     ]);
 
-    const agentOpts: DiscoveryAgentOptions = {
+    const { opts: agentOpts, events: usageEvents } = this.trackUsage({
       provider: this.provider,
       idFactory: this.idFactory,
       now,
       orgContext,
-    };
+    });
 
     const intent = await this.intentAgent.extractIntent(agentCtx, agentOpts);
 
@@ -496,6 +520,7 @@ export class DiscoveryOrchestrator {
       status: nextStatus,
       messages: [...session.messages, assistantMessage],
       timeline: [...session.timeline, ...newEvents],
+      usageRecords: this.appendUsage(session, usageEvents, now),
       updatedAt: now,
     });
   }
@@ -591,5 +616,43 @@ export class DiscoveryOrchestrator {
     occurredAt: string,
   ): DiscoveryTimelineEvent {
     return { status, occurredAt };
+  }
+
+  // ─── AI usage → cost reporting ────────────────────────────────────────────
+
+  /** Builds agent options wired to collect usage events emitted via onUsage. */
+  private trackUsage(
+    base: Omit<DiscoveryAgentOptions, "onUsage">,
+  ): { opts: DiscoveryAgentOptions; events: DiscoveryAgentUsageEvent[] } {
+    const events: DiscoveryAgentUsageEvent[] = [];
+    return { opts: { ...base, onUsage: (u) => events.push(u) }, events };
+  }
+
+  private buildUsageRecords(events: DiscoveryAgentUsageEvent[], now: string): DiscoveryAgentUsageRecord[] {
+    return events.map((e) => {
+      const totalTokens =
+        e.inputTokens !== undefined && e.outputTokens !== undefined
+          ? e.inputTokens + e.outputTokens
+          : undefined;
+      return {
+        id: this.idFactory("ai-usage"),
+        agentRole: e.agentRole,
+        provider: this.provider,
+        model: e.model,
+        inputTokens: e.inputTokens,
+        outputTokens: e.outputTokens,
+        totalTokens,
+        latencyMs: e.latencyMs,
+        estimatedCostUsd: e.model
+          ? estimateCost(e.inputTokens ?? 0, e.outputTokens ?? 0, loadModelCostConfig(e.model))
+          : null,
+        createdAt: now,
+      };
+    });
+  }
+
+  private appendUsage(session: DiscoverySession, events: DiscoveryAgentUsageEvent[], now: string): DiscoveryAgentUsageRecord[] | undefined {
+    if (events.length === 0) return session.usageRecords;
+    return [...(session.usageRecords ?? []), ...this.buildUsageRecords(events, now)];
   }
 }

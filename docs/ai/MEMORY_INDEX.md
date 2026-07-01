@@ -54,6 +54,10 @@ Generated at: 2026-06-09T14:53:20.716Z
 - `docs/ai/tasks/TASK-0032-input-validation-hardening.md`
 - `docs/ai/tasks/TASK-0033-google-oauth.md`
 - `docs/ai/tasks/TASK-0034-roster-integration.md`
+- `docs/ai/tasks/TASK-0036-ai-provider-config-blank-env-fix.md`
+- `docs/ai/tasks/TASK-0037-discovery-engine-ai-cost-reporting.md`
+- `docs/ai/tasks/TASK-0038-monday-schema-verification.md`
+- `docs/ai/tasks/TASK-0039-open-questions-decision-pass.md`
 
 ## Deployment Docs
 

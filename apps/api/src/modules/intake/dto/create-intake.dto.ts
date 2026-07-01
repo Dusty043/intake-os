@@ -7,6 +7,7 @@ import {
   MAX_INTAKE_DESCRIPTION_LENGTH,
   MAX_INTAKE_TITLE_LENGTH,
   MAX_REQUESTER_NAME_LENGTH,
+  MIN_INTAKE_DESCRIPTION_LENGTH,
 } from "../../../common/validation-constants.js";
 
 export class CreateIntakeDto implements CreateIntakeInput {
@@ -18,7 +19,7 @@ export class CreateIntakeDto implements CreateIntakeInput {
 
   @ApiProperty({ example: "Internal intake and approval workflow." })
   @IsString()
-  @MinLength(1)
+  @MinLength(MIN_INTAKE_DESCRIPTION_LENGTH)
   @MaxLength(MAX_INTAKE_DESCRIPTION_LENGTH)
   description!: string;
 

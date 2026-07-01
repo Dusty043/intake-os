@@ -34,12 +34,37 @@ test("returns openai config when key is provided", () => {
   const config = loadAnalysisProviderConfig({ AI_PROVIDER: "openai", OPENAI_API_KEY: "sk-test" });
   assert.equal(config.provider, "openai");
   assert.equal(config.openai?.apiKey, "sk-test");
-  assert.equal(config.openai?.model, "gpt-4o-mini");
+  assert.equal(config.openai?.model, "gpt-5.5");
+});
+
+test("treats blank AI_PROVIDER the same as unset (defaults to mock)", () => {
+  const config = loadAnalysisProviderConfig({ AI_PROVIDER: "" });
+  assert.equal(config.provider, "mock");
+});
+
+test("treats blank OPENAI_MODEL/OPENAI_TASKS_MODEL as unset and falls back to default", () => {
+  const config = loadAnalysisProviderConfig({
+    AI_PROVIDER: "openai",
+    OPENAI_API_KEY: "sk-test",
+    OPENAI_MODEL: "  ",
+    OPENAI_TASKS_MODEL: "",
+  });
+  assert.equal(config.openai?.model, "gpt-5.5");
 });
 
 test("respects custom OPENAI_MODEL", () => {
   const config = loadAnalysisProviderConfig({ AI_PROVIDER: "openai", OPENAI_API_KEY: "sk-x", OPENAI_MODEL: "gpt-4o" });
   assert.equal(config.openai?.model, "gpt-4o");
+});
+
+test("OPENAI_TASKS_MODEL overrides OPENAI_MODEL for lighter-weight tasks", () => {
+  const config = loadAnalysisProviderConfig({
+    AI_PROVIDER: "openai",
+    OPENAI_API_KEY: "sk-x",
+    OPENAI_MODEL: "gpt-5.5",
+    OPENAI_TASKS_MODEL: "gpt-5.4-mini",
+  });
+  assert.equal(config.openai?.model, "gpt-5.4-mini");
 });
 
 test("throws ConfigurationError for anthropic without API key", () => {
@@ -63,6 +88,13 @@ test("throws ConfigurationError for bedrock without model ID", () => {
   );
 });
 
+test("throws ConfigurationError for bedrock with blank model ID", () => {
+  assert.throws(
+    () => loadAnalysisProviderConfig({ AI_PROVIDER: "bedrock", BEDROCK_MODEL_ID: "   " }),
+    (err) => err instanceof ConfigurationError && err.message.includes("BEDROCK_MODEL_ID"),
+  );
+});
+
 test("returns bedrock config when model ID is provided", () => {
   const config = loadAnalysisProviderConfig({
     AI_PROVIDER: "bedrock",
@@ -76,24 +108,15 @@ test("returns bedrock config when model ID is provided", () => {
 
 test("applies generation defaults", () => {
   const config = loadAnalysisProviderConfig({});
-  assert.equal(config.maxInputChars, 12000);
   assert.equal(config.maxOutputTokens, 2500);
   assert.equal(config.temperature, 0.2);
-  assert.equal(config.costTrackingEnabled, true);
-  assert.equal(config.auditStorePrompt, false);
 });
 
 test("allows overriding generation defaults", () => {
   const config = loadAnalysisProviderConfig({
-    AI_MAX_INPUT_CHARS: "8000",
     AI_MAX_OUTPUT_TOKENS: "1000",
     AI_TEMPERATURE: "0.5",
-    AI_COST_TRACKING_ENABLED: "false",
-    AI_AUDIT_STORE_PROMPT: "true",
   });
-  assert.equal(config.maxInputChars, 8000);
   assert.equal(config.maxOutputTokens, 1000);
   assert.equal(config.temperature, 0.5);
-  assert.equal(config.costTrackingEnabled, false);
-  assert.equal(config.auditStorePrompt, true);
 });

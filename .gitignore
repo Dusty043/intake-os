@@ -25,5 +25,7 @@ apps/web/tsconfig.tsbuildinfo
 # Playwright MCP artifacts
 .playwright-mcp/
 
-# Scratch task files
-task-*.md
+# Scratch task files (repo root only — do not swallow docs/ai/tasks/TASK-####-*.md;
+# also case-insensitive on macOS/Windows checkouts (core.ignorecase), so an unanchored
+# pattern here matches TASK-*.md anywhere in the tree)
+/task-*.md

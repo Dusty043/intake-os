@@ -122,6 +122,24 @@ describe("loadModelCostConfig — built-in defaults", () => {
     assert.equal(cfg.outputCostPer1MTokens, 15.00);
   });
 
+  test("returns known defaults for gpt-5.5", () => {
+    const cfg = loadModelCostConfig("gpt-5.5");
+    assert.equal(cfg.inputCostPer1MTokens, 5.00);
+    assert.equal(cfg.outputCostPer1MTokens, 30.00);
+  });
+
+  test("returns known defaults for gpt-5.4-mini", () => {
+    const cfg = loadModelCostConfig("gpt-5.4-mini");
+    assert.equal(cfg.inputCostPer1MTokens, 0.75);
+    assert.equal(cfg.outputCostPer1MTokens, 4.50);
+  });
+
+  test("returns known defaults for gpt-5.4-nano", () => {
+    const cfg = loadModelCostConfig("gpt-5.4-nano");
+    assert.equal(cfg.inputCostPer1MTokens, 0.20);
+    assert.equal(cfg.outputCostPer1MTokens, 1.25);
+  });
+
   test("returns null costs for unknown model with no env var", () => {
     const cfg = loadModelCostConfig("completely-unknown-model-xyz");
     assert.equal(cfg.inputCostPer1MTokens, null);

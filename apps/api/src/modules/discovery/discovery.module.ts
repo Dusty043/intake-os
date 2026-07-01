@@ -1,5 +1,6 @@
 import { Module } from "@nestjs/common";
 import type { ProjectIntakeStore } from "../../../../../src/application/types.js";
+import type { IDiscoverySessionStore } from "../../../../../src/application/discovery/discovery-session-store.js";
 import {
   DiscoveryOrchestrator,
   DiscoveryController,
@@ -15,15 +16,15 @@ import {
   OpenAIClarificationAgent,
   OpenAIProposalComposerAgent,
 } from "../../../../../src/application/discovery/index.js";
-import { PROJECT_INTAKE_STORE } from "../../persistence/store.token.js";
-import { PrismaDiscoverySessionStore } from "../../persistence/prisma-discovery-session-store.js";
-import { PrismaService } from "../../prisma/prisma.service.js";
+import { loadAnalysisProviderConfig } from "../../../../../src/application/providers/analysis-provider-config.js";
+import { createLlmClient, resolveModel } from "../../../../../src/application/providers/llm-client-factory.js";
+import { DISCOVERY_SESSION_STORE, PROJECT_INTAKE_STORE } from "../../persistence/store.token.js";
 import { DiscoveryHttpController } from "./discovery.controller.js";
 import { GlobalSettingsService } from "../admin/global-settings.service.js";
 import { AdminModule } from "../admin/admin.module.js";
 
 function buildOrchestrator(
-  sessionStore: PrismaDiscoverySessionStore,
+  sessionStore: IDiscoverySessionStore,
   intakeStore?: ProjectIntakeStore,
   settingsService?: GlobalSettingsService,
 ): DiscoveryController {
@@ -33,28 +34,29 @@ function buildOrchestrator(
 
   const store = sessionStore;
 
-  const apiKey = process.env["OPENAI_API_KEY"] ?? "";
-  const model = process.env["OPENAI_MODEL"] ?? "gpt-4o-mini";
-  const useOpenAI = process.env["AI_PROVIDER"] === "openai" && !!apiKey;
+  const config = loadAnalysisProviderConfig();
+  const isMock = config.provider === "mock";
+  const model = resolveModel(config);
+  const llmClient = isMock ? null : createLlmClient(config);
 
-  const intentAgent = useOpenAI
-    ? new OpenAIIntentExtractionAgent(apiKey, model)
+  const intentAgent = llmClient
+    ? new OpenAIIntentExtractionAgent(llmClient, model)
     : new MockIntentExtractionAgent();
 
-  const framingAgent = useOpenAI
-    ? new OpenAIProblemFramingAgent(apiKey, model)
+  const framingAgent = llmClient
+    ? new OpenAIProblemFramingAgent(llmClient, model)
     : new MockProblemFramingAgent();
 
-  const solutionAgent = useOpenAI
-    ? new OpenAISolutionGenerationAgent(apiKey, model)
+  const solutionAgent = llmClient
+    ? new OpenAISolutionGenerationAgent(llmClient, model)
     : new MockSolutionGenerationAgent();
 
-  const clarificationAgent = useOpenAI
-    ? new OpenAIClarificationAgent(apiKey, model)
+  const clarificationAgent = llmClient
+    ? new OpenAIClarificationAgent(llmClient, model)
     : new MockClarificationAgent();
 
-  const proposalAgent = useOpenAI
-    ? new OpenAIProposalComposerAgent(apiKey, model)
+  const proposalAgent = llmClient
+    ? new OpenAIProposalComposerAgent(llmClient, model)
     : new MockProposalComposerAgent();
 
   const manifestAgent = new MockManifestGeneratorAgent();
@@ -68,6 +70,7 @@ function buildOrchestrator(
     proposalAgent,
     manifestAgent,
     {
+      provider: isMock ? "mock" : config.provider,
       idFactory,
       appBaseUrl: process.env["INTAKE_APP_URL"],
       intakeStore,
@@ -87,12 +90,11 @@ function buildOrchestrator(
   imports: [AdminModule],
   controllers: [DiscoveryHttpController],
   providers: [
-    PrismaDiscoverySessionStore,
     {
       provide: "DISCOVERY_CONTROLLER",
-      inject: [PrismaDiscoverySessionStore, PROJECT_INTAKE_STORE, GlobalSettingsService],
+      inject: [DISCOVERY_SESSION_STORE, PROJECT_INTAKE_STORE, GlobalSettingsService],
       useFactory: (
-        sessionStore: PrismaDiscoverySessionStore,
+        sessionStore: IDiscoverySessionStore,
         intakeStore: ProjectIntakeStore,
         settings: GlobalSettingsService,
       ) => buildOrchestrator(sessionStore, intakeStore, settings),

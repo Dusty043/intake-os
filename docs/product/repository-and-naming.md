@@ -496,8 +496,8 @@ Repository and naming implementation must include tests for:
 
 | ID | Question | Owner | Status | Notes |
 |---|---|---|---|---|
-| Q-REPO-001 | What are the approved team prefixes? | DevOps/Admin | open | Examples include `ds`, `ops`, `client`, `internal` |
-| Q-REPO-002 | Which GitHub org should repos be created under? | DevOps/Admin | open | Required before live provisioning |
-| Q-REPO-003 | Should repos be private by default? | DevOps/Admin | open | Likely yes for internal projects |
+| Q-REPO-001 | What are the approved team prefixes? | DevOps/Admin | resolved | Decision 2026-07-01 (= Q-0002 in `docs/ai/OPEN_QUESTIONS.md`): keep `ds`, `ops`, `client`, `internal` — no change. |
+| Q-REPO-002 | Which GitHub org should repos be created under? | DevOps/Admin | tentative | Decision 2026-07-01 (= Q-0003): `Simple-biz`, but unverified — picked from guessed quick-pick options, not typed by an admin. Confirm the exact org handle before first live provisioning. |
+| Q-REPO-003 | Should repos be private by default? | DevOps/Admin | resolved | Decision 2026-07-01 (= Q-0004): yes, private by default. |
 | Q-REPO-004 | Which branch protection rules should be applied by default? | DevOps/Admin | open | Could be deferred from v1 |
 | Q-REPO-005 | Which repo templates exist at launch? | DevOps/Admin | open | Needed for template registry |

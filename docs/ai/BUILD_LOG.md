@@ -1557,3 +1557,177 @@ GitHub repos: only for Web App, Chrome Extension, SaaS
 - Org context defaults from the constant; admin can override via Settings → Workspace Context textarea
 - All 5 OpenAI agents now receive the context — no mock agent changes needed (mocks use deterministic keyword logic)
 - `getOrgContext` and `getConfidenceThreshold` are fetched in parallel before analysis in `runAnalysis`
+
+---
+## 2026-07-01 — QA Session (Standard Tier)
+
+**Task**: `/qa` — Standard-tier QA: find and fix critical, high, medium bugs across all app flows.
+
+**Issues found and resolved**:
+- ISSUE-001 (high): Mock discovery agents polluted problem statement with short chat turns → filtered messages <15 chars
+- ISSUE-002 (medium): Breadcrumb showed truncated intake ID → show title with 50-char truncation
+- ISSUE-003 (by design): Evaluation tab empty in mock mode — IntakeEvaluation only created in orchestrator mode
+- ISSUE-004 (medium): Steering guidance appended to scope bullets → moved to assumptions array
+- ISSUE-005 (medium): "Approved By" shows `—` → added actorName to ApprovalRecord + fallback to actorId
+- ISSUE-006 (high): Distribution Preview 400 (teamPrefix missing) → added teamPrefix state+input+API param
+- ISSUE-007 (high): Discovery chat repeats identical keep_discovering response → floor tier at rough_frame after 2+ substantive messages; committed locally, push blocked by GitHub permissions
+- ISSUE-008 (medium): Reports "Submitted" column always `—` → submittedAt doesn't exist, switched to createdAt + renamed column
+
+**Infrastructure fixes**:
+- CORS missing allowedHeaders → x-actor-* headers were stripped by browser, defaulting all requests to request_creator
+- ActorProvider race condition → replaced useEffect with lazy useState for synchronous localStorage read
+
+**Commits**: b30c8d8, 3378718, 7e42752, 5819994, 18fcb7d, 414bd0e (+ earlier session commits)
+**Health score**: ~42 → 85/100
+**Pending**: ISSUE-007 fix needs push to oreochiserver; discovery timeline sidebar events don't advance visually
+
+---
+## 2026-07-01 — TASK-0036: AI Provider Config — Blank Env Var Fix + Dev/Prod Model Defaults
+
+**Status:** Complete
+
+**Context**: Continuing the provider-agnostic AI layer from TASK-0015 — dev should default to OpenAI, Bedrock is preferred for staging/production, other providers stay routable via `AI_PROVIDER`.
+
+**Bug found**: `loadAnalysisProviderConfig()` used `env["AI_PROVIDER"] ?? "mock"`. `??` doesn't catch empty strings, and the local `.env` had `AI_PROVIDER=` (present, blank) — so the app threw `ConfigurationError: AI_PROVIDER="" is not supported` at startup instead of defaulting to mock. Same gap existed for `OPENAI_MODEL`, `OPENAI_TASKS_MODEL`, `ANTHROPIC_MODEL`, `AWS_REGION`, `BEDROCK_MODEL_ID`, `BEDROCK_PREMIUM_MODEL_ID`, `BEDROCK_PROVIDER_MODE`.
+
+**Fixed**:
+- `src/application/providers/analysis-provider-config.ts` — added `nonEmpty()` helper treating blank/whitespace env values as absent; applied across all provider fields. Preserves TASK-0015's "no silent fallback" rule — an explicitly-set real provider still throws if its required key is missing.
+- OpenAI default model: `gpt-4o-mini` → `gpt-5.5` (`analysis-provider-config.ts` + `llm-client-factory.ts` `resolveModel()`); `OPENAI_TASKS_MODEL` override example updated to `gpt-5.4-mini` — the analysis pipeline runs one full draft-generation call (classification + drafting + synthesis-adjacent reasoning), which per `docs/product/ai-cost-governance.md` warrants the higher-capability tier, not the cheapest.
+- `model-cost-registry.ts` — added confirmed pricing for `gpt-5.5` ($5.00/$30.00), `gpt-5.4-mini` ($0.75/$4.50), `gpt-5.4-nano` ($0.20/$1.25) per 1M input/output tokens (source: developers.openai.com/api/docs/models/compare, checked 2026-07-01). `.env.example` documents `gpt-5.4-nano` as the manual cost-fallback option.
+- Bedrock model IDs left required with no hardcoded default (account/region-specific; unsafe to guess).
+- `.env` — removed dead `AI_LAYER_ENABLED` / `AWS_BEDROCK_MODEL_ID` (unread by any code); kept `AI_PROVIDER=mock` locally since no real `OPENAI_API_KEY` was available to add — documented the switch-to-`openai` path in a comment instead of fabricating a key.
+- `.env.example` — clarified dev → openai, prod → Bedrock preferred, blank values now safely default.
+- `tests/analysis-provider-config.test.mjs` — updated default-model assertion to `gpt-5.5`; added blank-`AI_PROVIDER`, blank-`OPENAI_MODEL`/`OPENAI_TASKS_MODEL`, blank-`BEDROCK_MODEL_ID`, and `OPENAI_TASKS_MODEL` override coverage.
+
+**Tests**: `npm run build:core` pass · `npm run typecheck` pass · `analysis-provider-config.test.mjs` 16/16 pass · `ai-cost-governance.test.mjs` 24/24 pass · `npm test` 683/688 pass (5 pre-existing failures in `discovery-phase-3.test.mjs`, unrelated — workflow status default mismatch, no reference to files touched here).
+
+**Task log**: `docs/ai/tasks/TASK-0036-ai-provider-config-blank-env-fix.md`
+
+**Follow-up**: Re-verify Bedrock Claude model IDs in `.env.example` against the AWS Bedrock console before first live use. Q-COST-1 stays open — per-agent model tiering (lower-cost vs higher-capability split) is not yet implemented; the pipeline still runs as one uniform-model call.
+
+---
+## 2026-07-01 — TASK-0037: Discovery Engine AI Cost Reporting
+
+**Status:** Complete
+
+**Context**: Discovery Engine's real OpenAI agents (intent extraction, problem framing, solution generation, clarification, proposal composition) made live LLM calls but never logged token usage or cost anywhere — only the intake-evaluation pipeline (TASK-0015/TASK-0030) fed `/admin/ai-usage`. Asked to log discovery's cost into the same report.
+
+**Built**:
+- `DiscoveryAgentUsageRecord`/`DiscoveryAgentRole` (`src/domain/discovery.ts`) + `usageRecords?` on `DiscoverySession`.
+- `DiscoveryAgentOptions.onUsage?` callback (`discovery-agent-contract.ts`); all 5 real OpenAI discovery agents now report `{agentRole, model, inputTokens, outputTokens, latencyMs}` after their LLM call (previously discarded the token counts already returned by `completeStructured()`).
+- `DiscoveryOrchestrator` converts events → full records (cost via existing `model-cost-registry.ts`) at all 5 call sites that touch real agents, appending to `session.usageRecords` (accumulates across turns, doesn't overwrite).
+- **Bug fixed in passing**: `discovery.module.ts`'s `buildOrchestrator()` never set `DiscoveryOrchestratorOptions.provider`, so every usage record would have been mistagged `provider: "mock"` regardless of the actual provider. Fixed.
+- `IDiscoverySessionStore.listAllUsageRecords()` (+ shared `flattenDiscoveryUsage()`) on both `InMemoryDiscoverySessionStore` and `PrismaDiscoverySessionStore` — **no Prisma migration needed**, since `DiscoverySessionRecord.snapshot` already stores the whole session as `Json`.
+- New global token `DISCOVERY_SESSION_STORE` (provided in `RuntimeModule`, not `DiscoveryModule`, to avoid a circular import with `AdminModule`) so `AiUsageController` can inject it directly.
+- `AiUsageController`'s `listUsage` and `monthlySummary` merge evaluation + discovery usage before aggregating — `totalCostUsd`/`totalTokens`/`runCount`/`byModel`/`byAgentRole` now reflect both; added `bySource` breakdown; `byIntake` preserved (evaluation-only, discovery has no intakeId yet).
+- UI: `/admin/ai-usage` gets a new "Cost by Source" table; `/reports`' AI Cost header gets an inline evaluation/discovery split. No other UI changes needed — both pages already render the merged totals generically.
+
+**Tests**: `tests/discovery-usage-tracking.test.mjs` (5) + `tests/openai-discovery-agents-usage.test.mjs` (6) — all pass. `npm run build:core`, `npm run typecheck`, `npm run api:build`, `apps/web` typecheck + production build all pass. `npm test` 698/703 (same 5 pre-existing unrelated failures).
+
+**Task log**: `docs/ai/tasks/TASK-0037-discovery-engine-ai-cost-reporting.md`
+
+**Follow-up**: No automated controller-level test exists for `AiUsageController` (no controller tests exist anywhere in this codebase) — recommend a manual smoke check against a running API. `docs/product/requirements-trace.md` G-001 noted but not restructured (Discovery Engine predates/isn't modeled by Appendix G).
+
+---
+## 2026-07-01 — TASK-0038: Monday Board Schema Verification (docs-only)
+
+**Status:** Complete
+
+**Context**: User supplied `Dev-Operations-Manager-Guide.pdf` (Simple.biz AI & Automation Team manager's guide) as the authoritative source for Q-0005. Asked to derive the Monday board schema from it and classify Project Intake OS's own project type against it.
+
+**Findings**: Code was already correct — `MondayProjectType` (`src/domain/discovery.ts`) and `SIMPLEBIZ_ORG_CONTEXT` (`org-context.ts`) already matched the guide's six-board Dev Operations Workspace closely (board hierarchy, sprint groups, quarter-based epics, 1/2/3/5/8/13 SP scale). The drift was in `docs/product/distribution-rules.md`, which listed an incomplete Project Type group set (`Web App / n8n Workflow / Dashboard / Process Change / Other`), missing `Chrome Extension`, `CRM`, `SaaS` that already exist in code.
+
+**Fixed**:
+- `docs/product/distribution-rules.md` — corrected Board 2 Project Type row to the real enum, cited the source PDF, noted Board 1 (Team Directory) is reference-only for the OS.
+- `docs/ai/OPEN_QUESTIONS.md` — Q-0001 and Q-0005 were stale (both already answered by existing repo state); marked resolved with source notes.
+
+**Classification**: Project Intake OS itself = **Web App** project type (Next.js + NestJS, internal, custom UI — matches `org-context.ts`'s own Web App definition verbatim). No code change; answered as classification only.
+
+**Tests**: Docs-only change, no tests run.
+
+**Task log**: `docs/ai/tasks/TASK-0038-monday-schema-verification.md`
+
+**Follow-up**: Guide's "and more" caveat on Projects Portfolio groups (beyond the 6 named) is unconfirmed against the live board — left open rather than guessed. `PROJECT_TYPE_BY_INTENT` in `mock-manifest-generator-agent.ts` has no mapping to `Chrome Extension`/`CRM`/`SaaS` since Discovery's `IntentType` has no corresponding intent categories yet — not a bug, just unexercised.
+
+---
+## 2026-07-01 — TASK-0039: Open Questions Decision Pass (docs-only)
+
+**Status:** Complete (decisions recorded; several need follow-up code changes)
+
+**Context**: Worked through 21 open questions in `docs/ai/OPEN_QUESTIONS.md` with the user via multiple-choice prompts and recorded the resulting decisions.
+
+**Resolved/deferred**: repo prefixes (no change), GitHub org (`Simple-biz`, tentative — unverified guess), private-by-default repos, keep monolith framework, email intake + Google Chat both deferred entirely, Google Auth going live (client ID to be set directly by admin), auth cookie fail-fast, per-target retry `maxAttempts`, no Chat notification on dead-letter/cancellation, scheduled-job backoff (v2), nginx-backstop rate limiting with flat tier, `gpt-5.5` confirmed live + admin-only cost visibility, DevOps-Lead-only completion authority, global `forbidNonWhitelisted`, 20-char minimum description length. Full table in `docs/ai/OPEN_QUESTIONS.md` and `docs/ai/tasks/TASK-0039-open-questions-decision-pass.md`.
+
+**Also updated**: `docs/product/repository-and-naming.md` (Q-REPO-001/002/003) and `docs/product/post-distribution-lifecycle.md` (Q-LIFE-001) — duplicate open-question tables that mirrored the same underlying questions, now consistent with the central resolutions.
+
+**Deliberately not implemented**: Q-AUTH-2 (auth startup behavior), Q-FAR-1/Q-FAR-3 (retry/dead-letter behavior, and Q-FAR-3 implies a new job-scheduling mechanism) fall under this repo's Safety Rules requiring explicit confirmation before editing auth/retry code — flagged rather than changed. Q-VAL-1/Q-VAL-2 are straightforward but also left for a follow-up implementation task since this pass was scoped as decision-recording only.
+
+**Tests**: Docs-only change, no tests run.
+
+**Task log**: `docs/ai/tasks/TASK-0039-open-questions-decision-pass.md`
+
+**Follow-up**: Confirm real GitHub org handle before any live provisioning (current value is a placeholder guess). If the user wants code changes, split into (a) auth/validation follow-up (Q-AUTH-2, Q-VAL-1, Q-VAL-2) and (b) retry/backoff follow-up (Q-FAR-1, Q-FAR-3 — the latter needs a design call on what runs the scheduled job).
+
+---
+## 2026-07-01 — TASK-0039 Part 2: Implement Auth/Validation/Retry Decisions
+
+**Status:** Complete (Q-FAR-3 deliberately not implemented — see below)
+
+**Context**: User asked to proceed with implementing the code-affecting decisions from the Part 1 decision pass.
+
+**Built**:
+- Q-VAL-1 (global `forbidNonWhitelisted`) — already true in `apps/api/src/main.ts`; no change needed.
+- Q-VAL-2 (20-char min intake description) — `MIN_INTAKE_DESCRIPTION_LENGTH` added to `validation-constants.ts`, applied to `CreateIntakeDto.description`. Updated `tests/input-validation.test.mjs`'s `validBase` fixture (was 19 chars, now under the new minimum) and added min-length test cases.
+- Q-AUTH-2 (fail-fast on missing `AUTH_SESSION_COOKIE_NAME` under google mode) — added to `src/auth-config-validator.ts`, documented in `.env.example`, tests added/updated in `tests/auth-config-validator.test.mjs` (existing "accepts google" tests needed the var set explicitly since `npm test` doesn't load `.env`).
+- Q-FAR-1 (per-target `maxAttempts`) — `AUTO_RETRY_MAX_BY_TARGET_KIND` map added to `intake-workflow-service.ts`; `executeWithAutoRetry` now resolves attempts via `executor.targetKind`. Empty map for now (no target has a different tolerance yet) — mechanism is in place.
+- Q-FAR-3 (scheduled-job backoff) — **not implemented**. Explained why in the task log: it's a real feature (new persisted retry-timestamp, a scheduling mechanism — no `@nestjs/schedule`/BullMQ installed — and a changed result contract for in-flight retries), not a config tweak, and lands squarely in this repo's Safety-Rule-gated retry/dead-letter category. Flagged for its own scoped task.
+
+**Incidental finding, then fixed**: `tests/rate-limiting.test.mjs` expects `aiEvaluation`/`inboundWebhook` tiers missing from `rate-limit.config.ts`'s working-tree state. Initially assumed pre-existing and spawned a background task; `git diff` showed both tiers exist at HEAD and were only missing from the uncommitted tree (accidental drop during in-flight TASK-0037 work) — withdrew the background task and restored the two tiers directly, matching HEAD exactly. Confirmed neither tier is wired to a `@Throttle()` decorator anywhere, same as at HEAD, so this is a config/test fix only, no runtime behavior change.
+
+**Tests**: `npm run typecheck` (root + apps/web) pass · `npm run build:core` pass · `npm run api:build` pass · `node --test tests/*.test.mjs` — 5 pre-existing failures remain (discovery workflow-status-default mismatch, known since TASK-0036/37); the 6 rate-limiting failures are fixed. All auth-config-validator and input-validation tests pass including new cases.
+
+**Task log**: `docs/ai/tasks/TASK-0039-open-questions-decision-pass.md` (Part 2 section)
+
+**Follow-up**: `aiEvaluation`/`inboundWebhook` tiers are restored and tested but still unwired to any endpoint (true at HEAD too) — worth revisiting if those need their own throttle tier.
+
+---
+## 2026-07-01 — TASK-0039 Part 3: Q-FAR-3 Scheduled Background Retry (branch: feature/scheduled-retry-backoff)
+
+**Status:** Complete
+
+**Context**: User asked to continue with Q-FAR-3. Before building, checked the actual delay being avoided (~3s max, 3 attempts) against what "true v2" requires: the run has to stay `"executing"` until the background retry resolves, and the intake detail page doesn't currently poll for run status. Presented the tradeoff (full backend+frontend / backend-only with a UI gap / not worth building) — user chose full v2, on a separate branch since `main`'s working tree already carries unrelated uncommitted work. Created `feature/scheduled-retry-backoff`.
+
+**Built** (no new dependency, no DB migration):
+- `src/domain/provisioning.ts` — added `"pending_retry"` target status (safe: `status` is a plain Prisma `String` column, not an enum).
+- `src/application/intake-workflow-service.ts` — replaced the blocking `executeWithAutoRetry` loop with `attemptOnce` + `executeTargetsAndFinalize` + `settleBackgroundRetry` (the detached `setTimeout`-based continuation) + a shared `finalizeProvisioningRun` extracted from the previously-duplicated tails of `executeDistribution`/`retryFailedProvisioningTargets`. Fixed a latent dead-letter double-counting risk uncovered while extracting the shared finalize logic (the old `+1` fudge assumed the current run was never persisted before the count — no longer safe once an interim `pending_retry` save can happen first; now excludes the current run's id explicitly instead).
+- `apps/web/src/lib/types.ts` + `apps/web/src/app/intakes/[id]/page.tsx` — added `"pending_retry"` to the frontend status union, a "Retrying…" badge, and a polling `useEffect` (keyed on a derived boolean, not the runs array) that refreshes every 2s while any run is `"executing"`, stopping once settled.
+- `tests/provisioning-scheduled-retry.test.mjs` (new) — custom transient-then-succeed executor proves: (1) the call returns in <500ms instead of blocking on backoff, (2) background settlement finalizes the run to `completed` and the intake to `distributed`, (3) exhausting all attempts finalizes to `failed`/`provisioning_failed`.
+
+**Tests**: `tests/provisioning-execution.test.mjs` + `tests/provisioning-retry.test.mjs` (20 existing tests, unmodified) — all pass, confirming existing mock executors never exercised this path before or after (their failure messages don't match any auto-retryable category) — backs the "no behavior change for the common case" claim. New test file: 3/3 pass. Full suite: same 5 pre-existing discovery failures, nothing new. `npm run typecheck` (root + apps/web), `npm run build:core`, `npm run api:build`, `apps/web` production build — all pass.
+
+**Task log**: `docs/ai/tasks/TASK-0039-open-questions-decision-pass.md` (Part 3 section)
+
+**Follow-up**: Branch not yet merged to `main` — it carries all prior uncommitted session work too since nothing was committed before branching; needs a commit/merge decision before landing. Crash-durability of in-flight background retries is unchanged from the old blocking version (not a regression, not an upgrade either) — persisted `nextRetryAt` + sweep is the documented upgrade path if that gap ever matters.
+
+---
+## 2026-07-02 — TASK-0039 Part 4: Live Smoke Test on oreochiserver, Two Real Bugs Found and Fixed
+
+**Status:** Complete
+
+**Context**: Local browser verification of Q-FAR-3 was blocked by environment contention with another concurrent chat session (shared dev-server ports and shared `.next` build directory). User asked to SSH to oreochiserver and run the smoke test from there.
+
+**Isolation**: cloned a separate checkout to `~/intake-os-qa` on the server rather than touch the live shared `~/intake-os` deployment (confirmed its containers were untouched throughout) — own Docker Compose project name, own ports (proxy on 8091), own throwaway Postgres. Tunneled back to this machine via `ssh -L` and drove the browser Preview tool against it.
+
+**Bug 1 (pre-existing, not Q-FAR-3-specific)**: `PrismaProjectIntakeStore.saveIntake` never persisted `ProvisioningPlan`/`ProvisioningPlanAction` rows — only kept the plan as JSON in `recordSnapshot`. `ProvisioningRun.planId` is a real FK into `ProvisioningPlan`, so **every** real (Postgres-backed) distribution execution failed with `P2003: Foreign key constraint violated`. Invisible in `npm test` since it only exercises `InMemoryProjectIntakeStore`. Fixed: `saveIntake` now upserts `ProvisioningPlan` + its actions inside the same transaction, mirroring the snapshot pattern used elsewhere.
+
+**Bug 2 (exposed by Q-FAR-3's new two-phase persistence)**: `saveProvisioningRun`'s target `update` block passed `errorMessage`/`externalId`/`externalUrl` through without `?? null` — Prisma treats `undefined` as "leave alone," not "clear," so a target that failed (persisted mid-retry) then later succeeded kept its stale error message. The old synchronous code never hit this since it only ever persisted a target once, with its final result. Fixed by adding `?? null` to match the pattern already used for `errorCategory`/`deadLetteredAt`/`completedAt`.
+
+**Verified live**: reproduced both bugs on the QA deployment, fixed, redeployed, reverified — `distribution/execute` went 500→201; direct curl polling (0.3s intervals, to catch the mid-flight state faster than browser round-trips) showed the immediate `executing`/`pending_retry` response, 3 polls still `pending_retry`, then `completed`/`succeeded` with `errorMessage: null`. Frontend polling confirmed via network log (`GET .../distribution/runs` firing repeatedly after execute, stopping once settled).
+
+**Cleanup**: QA stack fully torn down (`docker compose down -v`), clone directory removed, tunnel closed, both `.claude/launch.json` files (this repo's and the parent directory's, which the Preview tool actually reads) reverted.
+
+**Tests**: `npm run typecheck`/`build:core`/`api:build` pass. `node --test tests/*.test.mjs` — same 5 pre-existing discovery failures, nothing new. No automated Prisma-integration test added for either bug (this repo has none today) — verified live instead.
+
+**Task log**: `docs/ai/tasks/TASK-0039-open-questions-decision-pass.md` (Part 4 section)
+
+**Follow-up**: Bug 1 predates this branch and likely affects the shared `~/intake-os` deployment too, independent of this PR, once its `api`/`postgres` containers restart — worth checking. No automated coverage for either fix; flag if this repo ever adds Postgres integration tests.

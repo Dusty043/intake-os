@@ -1,6 +1,6 @@
 import type { EvaluationAgent, AgentOutput, AgentRunContext, AgentRunOptions } from "../agent-contract.js";
 import type { DistributionPlanSectionContent } from "../../intake-evaluation.js";
-import { callEvalStructured } from "./openai-eval-client.js";
+import type { LlmClient } from "../../llm-client.js";
 
 const schema = {
   type: "object",
@@ -46,14 +46,14 @@ const SYSTEM = `You are a project distribution planner. Determine how this proje
 
 export class OpenAIDistributionPlannerAgent implements EvaluationAgent<DistributionPlanSectionContent> {
   readonly role = "distribution_plan" as const;
-  constructor(private readonly apiKey: string, private readonly model: string) {}
+  constructor(private readonly client: LlmClient, private readonly model: string) {}
 
   async run(ctx: AgentRunContext, opts: AgentRunOptions): Promise<AgentOutput<DistributionPlanSectionContent>> {
     const { intake } = ctx;
     const userPrompt = `Title: ${intake.title}\nDescription:\n${intake.description}`;
-    const out = await callEvalStructured<{ monday: DistributionPlanSectionContent["monday"]; github: DistributionPlanSectionContent["github"]; distributionNotes: string[] }>(
-      this.apiKey, this.model, SYSTEM, userPrompt, "distribution_plan", schema as unknown as Record<string,unknown>,
-    );
+    const { content: out } = await this.client.completeStructured<{ monday: DistributionPlanSectionContent["monday"]; github: DistributionPlanSectionContent["github"]; distributionNotes: string[] }>({
+      model: this.model, systemPrompt: SYSTEM, userPrompt: userPrompt, schemaName: "distribution_plan", schema: schema as unknown as Record<string,unknown>,
+    });
     const content: DistributionPlanSectionContent = { ...out, dryRunOnly: true };
     return { sectionKind: "distribution_plan", content, confidence: 0.78, warnings: [] };
   }

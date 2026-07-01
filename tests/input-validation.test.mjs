@@ -31,6 +31,7 @@ const constants = await import(
 
 const {
   MAX_INTAKE_TITLE_LENGTH,
+  MIN_INTAKE_DESCRIPTION_LENGTH,
   MAX_INTAKE_DESCRIPTION_LENGTH,
   MAX_REQUESTER_NAME_LENGTH,
   MAX_DEPARTMENT_NAME_LENGTH,
@@ -68,7 +69,7 @@ async function expectInvalid(DtoClass, plain, field) {
 describe("CreateIntakeDto — max length enforcement", () => {
   const validBase = {
     title: "A valid title",
-    description: "A valid description",
+    description: "A valid description of sufficient length.",
     requester: "Jane Smith",
     projectType: "internal_tool",
   };
@@ -91,6 +92,14 @@ describe("CreateIntakeDto — max length enforcement", () => {
 
   test("description over max → rejected", async () => {
     await expectInvalid(CreateIntakeDto, { ...validBase, description: str(MAX_INTAKE_DESCRIPTION_LENGTH + 1) }, "description");
+  });
+
+  test("description at exact min passes", async () => {
+    await expectValid(CreateIntakeDto, { ...validBase, description: str(MIN_INTAKE_DESCRIPTION_LENGTH) });
+  });
+
+  test("description under min → rejected", async () => {
+    await expectInvalid(CreateIntakeDto, { ...validBase, description: str(MIN_INTAKE_DESCRIPTION_LENGTH - 1) }, "description");
   });
 
   test("requester over max → rejected", async () => {
@@ -235,6 +244,7 @@ describe("validation constants — sanity checks", () => {
   test("all constants are positive integers", () => {
     const vals = [
       MAX_INTAKE_TITLE_LENGTH,
+      MIN_INTAKE_DESCRIPTION_LENGTH,
       MAX_INTAKE_DESCRIPTION_LENGTH,
       MAX_REQUESTER_NAME_LENGTH,
       MAX_DEPARTMENT_NAME_LENGTH,
@@ -250,6 +260,10 @@ describe("validation constants — sanity checks", () => {
 
   test("description limit is larger than title limit", () => {
     assert.ok(MAX_INTAKE_DESCRIPTION_LENGTH > MAX_INTAKE_TITLE_LENGTH);
+  });
+
+  test("description max is larger than description min", () => {
+    assert.ok(MAX_INTAKE_DESCRIPTION_LENGTH > MIN_INTAKE_DESCRIPTION_LENGTH);
   });
 
   test("comment limit is larger than note limit", () => {

@@ -133,6 +133,13 @@ export default function ReportsPage() {
             <section>
               <h2 className="text-base font-semibold text-brand-text mb-3">
                 AI Cost — {aiSummary.month}
+                {aiSummary.bySource && (
+                  <span className="ml-2 text-sm font-normal text-brand-muted">
+                    {Object.entries(aiSummary.bySource)
+                      .map(([source, d]) => `${source}: ${fmt(d.costUsd)}`)
+                      .join(" · ")}
+                  </span>
+                )}
               </h2>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
                 <StatCard label="Est. Cost" value={fmt(aiSummary.totalCostUsd)} />

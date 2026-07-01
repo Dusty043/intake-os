@@ -18,10 +18,19 @@ import type { IntakeAnalysisProvider } from "./intake-analysis-provider.js";
 import { validateIntakeAnalysisDraft } from "./intake-analysis.js";
 import { MockIntakeAnalysisProvider } from "./providers/mock-intake-analysis-provider.js";
 import { buildDryRunProvisioningPlan, resolveDistributionSource } from "./provisioning-plan.js";
-import type { ProvisioningExecutor, ProvisioningRegistry } from "./provisioning/provisioning-executor.js";
-import type { ProvisioningRun, ProvisioningTargetResult } from "../domain/provisioning.js";
+import type {
+  ProvisioningContext,
+  ProvisioningExecutor,
+  ProvisioningRegistry,
+} from "./provisioning/provisioning-executor.js";
+import type {
+  ProvisioningRun,
+  ProvisioningRunStatus,
+  ProvisioningTargetKind,
+  ProvisioningTargetResult,
+} from "../domain/provisioning.js";
 import type { GoogleChatNotifier } from "./notifications/google-chat-notifier.js";
-import { normalizeProvisioningError } from "../domain/error-categories.js";
+import { isAutoRetryable, normalizeProvisioningError } from "../domain/error-categories.js";
 import { calculateBackoffMs, sleep } from "./provisioning/backoff.js";
 import type { RosterApiClient } from "./roster/index.js";
 import type {
@@ -72,36 +81,184 @@ export class IntakeWorkflowService {
 
   private static readonly DEAD_LETTER_CEILING = 3;
   private static readonly AUTO_RETRY_MAX = 3;
+  // Q-FAR-1: per-target override. Empty until DevOps asks for a different retry
+  // tolerance for a specific target kind (e.g. { github_repo: 5 }); falls back to
+  // AUTO_RETRY_MAX for any kind not listed here.
+  private static readonly AUTO_RETRY_MAX_BY_TARGET_KIND: Partial<Record<ProvisioningTargetKind, number>> = {};
+
+  private static maxAttemptsFor(targetKind: ProvisioningTargetKind): number {
+    return (
+      IntakeWorkflowService.AUTO_RETRY_MAX_BY_TARGET_KIND[targetKind] ??
+      IntakeWorkflowService.AUTO_RETRY_MAX
+    );
+  }
 
   get activeProviderName(): string {
     return this.analysisProvider.name;
   }
 
-  private async executeWithAutoRetry(
+  private async attemptOnce(
     executor: ProvisioningExecutor,
-    input: Parameters<ProvisioningExecutor["execute"]>[0],
+    ctx: ProvisioningContext,
+    attempt: number,
   ): Promise<ProvisioningTargetResult> {
-    let lastResult: ProvisioningTargetResult | undefined;
-    for (let attempt = 1; attempt <= IntakeWorkflowService.AUTO_RETRY_MAX; attempt++) {
-      const result = await executor.execute({ ...input });
-      if (result.status === "succeeded") return result;
+    const result = await executor.execute({ ...ctx });
+    if (result.status === "succeeded") return result;
 
-      const normalized = normalizeProvisioningError(result.errorMessage ?? "unknown error");
-      // Annotate the error category but preserve the executor's retryable signal — the
-      // manual retry path depends on it. Auto-retry is determined solely by category.
-      lastResult = {
-        ...result,
-        errorCategory: normalized.category,
-        attemptCount: attempt,
-      };
+    const normalized = normalizeProvisioningError(result.errorMessage ?? "unknown error");
+    // Annotate the error category but preserve the executor's retryable signal — the
+    // manual retry path depends on it. Auto-retry is determined solely by category.
+    return { ...result, errorCategory: normalized.category, attemptCount: attempt };
+  }
 
-      const isAutoRetryable = normalized.category === "transient_api_error" || normalized.category === "rate_limit";
-      if (!isAutoRetryable || attempt >= IntakeWorkflowService.AUTO_RETRY_MAX) break;
+  // `errorCategory` is stored as a loose `string` on the domain type (matches the Prisma
+  // column), but `attemptOnce` only ever writes it from `normalizeProvisioningError`'s
+  // narrow union — safe to narrow back here for the one place that needs to branch on it.
+  private isAutoRetryableResult(result: ProvisioningTargetResult): boolean {
+    return (
+      result.status !== "succeeded" &&
+      result.errorCategory !== undefined &&
+      isAutoRetryable(result.errorCategory as Parameters<typeof isAutoRetryable>[0])
+    );
+  }
 
-      const delay = calculateBackoffMs(attempt);
-      await sleep(delay);
+  // Q-FAR-3: runs every executor once synchronously. A target that fails with an
+  // auto-retryable category and has attempts remaining is NOT retried inline (that would
+  // block the caller on backoff sleep, "v1" behavior) — instead it's returned as
+  // "pending_retry" and the remaining attempts continue as a detached background
+  // continuation (settleBackgroundRetry). ponytail: this continuation lives only in this
+  // process's event loop, not a persisted+swept job — if the process restarts mid-backoff
+  // the retry is lost, same durability as the old blocking version (an in-flight
+  // `await sleep()` is also lost on crash). Upgrade to a persisted nextRetryAt + cron sweep
+  // only if that gap actually bites in practice.
+  private async executeTargetsAndFinalize(
+    executors: readonly ProvisioningExecutor[],
+    ctx: ProvisioningContext,
+    run: ProvisioningRun,
+  ): Promise<ProvisioningRun> {
+    const attempts = await Promise.all(
+      executors.map(async (executor) => {
+        const maxAttempts = IntakeWorkflowService.maxAttemptsFor(executor.targetKind);
+        const first = await this.attemptOnce(executor, ctx, 1);
+        const canAutoRetry = this.isAutoRetryableResult(first) && maxAttempts > 1;
+        if (!canAutoRetry) return first;
+
+        void this.settleBackgroundRetry(executor, ctx, first, maxAttempts);
+        return { ...first, status: "pending_retry" as const };
+      }),
+    );
+
+    const interimRun: ProvisioningRun = { ...run, targets: attempts };
+    await this.store.saveProvisioningRun(interimRun);
+
+    if (attempts.some((t) => t.status === "pending_retry")) {
+      return interimRun; // still executing — settleBackgroundRetry finalizes once resolved
     }
-    return lastResult!;
+    return this.finalizeProvisioningRun(interimRun, ctx.actor);
+  }
+
+  private async settleBackgroundRetry(
+    executor: ProvisioningExecutor,
+    ctx: ProvisioningContext,
+    firstResult: ProvisioningTargetResult,
+    maxAttempts: number,
+  ): Promise<void> {
+    let last = firstResult;
+    for (let attempt = 2; attempt <= maxAttempts; attempt++) {
+      await sleep(calculateBackoffMs(attempt - 1));
+      last = await this.attemptOnce(executor, ctx, attempt);
+      const canAutoRetry = this.isAutoRetryableResult(last) && attempt < maxAttempts;
+      if (!canAutoRetry) break;
+    }
+
+    const run = await this.store.getProvisioningRun(ctx.intakeId, ctx.runId);
+    if (!run) return; // defensive — run should always exist by the time backoff settles
+
+    const updatedTargets = run.targets.map((t) => (t.targetKind === executor.targetKind ? last : t));
+    const updatedRun: ProvisioningRun = { ...run, targets: updatedTargets };
+
+    if (updatedTargets.some((t) => t.status === "pending_retry")) {
+      // another target is still backing off — persist this one's outcome and wait for it too
+      await this.store.saveProvisioningRun(updatedRun);
+      return;
+    }
+
+    await this.finalizeProvisioningRun(updatedRun, ctx.actor);
+  }
+
+  // Shared tail for executeDistribution and retryFailedProvisioningTargets — also the
+  // completion path for a background-settled retry (settleBackgroundRetry above). Computes
+  // final run status, applies the dead-letter ceiling, transitions workflow status, audits,
+  // and notifies. `allRuns` is filtered to exclude `run.id` when counting prior failures so
+  // this behaves identically whether `run` has already been interim-saved or not.
+  private async finalizeProvisioningRun(run: ProvisioningRun, actor: Actor): Promise<ProvisioningRun> {
+    const intakeId = run.intakeId;
+    const priorRuns = (await this.store.listProvisioningRuns(intakeId)).filter((r) => r.id !== run.id);
+    const deadLetteredNow = this.clock();
+
+    const targetResults = run.targets.map((result) => {
+      if (result.status !== "failed" || result.deadLettered) return result;
+      const failCount =
+        priorRuns.reduce(
+          (n, r) => n + r.targets.filter((t) => t.targetKind === result.targetKind && t.status === "failed").length,
+          0,
+        ) + 1; // +1 for this run's own failure of this target kind
+      if (failCount < IntakeWorkflowService.DEAD_LETTER_CEILING) return result;
+      return { ...result, retryable: false, deadLettered: true, deadLetteredAt: deadLetteredNow };
+    });
+
+    const record = await this.requireIntake(intakeId);
+    for (const result of targetResults) {
+      if (result.deadLettered && result.deadLetteredAt === deadLetteredNow) {
+        await this.notifier?.notify({
+          eventType: "provisioning_dead_lettered",
+          intakeId,
+          title: record.title,
+          requester: record.requester,
+          detail: `Target "${result.targetKind}" has failed repeatedly and is now dead-lettered. Manual intervention required.`,
+        });
+      }
+    }
+
+    const allSucceeded = targetResults.every((t) => t.status === "succeeded");
+    const allFailed = targetResults.every((t) => t.status === "failed");
+    const runStatus: ProvisioningRunStatus = allSucceeded ? "completed" : allFailed ? "failed" : "partial_success";
+
+    const completedNow = this.clock();
+    const completedRun: ProvisioningRun = {
+      ...run,
+      status: runStatus,
+      completedAt: completedNow,
+      targets: targetResults,
+    };
+    await this.store.saveProvisioningRun(completedRun);
+
+    const latestRecord = await this.requireIntake(intakeId);
+    const nextAction: WorkflowAction = runStatus === "completed" ? "success" : "failure";
+    await this.applyTransitionToRecord(latestRecord, nextAction, actor, completedNow);
+
+    const isRetryRun = run.kind === "retry";
+    await this.audit({
+      record: latestRecord,
+      actor,
+      action: runStatus === "completed"
+        ? (isRetryRun ? "DISTRIBUTION_RETRY_COMPLETED" : "DISTRIBUTION_EXECUTION_COMPLETED")
+        : (isRetryRun ? "DISTRIBUTION_RETRY_FAILED" : "DISTRIBUTION_EXECUTION_FAILED"),
+      timestamp: completedNow,
+      fromState: "provisioning",
+      toState: runStatus === "completed" ? "distributed" : "provisioning_failed",
+      metadata: {
+        runId: run.id,
+        planId: run.planId,
+        runStatus,
+        succeeded: targetResults.filter((t) => t.status === "succeeded").length,
+        failed: targetResults.filter((t) => t.status === "failed").length,
+        ...(isRetryRun && run.retryOfRunId ? { originalRunId: run.retryOfRunId } : {}),
+      },
+    });
+
+    await this.notifyProvisioningOutcome(latestRecord, runStatus, targetResults);
+    return completedRun;
   }
 
   async listIntakes(): Promise<readonly ProjectIntakeRecord[]> {
@@ -974,56 +1131,15 @@ export class IntakeWorkflowService {
     });
 
     const executors = this.provisioningRegistry.getAll();
-    const targetResults = await Promise.all(
-      executors.map((executor) =>
-        this.executeWithAutoRetry(executor, {
-          intakeId: id,
-          planId,
-          runId,
-          actor,
-          reviewedPackage: record.reviewedProjectPackage!,
-          isRetry: false,
-        }),
-      ),
-    );
-
-    const allSucceeded = targetResults.every((t) => t.status === "succeeded");
-    const allFailed = targetResults.every((t) => t.status === "failed");
-    const runStatus = allSucceeded ? "completed" : allFailed ? "failed" : "partial_success";
-
-    const completedNow = this.clock();
-    const completedRun: ProvisioningRun = {
-      ...run,
-      status: runStatus,
-      completedAt: completedNow,
-      targets: targetResults,
-    };
-
-    await this.store.saveProvisioningRun(completedRun);
-
-    const latestRecord = await this.requireIntake(id);
-    const nextStatus: WorkflowAction = runStatus === "completed" ? "success" : "failure";
-    await this.applyTransitionToRecord(latestRecord, nextStatus, actor, completedNow);
-
-    await this.audit({
-      record: latestRecord,
+    const ctx: ProvisioningContext = {
+      intakeId: id,
+      planId,
+      runId,
       actor,
-      action: runStatus === "completed" ? "DISTRIBUTION_EXECUTION_COMPLETED" : "DISTRIBUTION_EXECUTION_FAILED",
-      timestamp: completedNow,
-      fromState: "provisioning",
-      toState: runStatus === "completed" ? "distributed" : "provisioning_failed",
-      metadata: {
-        runId,
-        planId,
-        runStatus,
-        succeeded: targetResults.filter((t) => t.status === "succeeded").length,
-        failed: targetResults.filter((t) => t.status === "failed").length,
-      },
-    });
-
-    await this.notifyProvisioningOutcome(latestRecord, runStatus, targetResults);
-
-    return completedRun;
+      reviewedPackage: record.reviewedProjectPackage!,
+      isRetry: false,
+    };
+    return this.executeTargetsAndFinalize(executors, ctx, run);
   }
 
   async listProvisioningRuns(intakeId: string): Promise<ProvisioningRun[]> {
@@ -1120,79 +1236,15 @@ export class IntakeWorkflowService {
       .getAll()
       .filter((e) => retryableKinds.has(e.targetKind));
 
-    const targetResults = await Promise.all(
-      executors.map((executor) =>
-        this.executeWithAutoRetry(executor, {
-          intakeId,
-          planId,
-          runId: retryRunId,
-          actor,
-          reviewedPackage: record.reviewedProjectPackage!,
-          isRetry: true,
-        }),
-      ),
-    );
-
-    const allSucceeded = targetResults.every((t) => t.status === "succeeded");
-    const allFailed = targetResults.every((t) => t.status === "failed");
-    const retryRunStatus = allSucceeded ? "completed" : allFailed ? "failed" : "partial_success";
-
-    // Dead-letter ceiling: promote permanently failed targets if total failures >= ceiling
-    const allRuns = await this.store.listProvisioningRuns(intakeId);
-    const deadLetteredNow = this.clock();
-    for (const result of targetResults) {
-      if (result.status !== "failed") continue;
-      const failCount = allRuns.reduce((n, r) =>
-        n + r.targets.filter((t) => t.targetKind === result.targetKind && t.status === "failed").length, 0
-      ) + 1; // +1 for this retry run (not yet persisted)
-      if (failCount >= IntakeWorkflowService.DEAD_LETTER_CEILING) {
-        result.retryable = false;
-        result.deadLettered = true;
-        result.deadLetteredAt = deadLetteredNow;
-        await this.notifier?.notify({
-          eventType: "provisioning_dead_lettered",
-          intakeId,
-          title: record.title,
-          requester: record.requester,
-          detail: `Target "${result.targetKind}" has failed ${failCount} times and is now dead-lettered. Manual intervention required.`,
-        });
-      }
-    }
-
-    const completedNow = this.clock();
-    const completedRetryRun: ProvisioningRun = {
-      ...retryRun,
-      status: retryRunStatus,
-      completedAt: completedNow,
-      targets: targetResults,
-    };
-
-    await this.store.saveProvisioningRun(completedRetryRun);
-
-    const latestRecord = await this.requireIntake(intakeId);
-    const nextAction: WorkflowAction = retryRunStatus === "completed" ? "success" : "failure";
-    await this.applyTransitionToRecord(latestRecord, nextAction, actor, completedNow);
-
-    await this.audit({
-      record: latestRecord,
+    const ctx: ProvisioningContext = {
+      intakeId,
+      planId,
+      runId: retryRunId,
       actor,
-      action: retryRunStatus === "completed" ? "DISTRIBUTION_RETRY_COMPLETED" : "DISTRIBUTION_RETRY_FAILED",
-      timestamp: completedNow,
-      fromState: "provisioning",
-      toState: retryRunStatus === "completed" ? "distributed" : "provisioning_failed",
-      metadata: {
-        retryRunId,
-        originalRunId,
-        planId,
-        retryRunStatus,
-        succeeded: targetResults.filter((t) => t.status === "succeeded").length,
-        failed: targetResults.filter((t) => t.status === "failed").length,
-      },
-    });
-
-    await this.notifyProvisioningOutcome(latestRecord, retryRunStatus, targetResults);
-
-    return completedRetryRun;
+      reviewedPackage: record.reviewedProjectPackage!,
+      isRetry: true,
+    };
+    return this.executeTargetsAndFinalize(executors, ctx, retryRun);
   }
 
   private async notifyProvisioningOutcome(

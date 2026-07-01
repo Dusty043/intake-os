@@ -1,6 +1,6 @@
 import type { EvaluationAgent, AgentOutput, AgentRunContext, AgentRunOptions } from "../agent-contract.js";
 import type { IntakeBriefSectionContent } from "../../intake-evaluation.js";
-import { callEvalStructured } from "./openai-eval-client.js";
+import type { LlmClient } from "../../llm-client.js";
 
 const schema = {
   type: "object",
@@ -24,15 +24,15 @@ const SYSTEM = `You are a senior project analyst. Summarize and normalize the in
 
 export class OpenAIIntakeAnalystAgent implements EvaluationAgent<IntakeBriefSectionContent> {
   readonly role = "intake_brief" as const;
-  constructor(private readonly apiKey: string, private readonly model: string) {}
+  constructor(private readonly client: LlmClient, private readonly model: string) {}
 
   async run(ctx: AgentRunContext, opts: AgentRunOptions): Promise<AgentOutput<IntakeBriefSectionContent>> {
     const { intake } = ctx;
     const userPrompt = `Title: ${intake.title}\nRequester: ${intake.requester ?? "unknown"}\nDescription:\n${intake.description}`;
 
-    const out = await callEvalStructured<IntakeBriefSectionContent>(
-      this.apiKey, this.model, SYSTEM, userPrompt, "intake_brief", schema as unknown as Record<string,unknown>,
-    );
+    const { content: out } = await this.client.completeStructured<IntakeBriefSectionContent>({
+      model: this.model, systemPrompt: SYSTEM, userPrompt: userPrompt, schemaName: "intake_brief", schema: schema as unknown as Record<string,unknown>,
+    });
 
     return { sectionKind: "intake_brief", content: { ...out, title: intake.title }, confidence: 0.85, warnings: [] };
   }

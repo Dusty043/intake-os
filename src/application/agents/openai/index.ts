@@ -1,3 +1,4 @@
+import type { LlmClient } from "../../llm-client.js";
 import { OpenAIIntakeAnalystAgent } from "./openai-intake-analyst-agent.js";
 import { OpenAIClarificationQuestionsAgent } from "./openai-clarification-questions-agent.js";
 import { OpenAIProjectClassifierAgent } from "./openai-project-classifier-agent.js";
@@ -26,19 +27,19 @@ export {
   OpenAICriticQAAgent,
 };
 
-export function createAllOpenAIEvaluationAgents(apiKey: string, model: string) {
+export function createAllEvaluationAgents(client: LlmClient, model: string) {
   return [
-    new OpenAIIntakeAnalystAgent(apiKey, model),
-    new OpenAIClarificationQuestionsAgent(apiKey, model),
-    new OpenAIProjectClassifierAgent(apiKey, model),
-    new OpenAISolutionsArchitectAgent(apiKey, model),
-    new OpenAILowCodePathAgent(apiKey, model),
-    new OpenAICustomBuildAgent(apiKey, model),
-    new OpenAIRiskSecurityAgent(apiKey, model),
-    new OpenAICostEffortAgent(apiKey, model),
-    new OpenAIWorkBreakdownAgent(apiKey, model),
-    new OpenAIDistributionPlannerAgent(apiKey, model),
-    new OpenAIFinalSynthesisAgent(apiKey, model),
-    new OpenAICriticQAAgent(apiKey, model),
+    new OpenAIIntakeAnalystAgent(client, model),
+    new OpenAIClarificationQuestionsAgent(client, model),
+    new OpenAIProjectClassifierAgent(client, model),
+    new OpenAISolutionsArchitectAgent(client, model),
+    new OpenAILowCodePathAgent(client, model),
+    new OpenAICustomBuildAgent(client, model),
+    new OpenAIRiskSecurityAgent(client, model),
+    new OpenAICostEffortAgent(client, model),
+    new OpenAIWorkBreakdownAgent(client, model),
+    new OpenAIDistributionPlannerAgent(client, model),
+    new OpenAIFinalSynthesisAgent(client, model),
+    new OpenAICriticQAAgent(client, model),
   ];
 }

@@ -1,7 +1,7 @@
 import type { EvaluationAgent, AgentOutput, AgentRunContext, AgentRunOptions } from "../agent-contract.js";
 import type { QualityReviewSectionContent } from "../../intake-evaluation.js";
 import { qualityBandFromScore } from "../../intake-evaluation.js";
-import { callEvalStructured } from "./openai-eval-client.js";
+import type { LlmClient } from "../../llm-client.js";
 
 const schema = {
   type: "object",
@@ -54,7 +54,7 @@ reviewerWarnings: flags for the human reviewer`;
 
 export class OpenAICriticQAAgent implements EvaluationAgent<QualityReviewSectionContent> {
   readonly role = "quality_review" as const;
-  constructor(private readonly apiKey: string, private readonly model: string) {}
+  constructor(private readonly client: LlmClient, private readonly model: string) {}
 
   async run(ctx: AgentRunContext, opts: AgentRunOptions): Promise<AgentOutput<QualityReviewSectionContent>> {
     const { intake, sections } = ctx;
@@ -62,9 +62,9 @@ export class OpenAICriticQAAgent implements EvaluationAgent<QualityReviewSection
       .map(([kind, s]) => `[${kind}]: ${JSON.stringify(s?.content).slice(0, 300)}`)
       .join("\n");
     const userPrompt = `Title: ${intake.title}\n\nEvaluation sections to review:\n${sectionSummary}`;
-    const out = await callEvalStructured<Omit<QualityReviewSectionContent, "qualityScore"> & { qualityScore: { dimensions: QualityReviewSectionContent["qualityScore"]["dimensions"]; overall: number } }>(
-      this.apiKey, this.model, SYSTEM, userPrompt, "quality_review", schema as unknown as Record<string,unknown>,
-    );
+    const { content: out } = await this.client.completeStructured<Omit<QualityReviewSectionContent, "qualityScore"> & { qualityScore: { dimensions: QualityReviewSectionContent["qualityScore"]["dimensions"]; overall: number } }>({
+      model: this.model, systemPrompt: SYSTEM, userPrompt: userPrompt, schemaName: "quality_review", schema: schema as unknown as Record<string,unknown>,
+    });
 
     const clamp = (v: number) => Math.max(0, Math.min(100, v));
     const dims = {

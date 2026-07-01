@@ -1,7 +1,7 @@
-import OpenAI from "openai";
 import type { ClarificationQuestion } from "../../../../domain/discovery.js";
 import type { DiscoveryAgentContext, DiscoveryAgentOptions, IClarificationAgent } from "../discovery-agent-contract.js";
-import { callStructured, makeClient } from "./openai-discovery-client.js";
+import { completeWithUsage } from "../discovery-agent-contract.js";
+import type { LlmClient } from "../../../llm-client.js";
 import { orgContextBlock } from "../org-context.js";
 
 const DIMENSIONS = ["problemUnderstanding", "solutionFit", "scopeClarity", "technicalFeasibility", "stakeholderClarity", "downstreamMapping"] as const;
@@ -46,13 +46,7 @@ Do not ask vague questions — each must be specific and answerable.
 NEVER ask questions already answered by the workspace context (e.g., team ownership, PM tool, SP scale, sprint length, deployment platform for internal tools).`;
 
 export class OpenAIClarificationAgent implements IClarificationAgent {
-  private readonly client: OpenAI;
-  private readonly model: string;
-
-  constructor(apiKey: string, model: string) {
-    this.client = makeClient({ apiKey, model });
-    this.model = model;
-  }
+  constructor(private readonly client: LlmClient, private readonly model: string) {}
 
   async planClarifications(ctx: DiscoveryAgentContext, opts: DiscoveryAgentOptions): Promise<ClarificationQuestion[]> {
     const alreadyAnswered = (ctx.existingQuestions ?? []).filter(q => q.answered).map(q => q.question);
@@ -70,11 +64,9 @@ export class OpenAIClarificationAgent implements IClarificationAgent {
     const userPrompt = `${answeredBlock}Low-confidence dimensions: ${lowDims || "none"}\n\nConversation:\n${conversation}\n\nWhat clarifying questions are needed?`;
 
     const system = BASE_SYSTEM + orgContextBlock(opts.orgContext);
-    const out = await callStructured<Output>(
-      this.client, this.model,
-      system, userPrompt,
-      "clarification_planning", schema as unknown as Record<string, unknown>,
-    );
+    const out = await completeWithUsage<Output>(this.client, opts, "clarification", this.model, {
+      systemPrompt: system, userPrompt: userPrompt, schemaName: "clarification_planning", schema: schema as unknown as Record<string, unknown>,
+    });
 
     return out.questions.map(q => ({
       id: opts.idFactory("clq"),

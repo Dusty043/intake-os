@@ -120,6 +120,37 @@ export default function AiUsagePage() {
             </section>
           )}
 
+          {/* By source (intake evaluation vs. discovery) */}
+          {summary?.bySource && Object.keys(summary.bySource).length > 0 && (
+            <section>
+              <h2 className="text-base font-semibold text-brand-text mb-3">Cost by Source</h2>
+              <div className="card overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-brand-border bg-brand-surface text-brand-muted text-xs uppercase tracking-wider">
+                      <th className="px-4 py-3 text-left">Source</th>
+                      <th className="px-4 py-3 text-right">Runs</th>
+                      <th className="px-4 py-3 text-right">Tokens</th>
+                      <th className="px-4 py-3 text-right">Est. Cost</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-brand-border">
+                    {Object.entries(summary.bySource)
+                      .sort(([, a], [, b]) => b.costUsd - a.costUsd)
+                      .map(([source, data]) => (
+                        <tr key={source} className="hover:bg-brand-surface/50">
+                          <td className="px-4 py-3 capitalize">{source}</td>
+                          <td className="px-4 py-3 text-right text-brand-muted">{data.count}</td>
+                          <td className="px-4 py-3 text-right text-brand-muted">{fmtTokens(data.tokens)}</td>
+                          <td className="px-4 py-3 text-right font-mono">{fmt(data.costUsd)}</td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          )}
+
           {/* By agent role */}
           {summary && Object.keys(summary.byAgentRole).length > 0 && (
             <section>

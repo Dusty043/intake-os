@@ -13,6 +13,19 @@ export function formatDate(iso?: string): string {
   }
 }
 
+export function formatDateOnly(iso?: string): string {
+  if (!iso) return "—";
+  try {
+    return new Intl.DateTimeFormat("en-AU", {
+      year: "numeric",
+      month: "short",
+      day: "2-digit",
+    }).format(new Date(iso));
+  } catch {
+    return iso;
+  }
+}
+
 export function formatDateShort(iso?: string): string {
   if (!iso) return "—";
   try {

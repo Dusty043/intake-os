@@ -1,6 +1,6 @@
 import type { EvaluationAgent, AgentOutput, AgentRunContext, AgentRunOptions } from "../agent-contract.js";
 import type { ClarificationQuestionsSectionContent } from "../../intake-evaluation.js";
-import { callEvalStructured } from "./openai-eval-client.js";
+import type { LlmClient } from "../../llm-client.js";
 
 const schema = {
   type: "object",
@@ -35,14 +35,14 @@ const SYSTEM = `You are a requirements analyst. Identify missing information tha
 
 export class OpenAIClarificationQuestionsAgent implements EvaluationAgent<ClarificationQuestionsSectionContent> {
   readonly role = "clarification_questions" as const;
-  constructor(private readonly apiKey: string, private readonly model: string) {}
+  constructor(private readonly client: LlmClient, private readonly model: string) {}
 
   async run(ctx: AgentRunContext, opts: AgentRunOptions): Promise<AgentOutput<ClarificationQuestionsSectionContent>> {
     const { intake } = ctx;
     const userPrompt = `Title: ${intake.title}\nDescription:\n${intake.description}`;
-    const out = await callEvalStructured<ClarificationQuestionsSectionContent>(
-      this.apiKey, this.model, SYSTEM, userPrompt, "clarification_questions", schema as unknown as Record<string,unknown>,
-    );
+    const { content: out } = await this.client.completeStructured<ClarificationQuestionsSectionContent>({
+      model: this.model, systemPrompt: SYSTEM, userPrompt: userPrompt, schemaName: "clarification_questions", schema: schema as unknown as Record<string,unknown>,
+    });
     const warnings = out.isBlocking ? ["Clarification is blocking — evaluation may be incomplete."] : [];
     return { sectionKind: "clarification_questions", content: out, confidence: 0.80, warnings };
   }

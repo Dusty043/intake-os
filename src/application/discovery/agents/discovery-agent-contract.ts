@@ -1,6 +1,7 @@
 import type {
   ClarificationQuestion,
   ConversationMessage,
+  DiscoveryAgentRole,
   DiscoveryConfidence,
   DiscoverySession,
   IntentExtractionResult,
@@ -9,6 +10,7 @@ import type {
   ProvisioningManifest,
   SolutionOption,
 } from "../../../domain/discovery.js";
+import type { LlmClient, StructuredCompletionParams } from "../../llm-client.js";
 
 // ─── Shared run context passed to every discovery agent ───────────────────────
 
@@ -20,6 +22,15 @@ export interface DiscoveryAgentContext {
   existingQuestions?: ClarificationQuestion[];
 }
 
+/** Raw usage reported by a real (non-mock) discovery agent after an LLM call. */
+export interface DiscoveryAgentUsageEvent {
+  agentRole: DiscoveryAgentRole;
+  model?: string;
+  inputTokens?: number;
+  outputTokens?: number;
+  latencyMs?: number;
+}
+
 export interface DiscoveryAgentOptions {
   provider: "mock" | "openai" | "anthropic" | "bedrock";
   idFactory: (prefix: string) => string;
@@ -28,6 +39,22 @@ export interface DiscoveryAgentOptions {
   appBaseUrl?: string;
   /** Org-level workspace context injected into agent system prompts for baseline assumptions. */
   orgContext?: string;
+  /** Called by real agents after each LLM call so the orchestrator can log cost for reporting. */
+  onUsage?: (usage: DiscoveryAgentUsageEvent) => void;
+}
+
+/** Runs a structured LLM call and reports its usage via opts.onUsage. Shared by all real discovery agents. */
+export async function completeWithUsage<T>(
+  client: LlmClient,
+  opts: DiscoveryAgentOptions,
+  agentRole: DiscoveryAgentRole,
+  model: string,
+  params: Omit<StructuredCompletionParams, "model">,
+): Promise<T> {
+  const startedAt = Date.now();
+  const { content, inputTokens, outputTokens } = await client.completeStructured<T>({ ...params, model });
+  opts.onUsage?.({ agentRole, model, inputTokens, outputTokens, latencyMs: Date.now() - startedAt });
+  return content;
 }
 
 // ─── Intent extraction ────────────────────────────────────────────────────────

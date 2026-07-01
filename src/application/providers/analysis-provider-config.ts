@@ -1,13 +1,11 @@
 import { ConfigurationError } from "../errors.js";
 import type { AnalysisProviderName } from "../intake-analysis-provider.js";
+import { parseOptionalFloat } from "./token-cost.js";
 
 export interface AnalysisProviderConfig {
   provider: AnalysisProviderName;
-  maxInputChars: number;
   maxOutputTokens: number;
   temperature: number;
-  costTrackingEnabled: boolean;
-  auditStorePrompt: boolean;
 
   openai?: {
     apiKey: string;
@@ -36,7 +34,7 @@ export interface AnalysisProviderConfig {
 const SUPPORTED_PROVIDERS: AnalysisProviderName[] = ["mock", "openai", "anthropic", "bedrock"];
 
 export function loadAnalysisProviderConfig(env: NodeJS.ProcessEnv = process.env): AnalysisProviderConfig {
-  const providerRaw = (env["AI_PROVIDER"] ?? "mock").toLowerCase().trim();
+  const providerRaw = (nonEmpty(env["AI_PROVIDER"]) ?? "mock").toLowerCase().trim();
 
   if (!SUPPORTED_PROVIDERS.includes(providerRaw as AnalysisProviderName)) {
     throw new ConfigurationError(
@@ -48,11 +46,8 @@ export function loadAnalysisProviderConfig(env: NodeJS.ProcessEnv = process.env)
 
   const config: AnalysisProviderConfig = {
     provider,
-    maxInputChars: parseInt(env["AI_MAX_INPUT_CHARS"] ?? "12000", 10),
     maxOutputTokens: parseInt(env["AI_MAX_OUTPUT_TOKENS"] ?? "2500", 10),
     temperature: parseFloat(env["AI_TEMPERATURE"] ?? "0.2"),
-    costTrackingEnabled: (env["AI_COST_TRACKING_ENABLED"] ?? "true") !== "false",
-    auditStorePrompt: (env["AI_AUDIT_STORE_PROMPT"] ?? "false") === "true",
   };
 
   if (provider === "openai") {
@@ -60,7 +55,7 @@ export function loadAnalysisProviderConfig(env: NodeJS.ProcessEnv = process.env)
     if (!apiKey) throw new ConfigurationError("AI_PROVIDER=openai requires OPENAI_API_KEY.");
     config.openai = {
       apiKey,
-      model: env["OPENAI_TASKS_MODEL"] ?? env["OPENAI_MODEL"] ?? "gpt-4o-mini",
+      model: nonEmpty(env["OPENAI_TASKS_MODEL"]) ?? nonEmpty(env["OPENAI_MODEL"]) ?? "gpt-5.5",
       inputCostPer1MTokens: parseOptionalFloat(env["OPENAI_INPUT_COST_PER_1M_TOKENS"]),
       outputCostPer1MTokens: parseOptionalFloat(env["OPENAI_OUTPUT_COST_PER_1M_TOKENS"]),
     };
@@ -71,20 +66,20 @@ export function loadAnalysisProviderConfig(env: NodeJS.ProcessEnv = process.env)
     if (!apiKey) throw new ConfigurationError("AI_PROVIDER=anthropic requires ANTHROPIC_API_KEY.");
     config.anthropic = {
       apiKey,
-      model: env["ANTHROPIC_MODEL"] ?? "claude-3-5-haiku-latest",
+      model: nonEmpty(env["ANTHROPIC_MODEL"]) ?? "claude-3-5-haiku-latest",
       inputCostPer1MTokens: parseOptionalFloat(env["ANTHROPIC_INPUT_COST_PER_1M_TOKENS"]),
       outputCostPer1MTokens: parseOptionalFloat(env["ANTHROPIC_OUTPUT_COST_PER_1M_TOKENS"]),
     };
   }
 
   if (provider === "bedrock") {
-    const modelId = env["BEDROCK_MODEL_ID"] ?? "";
+    const modelId = nonEmpty(env["BEDROCK_MODEL_ID"]);
     if (!modelId) throw new ConfigurationError("AI_PROVIDER=bedrock requires BEDROCK_MODEL_ID.");
     config.bedrock = {
-      region: env["AWS_REGION"] ?? "us-east-1",
+      region: nonEmpty(env["AWS_REGION"]) ?? "us-east-1",
       modelId,
-      premiumModelId: env["BEDROCK_PREMIUM_MODEL_ID"] ?? undefined,
-      providerMode: env["BEDROCK_PROVIDER_MODE"] ?? "converse",
+      premiumModelId: nonEmpty(env["BEDROCK_PREMIUM_MODEL_ID"]),
+      providerMode: nonEmpty(env["BEDROCK_PROVIDER_MODE"]) ?? "converse",
       inputCostPer1MTokens: parseOptionalFloat(env["BEDROCK_INPUT_COST_PER_1M_TOKENS"]),
       outputCostPer1MTokens: parseOptionalFloat(env["BEDROCK_OUTPUT_COST_PER_1M_TOKENS"]),
     };
@@ -93,8 +88,8 @@ export function loadAnalysisProviderConfig(env: NodeJS.ProcessEnv = process.env)
   return config;
 }
 
-function parseOptionalFloat(value: string | undefined): number | null {
-  if (!value) return null;
-  const parsed = parseFloat(value);
-  return isNaN(parsed) ? null : parsed;
+/** Treats unset, empty, and whitespace-only env values as absent so blank `.env` entries fall back to defaults instead of being used literally. */
+function nonEmpty(value: string | undefined): string | undefined {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : undefined;
 }

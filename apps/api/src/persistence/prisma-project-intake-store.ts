@@ -42,48 +42,115 @@ export class PrismaProjectIntakeStore implements ProjectIntakeStore {
     const latestAnalysisDraft = record.latestAnalysisDraft ? toJson(record.latestAnalysisDraft) : undefined;
     const sourceRawPayload = record.source.rawPayload ? toJson(record.source.rawPayload) : undefined;
 
-    const saved = await this.prisma.projectIntake.upsert({
-      where: { id: record.id },
-      create: {
-        id: record.id,
-        title: record.title,
-        description: record.description,
-        requester: record.requester,
-        department: record.department,
-        projectType: record.projectType,
-        status: record.status,
-        sourceSystem: record.source.system,
-        sourceExternalId: record.source.externalId,
-        sourceExternalUrl: record.source.externalUrl,
-        sourceRawPayload,
-        distributionPackage,
-        analysisDrafts,
-        latestAnalysisDraft,
-        recordSnapshot: snapshot,
-        createdAt: new Date(record.createdAt),
-        updatedAt: new Date(record.updatedAt ?? record.createdAt),
-        createdById: record.createdBy.id,
-        createdByRole: record.createdBy.role,
-        createdByName: record.createdBy.displayName,
-      },
-      update: {
-        title: record.title,
-        description: record.description,
-        requester: record.requester,
-        department: record.department,
-        projectType: record.projectType,
-        status: record.status,
-        sourceSystem: record.source.system,
-        sourceExternalId: record.source.externalId,
-        sourceExternalUrl: record.source.externalUrl,
-        sourceRawPayload,
-        distributionPackage,
-        analysisDrafts,
-        latestAnalysisDraft,
-        recordSnapshot: snapshot,
-        updatedAt: new Date(record.updatedAt ?? new Date().toISOString()),
-      },
-      select: { recordSnapshot: true },
+    const saved = await this.prisma.$transaction(async (tx) => {
+      const row = await tx.projectIntake.upsert({
+        where: { id: record.id },
+        create: {
+          id: record.id,
+          title: record.title,
+          description: record.description,
+          requester: record.requester,
+          department: record.department,
+          projectType: record.projectType,
+          status: record.status,
+          sourceSystem: record.source.system,
+          sourceExternalId: record.source.externalId,
+          sourceExternalUrl: record.source.externalUrl,
+          sourceRawPayload,
+          distributionPackage,
+          analysisDrafts,
+          latestAnalysisDraft,
+          recordSnapshot: snapshot,
+          createdAt: new Date(record.createdAt),
+          updatedAt: new Date(record.updatedAt ?? record.createdAt),
+          createdById: record.createdBy.id,
+          createdByRole: record.createdBy.role,
+          createdByName: record.createdBy.displayName,
+        },
+        update: {
+          title: record.title,
+          description: record.description,
+          requester: record.requester,
+          department: record.department,
+          projectType: record.projectType,
+          status: record.status,
+          sourceSystem: record.source.system,
+          sourceExternalId: record.source.externalId,
+          sourceExternalUrl: record.source.externalUrl,
+          sourceRawPayload,
+          distributionPackage,
+          analysisDrafts,
+          latestAnalysisDraft,
+          recordSnapshot: snapshot,
+          updatedAt: new Date(record.updatedAt ?? new Date().toISOString()),
+        },
+        select: { recordSnapshot: true },
+      });
+
+      // The provisioning plan is authored as a JSON field on the intake record (like
+      // everything else here), but ProvisioningRun.planId is a real foreign key into
+      // ProvisioningPlan — without this, executeDistribution/retryFailedProvisioningTargets
+      // fail with a FK violation the moment they try to save a run. Mirror the plan (and its
+      // actions) into their relational tables whenever present, same pattern as recordSnapshot.
+      if (record.provisioningPlan) {
+        const plan = record.provisioningPlan;
+        await tx.provisioningPlan.upsert({
+          where: { id: plan.id },
+          create: {
+            id: plan.id,
+            intakeId: plan.intakeId,
+            status: plan.status,
+            generatedAt: new Date(plan.generatedAt),
+            generatedById: plan.generatedBy.id,
+            generatedByRole: plan.generatedBy.role,
+            generatedByName: plan.generatedBy.displayName,
+            repository: plan.repository ? toJson(plan.repository) : undefined,
+            githubRequirement: plan.githubRequirement,
+            evaluationDepth: plan.evaluationDepth,
+            distributionMode: plan.distributionMode,
+            validation: toJson(plan.validation),
+            approvedForExecutionAt: plan.approvedForExecutionAt ? new Date(plan.approvedForExecutionAt) : undefined,
+            approvedForExecutionById: plan.approvedForExecutionBy?.id,
+            approvedForExecutionByRole: plan.approvedForExecutionBy?.role,
+            approvedForExecutionByName: plan.approvedForExecutionBy?.displayName,
+            planSnapshot: toJson(plan),
+          },
+          update: {
+            status: plan.status,
+            repository: plan.repository ? toJson(plan.repository) : undefined,
+            validation: toJson(plan.validation),
+            approvedForExecutionAt: plan.approvedForExecutionAt ? new Date(plan.approvedForExecutionAt) : undefined,
+            approvedForExecutionById: plan.approvedForExecutionBy?.id,
+            approvedForExecutionByRole: plan.approvedForExecutionBy?.role,
+            approvedForExecutionByName: plan.approvedForExecutionBy?.displayName,
+            planSnapshot: toJson(plan),
+          },
+        });
+
+        for (const action of plan.actions) {
+          await tx.provisioningPlanAction.upsert({
+            where: { id: action.id },
+            create: {
+              id: action.id,
+              planId: plan.id,
+              system: action.system,
+              action: action.action,
+              description: action.description,
+              dryRun: action.dryRun,
+              requiresCredential: action.requiresCredential,
+              idempotencyKey: action.idempotencyKey,
+              payload: toJson(action.payload),
+            },
+            update: {
+              description: action.description,
+              requiresCredential: action.requiresCredential,
+              payload: toJson(action.payload),
+            },
+          });
+        }
+      }
+
+      return row;
     });
 
     return fromJson<ProjectIntakeRecord>(saved.recordSnapshot);
@@ -319,9 +386,14 @@ export class PrismaProjectIntakeStore implements ProjectIntakeStore {
           },
           update: {
             status: target.status,
-            externalId: target.externalId,
-            externalUrl: target.externalUrl,
-            errorMessage: target.errorMessage,
+            // `?? null` (not left as `undefined`) on every nullable field below — Prisma
+            // treats `undefined` in an update payload as "leave the existing value alone",
+            // not "clear it". Q-FAR-3's background retry re-upserts the same row after an
+            // interim failed save; without this a target that fails then later succeeds kept
+            // its stale errorMessage/errorCategory from the earlier failed attempt.
+            externalId: target.externalId ?? null,
+            externalUrl: target.externalUrl ?? null,
+            errorMessage: target.errorMessage ?? null,
             errorCategory: target.errorCategory ?? null,
             attemptCount: target.attemptCount,
             retryable: target.retryable,

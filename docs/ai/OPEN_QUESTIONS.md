@@ -2,26 +2,26 @@
 
 | ID | Question | Owner | Status | Notes |
 |---|---|---|---|---|
-| Q-0001 | Should `docs/product/distribution-rules.md` be recreated from the appendices before distribution package implementation? | Product/Admin | open | The file is referenced but missing from the uploaded repo. |
-| Q-0002 | What are the approved team prefixes for repository naming? | DevOps/Admin | open | Current helper supports `ds`, `ops`, `client`, and `internal` examples only. |
-| Q-0003 | Which GitHub org should live repos be created under? | DevOps/Admin | open | Required before live GitHub provisioning. |
-| Q-0004 | Should GitHub repositories be private by default? | DevOps/Admin | open | Likely yes for internal work, but not confirmed. |
-| Q-0005 | Which Monday board/group/column schema should provisioning target? | DevOps/Admin | open | Required before live Monday payload generation. |
-| Q-0006 | Which app framework should wrap the domain core? | Engineering | open | Domain code is framework-neutral for now; likely monolith remains preferred. |
-| Q-0007 | Which inbound email service for TASK-0025? (postmark/cloudmailin/mailgun/sendgrid) | DevOps/Admin | open | Needed before email intake endpoint can be implemented. |
-| Q-0008 | What email address will users send project intakes to? | Admin | open | Required for TASK-0025. E.g. `intake@simple.biz`. |
-| Q-0009 | Does Simple.biz have a Google Cloud project for TASK-0026? | Admin | open | Needed for Google Chat app setup. |
-| Q-0010 | Does Simple.biz have a Google Workspace admin? | Admin | open | Required to install Google Chat app domain-wide (TASK-0026). |
-| Q-AUTH-1 | When Google Auth goes live, what `GOOGLE_CLIENT_ID` will be used? | Admin | open | Required for TASK-0027. |
-| Q-AUTH-2 | Should missing `AUTH_SESSION_COOKIE_NAME` also fail at startup when `AUTH_MODE=google`? | Engineering | open | TASK-0027. |
-| Q-FAR-1 | Should `maxAttempts` be configurable per target kind (Monday vs GitHub)? | Engineering | open | TASK-0028. |
-| Q-FAR-2 | Should dead-letter promotion send a Google Chat notification? | Product | open | TASK-0028. |
-| Q-FAR-3 | Should backoff sleep be synchronous (v1) or scheduled as a future job (v2)? | Engineering | open | TASK-0028. |
-| Q-RL-1 | Is the server behind nginx? Does nginx already rate-limit? | DevOps | open | TASK-0029. |
-| Q-RL-2 | Should authenticated users get a higher rate limit than unauthenticated? | Product | open | TASK-0029. |
-| Q-COST-1 | Which AI models are currently in use in production evaluations? | Engineering | open | TASK-0030. |
-| Q-COST-2 | Should cost estimates be shown to non-admin users (Intake Owners)? | Product | open | TASK-0030. |
-| Q-LIFE-001 | Who can mark a distributed project completed — DevOps Lead only, or also Intake Owner? | Admin | open | TASK-0031. |
-| Q-LIFE-002 | Should `canceled` after distribution trigger a Chat notification? | Product | open | TASK-0031. |
-| Q-VAL-1 | Should `forbidNonWhitelisted: true` be enabled globally on the ValidationPipe? | Engineering | open | TASK-0032. |
-| Q-VAL-2 | Should description have a minimum useful length (e.g. 20 chars)? | Product | open | TASK-0032. |
+| Q-0001 | Should `docs/product/distribution-rules.md` be recreated from the appendices before distribution package implementation? | Product/Admin | resolved | File exists with full six-board schema; cross-verified 2026-07-01 against `Dev-Operations-Manager-Guide.pdf`. |
+| Q-0002 | What are the approved team prefixes for repository naming? | DevOps/Admin | resolved | Decision 2026-07-01: keep `ds`, `ops`, `client`, `internal` as-is — matches current code, no change. |
+| Q-0003 | Which GitHub org should live repos be created under? | DevOps/Admin | tentative | Decision 2026-07-01: `Simple-biz` — picked from guessed quick-pick options, not typed/verified by an admin. **Must confirm exact org handle before first live repo creation** — a wrong slug fails provisioning outright. |
+| Q-0004 | Should GitHub repositories be private by default? | DevOps/Admin | resolved | Decision 2026-07-01: yes, private by default. |
+| Q-0005 | Which Monday board/group/column schema should provisioning target? | DevOps/Admin | resolved | Confirmed 2026-07-01 from `Dev-Operations-Manager-Guide.pdf`: Dev Operations Workspace, six boards (Team Directory, Projects Portfolio, Roadmap & Epics, Sprint Tasks, Credentials Vault, Microtasks & Ops); documented in `docs/product/distribution-rules.md`. Code (`org-context.ts`, `discovery.ts` `MondayProjectType`) already matched this schema before the doc was corrected. Open sub-item: guide says Projects Portfolio groups are "Web App, Chrome Extension, n8n Workflow, Dashboard, CRM, SaaS, and more" — the "and more" is unconfirmed against the live board. |
+| Q-0006 | Which app framework should wrap the domain core? | Engineering | resolved | Decision 2026-07-01: keep the current NestJS + Next.js monolith (matches ADR-0002) — no change. |
+| Q-0007 | Which inbound email service for TASK-0025? (postmark/cloudmailin/mailgun/sendgrid) | DevOps/Admin | deferred | Decision 2026-07-01: defer — TASK-0025 (email intake) stays unstarted. |
+| Q-0008 | What email address will users send project intakes to? | Admin | deferred | Decision 2026-07-01: defer along with Q-0007 — no address chosen since email intake isn't being built yet. |
+| Q-0009 | Does Simple.biz have a Google Cloud project for TASK-0026? | Admin | deferred | Decision 2026-07-01: skip Google Chat integration for now — TASK-0026 stays unstarted; notifications remain in-app only. |
+| Q-0010 | Does Simple.biz have a Google Workspace admin? | Admin | open | Tied to Q-0009 — moot while Chat integration is deferred; revisit together if Chat work is picked back up. |
+| Q-AUTH-1 | When Google Auth goes live, what `GOOGLE_CLIENT_ID` will be used? | Admin | resolved | Decision 2026-07-01: Google Auth is going live now. `GOOGLE_CLIENT_ID` value to be added directly to `.env`/secrets by an admin, not pasted into chat/logs. TASK-0027 config code should be wired to expect it. |
+| Q-AUTH-2 | Should missing `AUTH_SESSION_COOKIE_NAME` also fail at startup when `AUTH_MODE=google`? | Engineering | implemented | Decision 2026-07-01: yes, fail fast. Implemented same day in `src/auth-config-validator.ts` (TASK-0039 Part 2); tests added in `tests/auth-config-validator.test.mjs`. |
+| Q-FAR-1 | Should `maxAttempts` be configurable per target kind (Monday vs GitHub)? | Engineering | implemented | Decision 2026-07-01: yes. Implemented same day — `AUTO_RETRY_MAX_BY_TARGET_KIND` map added in `src/application/intake-workflow-service.ts` (TASK-0039 Part 2), currently empty (all kinds use the existing default) until a target needs a different value. |
+| Q-FAR-2 | Should dead-letter promotion send a Google Chat notification? | Product | resolved | Decision 2026-07-01: no — stay visible in-app/admin-dashboard only. Also moot for now since Q-0009 deferred Chat integration entirely. |
+| Q-FAR-3 | Should backoff sleep be synchronous (v1) or scheduled as a future job (v2)? | Engineering | implemented | Decision 2026-07-01: v2. Implemented same day on branch `feature/scheduled-retry-backoff` (TASK-0039 Part 3): `setTimeout`-based detached background continuation (no new dependency, no DB migration — `pending_retry` is a new status value on the existing string column), plus frontend polling in `intakes/[id]/page.tsx` so the UI reflects the eventual outcome instead of going stale. Not crash-durable (same as v1's blocking sleep) — persisted-sweep upgrade path documented if that ever matters. |
+| Q-RL-1 | Is the server behind nginx? Does nginx already rate-limit? | DevOps | resolved | Decision 2026-07-01: yes, behind nginx — app-level rate limiting is a defense-in-depth backstop, not the primary control. |
+| Q-RL-2 | Should authenticated users get a higher rate limit than unauthenticated? | Product | resolved | Decision 2026-07-01: no — same limit for all, since nginx is the primary rate-limit layer (see Q-RL-1). |
+| Q-COST-1 | Which AI models are currently in use in production evaluations? | Engineering | resolved | Decision 2026-07-01: OpenAI `gpt-5.5` is live in production (matches TASK-0036 default). |
+| Q-COST-2 | Should cost estimates be shown to non-admin users (Intake Owners)? | Product | resolved | Decision 2026-07-01: no — admin-only, matches current `/admin/ai-usage` route restriction, no change needed. |
+| Q-LIFE-001 | Who can mark a distributed project completed — DevOps Lead only, or also Intake Owner? | Admin | resolved | Decision 2026-07-01: DevOps Lead only. |
+| Q-LIFE-002 | Should `canceled` after distribution trigger a Chat notification? | Product | resolved | Decision 2026-07-01: no — also moot for now since Q-0009 deferred Chat integration entirely. |
+| Q-VAL-1 | Should `forbidNonWhitelisted: true` be enabled globally on the ValidationPipe? | Engineering | implemented | Decision 2026-07-01: yes. Already true in `apps/api/src/main.ts` before this decision pass — no change needed. |
+| Q-VAL-2 | Should description have a minimum useful length (e.g. 20 chars)? | Product | implemented | Decision 2026-07-01: yes, 20 characters. Implemented same day — `MIN_INTAKE_DESCRIPTION_LENGTH` added to `apps/api/src/common/validation-constants.ts`, applied to `CreateIntakeDto.description` (TASK-0039 Part 2); tests added in `tests/input-validation.test.mjs`. |
