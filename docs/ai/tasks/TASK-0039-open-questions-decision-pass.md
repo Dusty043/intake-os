@@ -155,3 +155,37 @@ No new dependency, no DB migration:
 - This branch (`feature/scheduled-retry-backoff`) has not been merged to `main` — it also carries all of `main`'s prior uncommitted changes (TASK-0037/38/39 Parts 1–2), since nothing was committed before branching. Needs a decision on commit/merge strategy before landing.
 - If crash-durability of in-flight background retries ever matters in practice (process restarts frequently, or backoff windows get much longer), upgrade path is a persisted `nextRetryAt` + a sweep — deliberately not built now since the current gap is no worse than the blocking version it replaced.
 - Multi-target concurrent backgrounding (two targets both needing backoff at once) is handled (`settleBackgroundRetry` checks whether *other* targets are still pending before finalizing) but only exercised implicitly — no test constructs that specific race on purpose.
+
+---
+
+## Part 4 — Live browser smoke test on oreochiserver, two real bugs found and fixed
+
+Local browser verification was blocked by environment contention (another chat's dev server sharing the same `.next` build directory and local Postgres ports — see BUILD_LOG). User asked to SSH to `oreochiserver` and run there instead.
+
+**Isolation approach**: rather than touch the live shared `~/intake-os` deployment (checked first — `api`/`postgres` were already stopped there, `web`/`local-proxy` still serving `main`), cloned a fully separate checkout to `~/intake-os-qa` on the same server, with its own Docker Compose project name (directory-based → `intake-os-qa_*` volumes/network, zero overlap with `intake-os_*`), its own ports (proxy on 8091 instead of the live stack's 8080), and its own throwaway Postgres. Tunneled `localhost:8091` back to this machine via `ssh -L` and drove the browser Preview tool against the tunnel — same approach as the local attempt, but the actual Next.js/Postgres processes run on the server, sidestepping both contention points.
+
+**Bug 1 — ProvisioningPlan never persisted (blocks all real distribution execution, not just Q-FAR-3)**: `PrismaProjectIntakeStore.saveIntake` only ever wrote the plan as JSON inside `recordSnapshot`; it never inserted rows into the relational `ProvisioningPlan`/`ProvisioningPlanAction` tables. But `ProvisioningRun.planId` is a real foreign key into `ProvisioningPlan`. Result: **every** `executeDistribution`/`retryFailedProvisioningTargets` call against a real Postgres-backed deployment fails with `P2003: Foreign key constraint violated (ProvisioningRun_planId_fkey)` — invisible in the test suite because it only exercises `InMemoryProjectIntakeStore`, which doesn't enforce the constraint. Not a Q-FAR-3 bug — this would have blocked the *previous* synchronous retry code too, the moment anyone tried to execute distribution against Postgres for the first time.
+  - Fixed in `apps/api/src/persistence/prisma-project-intake-store.ts`: `saveIntake` now runs inside `$transaction` and, when `record.provisioningPlan` is present, upserts `ProvisioningPlan` (using the schema's existing `planSnapshot` JSON field for the same snapshot pattern used elsewhere) and each `ProvisioningPlanAction`.
+  - No automated test added — this repo has zero Prisma-integration tests today (nothing connects to a real Postgres in `npm test`); adding that test infrastructure is a bigger, separate undertaking than this bug fix. Verified live instead: reproduced the FK error on the QA deployment, deployed the fix, confirmed `POST .../distribution/execute` went from `500` to `201` on a fresh intake walked through the full lifecycle.
+
+**Bug 2 — stale `errorMessage`/`externalId`/`externalUrl` surviving a status change, exposed by Q-FAR-3's two-phase persistence**: `saveProvisioningRun`'s target `update` block passed `target.errorMessage`/`externalId`/`externalUrl` straight through without `?? null`. Prisma treats `undefined` in an update payload as "leave the existing value," not "clear it" — so a target that failed (persisted with an error message during the new interim `pending_retry` save) and then later succeeded kept the **old error message** in the database and API response even though its status was `"succeeded"`. The previous synchronous code never hit this because it only ever persisted a target once, with its final result — Q-FAR-3's interim-then-final save pattern is what exposes it.
+  - Fixed by adding `?? null` to those three fields in the `update` block (matching the pattern already used correctly for `errorCategory`/`deadLetteredAt`/`completedAt`).
+  - Verified live via direct API polling (curl through the tunnel, bypassing browser round-trip latency to catch the mid-flight state): `POST .../distribution/execute` → immediate `{"status":"executing","targets":[{"targetKind":"monday_project_item","status":"pending_retry","errorMessage":"503 Service Unavailable..."}]}`; 3 subsequent polls at 0.3s intervals still show `pending_retry`; 4th poll onward shows `{"status":"completed","targets":[{"status":"succeeded","errorMessage":null}]}` — confirms both the non-blocking behavior and the errorMessage-clearing fix in one reproduction.
+
+**Frontend polling confirmed working**: network log from the browser-driven run showed `GET .../distribution/runs` and `GET .../intakes/:id` firing repeatedly after `POST .../distribution/execute` returned — the new polling `useEffect` engaged and only stopped once the run left `"executing"`.
+
+**Cleanup**: QA stack torn down (`docker compose down -v`), `~/intake-os-qa` directory removed, SSH tunnel closed, local `qa-tunnel-placeholder` preview server stopped, `.claude/launch.json` (both the one in this repo and the one in the parent directory the Preview tool actually reads) reverted to their pre-QA state. Confirmed the live `~/intake-os` deployment's containers were untouched throughout (`docker ps` before/after identical for `intake-os-*`).
+
+### Tests (Part 4)
+
+```
+npm run typecheck / build:core / api:build  — pass
+node --test tests/*.test.mjs                — same 5 pre-existing discovery failures, nothing new
+Live QA deployment (oreochiserver, isolated stack, torn down after): full intake lifecycle via
+  browser + curl, twice (once per bug fix) — both bugs reproduced, fixed, and reverified.
+```
+
+### Follow-up / Open Items (Part 4)
+
+- No automated Prisma-integration test exists for `saveIntake`'s `ProvisioningPlan` persistence (Bug 1) or the `saveProvisioningRun` null-clearing (Bug 2) — both verified live only. Worth a follow-up if this repo ever adds Postgres-backed integration tests to `npm test`.
+- Bug 1 predates this branch entirely — worth checking whether it's already silently blocking real usage on `~/intake-os` (the shared deployment) once its `api`/`postgres` containers come back up, independent of anything in this PR.

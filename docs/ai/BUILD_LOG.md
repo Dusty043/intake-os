@@ -1708,3 +1708,26 @@ GitHub repos: only for Web App, Chrome Extension, SaaS
 **Task log**: `docs/ai/tasks/TASK-0039-open-questions-decision-pass.md` (Part 3 section)
 
 **Follow-up**: Branch not yet merged to `main` — it carries all prior uncommitted session work too since nothing was committed before branching; needs a commit/merge decision before landing. Crash-durability of in-flight background retries is unchanged from the old blocking version (not a regression, not an upgrade either) — persisted `nextRetryAt` + sweep is the documented upgrade path if that gap ever matters.
+
+---
+## 2026-07-02 — TASK-0039 Part 4: Live Smoke Test on oreochiserver, Two Real Bugs Found and Fixed
+
+**Status:** Complete
+
+**Context**: Local browser verification of Q-FAR-3 was blocked by environment contention with another concurrent chat session (shared dev-server ports and shared `.next` build directory). User asked to SSH to oreochiserver and run the smoke test from there.
+
+**Isolation**: cloned a separate checkout to `~/intake-os-qa` on the server rather than touch the live shared `~/intake-os` deployment (confirmed its containers were untouched throughout) — own Docker Compose project name, own ports (proxy on 8091), own throwaway Postgres. Tunneled back to this machine via `ssh -L` and drove the browser Preview tool against it.
+
+**Bug 1 (pre-existing, not Q-FAR-3-specific)**: `PrismaProjectIntakeStore.saveIntake` never persisted `ProvisioningPlan`/`ProvisioningPlanAction` rows — only kept the plan as JSON in `recordSnapshot`. `ProvisioningRun.planId` is a real FK into `ProvisioningPlan`, so **every** real (Postgres-backed) distribution execution failed with `P2003: Foreign key constraint violated`. Invisible in `npm test` since it only exercises `InMemoryProjectIntakeStore`. Fixed: `saveIntake` now upserts `ProvisioningPlan` + its actions inside the same transaction, mirroring the snapshot pattern used elsewhere.
+
+**Bug 2 (exposed by Q-FAR-3's new two-phase persistence)**: `saveProvisioningRun`'s target `update` block passed `errorMessage`/`externalId`/`externalUrl` through without `?? null` — Prisma treats `undefined` as "leave alone," not "clear," so a target that failed (persisted mid-retry) then later succeeded kept its stale error message. The old synchronous code never hit this since it only ever persisted a target once, with its final result. Fixed by adding `?? null` to match the pattern already used for `errorCategory`/`deadLetteredAt`/`completedAt`.
+
+**Verified live**: reproduced both bugs on the QA deployment, fixed, redeployed, reverified — `distribution/execute` went 500→201; direct curl polling (0.3s intervals, to catch the mid-flight state faster than browser round-trips) showed the immediate `executing`/`pending_retry` response, 3 polls still `pending_retry`, then `completed`/`succeeded` with `errorMessage: null`. Frontend polling confirmed via network log (`GET .../distribution/runs` firing repeatedly after execute, stopping once settled).
+
+**Cleanup**: QA stack fully torn down (`docker compose down -v`), clone directory removed, tunnel closed, both `.claude/launch.json` files (this repo's and the parent directory's, which the Preview tool actually reads) reverted.
+
+**Tests**: `npm run typecheck`/`build:core`/`api:build` pass. `node --test tests/*.test.mjs` — same 5 pre-existing discovery failures, nothing new. No automated Prisma-integration test added for either bug (this repo has none today) — verified live instead.
+
+**Task log**: `docs/ai/tasks/TASK-0039-open-questions-decision-pass.md` (Part 4 section)
+
+**Follow-up**: Bug 1 predates this branch and likely affects the shared `~/intake-os` deployment too, independent of this PR, once its `api`/`postgres` containers restart — worth checking. No automated coverage for either fix; flag if this repo ever adds Postgres integration tests.
