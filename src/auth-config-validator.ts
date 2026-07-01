@@ -40,5 +40,12 @@ export function validateAuthConfig(): AuthConfig {
     );
   }
 
+  if (raw === "google" && !process.env.AUTH_SESSION_COOKIE_NAME) {
+    throw new Error(
+      "[Auth] AUTH_MODE=google requires AUTH_SESSION_COOKIE_NAME to be set. " +
+        'The "intake_os_session" fallback used elsewhere is a dev_headers-only default.',
+    );
+  }
+
   return { mode: raw as AuthMode };
 }

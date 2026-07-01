@@ -291,7 +291,7 @@ export type ProvisioningPlanAction = {
 export type ProvisioningTargetResult = {
   id: string;
   targetKind: string;
-  status: "pending" | "succeeded" | "failed" | "skipped";
+  status: "pending" | "succeeded" | "failed" | "skipped" | "pending_retry";
   idempotencyKey: string;
   externalId?: string;
   externalUrl?: string;

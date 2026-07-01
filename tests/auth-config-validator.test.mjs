@@ -6,11 +6,13 @@ describe("auth-config-validator", () => {
   let originalAuthMode;
   let originalNodeEnv;
   let originalClientId;
+  let originalSessionCookieName;
 
   beforeEach(() => {
     originalAuthMode = process.env.AUTH_MODE;
     originalNodeEnv = process.env.NODE_ENV;
     originalClientId = process.env.AUTH_GOOGLE_CLIENT_ID;
+    originalSessionCookieName = process.env.AUTH_SESSION_COOKIE_NAME;
   });
 
   afterEach(() => {
@@ -28,6 +30,11 @@ describe("auth-config-validator", () => {
       delete process.env.AUTH_GOOGLE_CLIENT_ID;
     } else {
       process.env.AUTH_GOOGLE_CLIENT_ID = originalClientId;
+    }
+    if (originalSessionCookieName === undefined) {
+      delete process.env.AUTH_SESSION_COOKIE_NAME;
+    } else {
+      process.env.AUTH_SESSION_COOKIE_NAME = originalSessionCookieName;
     }
   });
 
@@ -50,6 +57,7 @@ describe("auth-config-validator", () => {
       process.env.AUTH_MODE = "google";
       process.env.NODE_ENV = "development";
       process.env.AUTH_GOOGLE_CLIENT_ID = "test-client-id.apps.googleusercontent.com";
+      process.env.AUTH_SESSION_COOKIE_NAME = "test_session_cookie";
       const config = validateAuthConfig();
       assert.equal(config.mode, "google");
     });
@@ -58,10 +66,25 @@ describe("auth-config-validator", () => {
       process.env.AUTH_MODE = "google";
       process.env.NODE_ENV = "development";
       delete process.env.AUTH_GOOGLE_CLIENT_ID;
+      process.env.AUTH_SESSION_COOKIE_NAME = "test_session_cookie";
       assert.throws(
         () => validateAuthConfig(),
         (err) => {
           assert.ok(err.message.includes("AUTH_GOOGLE_CLIENT_ID"));
+          return true;
+        },
+      );
+    });
+
+    it("throws when AUTH_MODE=google without AUTH_SESSION_COOKIE_NAME", () => {
+      process.env.AUTH_MODE = "google";
+      process.env.NODE_ENV = "development";
+      process.env.AUTH_GOOGLE_CLIENT_ID = "test-client-id.apps.googleusercontent.com";
+      delete process.env.AUTH_SESSION_COOKIE_NAME;
+      assert.throws(
+        () => validateAuthConfig(),
+        (err) => {
+          assert.ok(err.message.includes("AUTH_SESSION_COOKIE_NAME"));
           return true;
         },
       );
@@ -112,6 +135,7 @@ describe("auth-config-validator", () => {
       process.env.AUTH_MODE = "google";
       process.env.NODE_ENV = "production";
       process.env.AUTH_GOOGLE_CLIENT_ID = "test-client-id.apps.googleusercontent.com";
+      process.env.AUTH_SESSION_COOKIE_NAME = "test_session_cookie";
       const config = validateAuthConfig();
       assert.equal(config.mode, "google");
     });

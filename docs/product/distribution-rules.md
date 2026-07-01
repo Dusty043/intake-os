@@ -45,7 +45,12 @@ Do not mirror every OS field into Monday.
 
 ## Monday Downstream Target — Dev Operations Workspace
 
-The live Monday target is the **Dev Operations Workspace** (six linked boards). The provisioning manifest must generate items that map to this structure.
+The live Monday target is the **Dev Operations Workspace** (six linked boards). The provisioning manifest must generate items that map to this structure. Schema confirmed against `Dev-Operations-Manager-Guide.pdf` (Simple.biz AI & Automation Team, prepared by Cob) — see Q-0005 resolution in `docs/ai/OPEN_QUESTIONS.md`.
+
+Boards 1 (Team Directory) and 5 (Credentials Vault) are populated by PM/admin, not by the intake OS — listed below for completeness but the OS does not write to them at provisioning time.
+
+### Board 1: Team Directory (reference only, not written by the OS)
+One row per person. Groups: Fullstack Developers, Integration Specialists. Used to resolve `assigned developer` against a real roster entry, not to create rows.
 
 ### Board 2: Projects Portfolio
 One row per whole deliverable. The intake OS creates this when `recommendedAction = create_project`.
@@ -54,7 +59,7 @@ One row per whole deliverable. The intake OS creates this when `recommendedActio
 |---|---|
 | Name | proposal title |
 | Client | intake client field (null = internal) |
-| Project Type (group) | intent type → Web App / n8n Workflow / Dashboard / Process Change / Other |
+| Project Type (group) | intent type → `MondayProjectType` (`src/domain/discovery.ts`): Web App, Chrome Extension, n8n Workflow, Dashboard, CRM, SaaS, Process Change, Other. Live board may carry additional groups beyond the 6 named in the source guide ("and more") — confirm against the live board before adding new intent→type mappings. |
 | Project Lead | assigned developer (null until roster match confirmed) |
 | Status | "Conceptualization" on creation |
 | Health | "green" on creation |

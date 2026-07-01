@@ -305,7 +305,7 @@ Post-distribution lifecycle implementation must include tests for:
 
 | ID | Question | Owner | Status | Notes |
 |---|---|---|---|---|
-| Q-LIFE-001 | Who can mark a distributed project completed? | DevOps/Admin | open | Could include DevOps Lead only for v1 |
+| Q-LIFE-001 | Who can mark a distributed project completed? | DevOps/Admin | resolved | Decision 2026-07-01 (= Q-LIFE-001 in `docs/ai/OPEN_QUESTIONS.md`): DevOps Lead only. |
 | Q-LIFE-002 | Should Monday completion status update the app automatically? | DevOps/Admin | open | Avoid deep sync in v1 unless lightweight signal is easy |
 | Q-LIFE-003 | Should GitHub milestone closure update lifecycle status? | DevOps/Admin | open | Useful later but not required for v1 |
 | Q-LIFE-004 | What lifecycle statuses should appear in management reports? | Management/DevOps | open | Initial statuses listed above |

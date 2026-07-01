@@ -12,6 +12,9 @@ export const provisioningTargetStatuses = [
   "succeeded",
   "failed",
   "skipped",
+  // Q-FAR-3: auto-retry backoff is running in the background (not blocking the caller);
+  // the run stays "executing" until every target leaves this status.
+  "pending_retry",
 ] as const;
 
 export type ProvisioningTargetStatus = (typeof provisioningTargetStatuses)[number];

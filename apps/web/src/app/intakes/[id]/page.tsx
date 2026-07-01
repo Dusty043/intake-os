@@ -912,6 +912,7 @@ function RunStatusBadge({ status }: { status: string }) {
     succeeded:       { label: "Succeeded",  variant: "success" },
     skipped:         { label: "Skipped",    variant: "info" },
     pending:         { label: "Pending",    variant: "info" },
+    pending_retry:   { label: "Retrying…",  variant: "warning" },
   };
   const s = map[status] ?? { label: status, variant: "info" as const };
   return <StatusBadge label={s.label} variant={s.variant} />;
@@ -1070,6 +1071,22 @@ function DistributionTab({
   }
 
   useEffect(() => { void loadRuns(); }, [intake.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Q-FAR-3: a run can come back "executing" with a target still "pending_retry" — the
+  // backend keeps auto-retrying in the background rather than blocking the original request.
+  // Poll until it settles so this view doesn't go stale while that happens.
+  const hasExecutingRun = runs?.some((r) => r.status === "executing") ?? false;
+  useEffect(() => {
+    if (!hasExecutingRun) return;
+    const interval = setInterval(() => {
+      void loadRuns();
+      void import("@/lib/api-client")
+        .then((m) => m.getIntake(intake.id, actor))
+        .then(onIntakeUpdate)
+        .catch(() => { /* non-fatal */ });
+    }, 2000);
+    return () => clearInterval(interval);
+  }, [hasExecutingRun, intake.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="space-y-4">
