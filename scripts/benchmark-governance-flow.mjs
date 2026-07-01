@@ -137,7 +137,7 @@ async function runGovernanceFlow(runIndex) {
   t = performance.now();
   const gate1 = await service.recordApproval(
     accepted.id,
-    { decision: "approved", comment: "Benchmark: Gate 1 approved. Requirements clear." },
+    { comment: "Benchmark: Gate 1 approved. Requirements clear." },
     ACTORS.owner,
   );
   timings.push(lap("7. recordApproval (Gate 1)", t));
@@ -148,7 +148,7 @@ async function runGovernanceFlow(runIndex) {
   t = performance.now();
   const gate2 = await service.recordApproval(
     gate1.id,
-    { decision: "approved", comment: "Benchmark: Gate 2 approved. Infra requirements feasible." },
+    { comment: "Benchmark: Gate 2 approved. Infra requirements feasible." },
     ACTORS.devops,
   );
   timings.push(lap("8. recordApproval (Gate 2)", t));

@@ -25,6 +25,18 @@ const { CompleteDiscoveryDto } = await import(
 const { LifecycleTransitionDto } = await import(
   "../dist/apps/api/src/modules/intake/dto/lifecycle-transition.dto.js"
 );
+const { DiscoveryMessageDto } = await import(
+  "../dist/apps/api/src/modules/discovery/dto/discovery-message.dto.js"
+);
+const { AnswerClarificationDto } = await import(
+  "../dist/apps/api/src/modules/discovery/dto/answer-clarification.dto.js"
+);
+const { SelectDirectionDto } = await import(
+  "../dist/apps/api/src/modules/discovery/dto/select-direction.dto.js"
+);
+const { UpdateDiscoverySettingsDto } = await import(
+  "../dist/apps/api/src/modules/admin/dto/update-discovery-settings.dto.js"
+);
 const constants = await import(
   "../dist/apps/api/src/common/validation-constants.js"
 );
@@ -39,6 +51,8 @@ const {
   MAX_COMMENT_LENGTH,
   MAX_NOTE_LENGTH,
   MAX_DISCOVERY_FIELD_LENGTH,
+  MAX_EXTERNAL_ID_LENGTH,
+  MAX_ORG_CONTEXT_LENGTH,
 } = constants;
 
 function str(n) {
@@ -235,6 +249,111 @@ describe("LifecycleTransitionDto — max length enforcement", () => {
 
   test("canceledReason over max → rejected", async () => {
     await expectInvalid(LifecycleTransitionDto, { canceledReason: str(MAX_REASON_LENGTH + 1) }, "canceledReason");
+  });
+});
+
+// ─── DiscoveryMessageDto (TASK-0040) ───────────────────────────────────────────
+// Shared by POST /discovery (start) and POST /discovery/:id/message (follow-up).
+
+describe("DiscoveryMessageDto — validation", () => {
+  test("valid message passes", async () => {
+    await expectValid(DiscoveryMessageDto, { message: "We need a way to track project handoffs." });
+  });
+
+  test("message at exact max passes", async () => {
+    await expectValid(DiscoveryMessageDto, { message: str(MAX_DISCOVERY_FIELD_LENGTH) });
+  });
+
+  test("message over max → rejected", async () => {
+    await expectInvalid(DiscoveryMessageDto, { message: str(MAX_DISCOVERY_FIELD_LENGTH + 1) }, "message");
+  });
+
+  test("empty message → rejected", async () => {
+    await expectInvalid(DiscoveryMessageDto, { message: "" }, "message");
+  });
+
+  test("missing message → rejected", async () => {
+    await expectInvalid(DiscoveryMessageDto, {}, "message");
+  });
+
+  test("non-string message → rejected", async () => {
+    await expectInvalid(DiscoveryMessageDto, { message: 12345 }, "message");
+  });
+
+  test("forbidNonWhitelisted rejects unknown field", async () => {
+    const instance = plainToInstance(DiscoveryMessageDto, { message: "ok", extra: "nope" });
+    const errs = await validate(instance, { whitelist: true, forbidNonWhitelisted: true });
+    assert.ok(errs.some(e => e.property === "extra"));
+  });
+});
+
+// ─── AnswerClarificationDto (TASK-0040) ────────────────────────────────────────
+
+describe("AnswerClarificationDto — validation", () => {
+  const valid = { questionId: "CLARIFY-1", answer: "Covers both internal and client requests." };
+
+  test("valid input passes", async () => {
+    await expectValid(AnswerClarificationDto, valid);
+  });
+
+  test("missing questionId → rejected", async () => {
+    await expectInvalid(AnswerClarificationDto, { answer: valid.answer }, "questionId");
+  });
+
+  test("missing answer → rejected", async () => {
+    await expectInvalid(AnswerClarificationDto, { questionId: valid.questionId }, "answer");
+  });
+
+  test("questionId over max → rejected", async () => {
+    await expectInvalid(AnswerClarificationDto, { ...valid, questionId: str(MAX_EXTERNAL_ID_LENGTH + 1) }, "questionId");
+  });
+
+  test("answer over max → rejected", async () => {
+    await expectInvalid(AnswerClarificationDto, { ...valid, answer: str(MAX_DISCOVERY_FIELD_LENGTH + 1) }, "answer");
+  });
+});
+
+// ─── SelectDirectionDto (TASK-0040) ────────────────────────────────────────────
+
+describe("SelectDirectionDto — validation", () => {
+  test("valid input passes", async () => {
+    await expectValid(SelectDirectionDto, { solutionId: "SOL-1" });
+  });
+
+  test("missing solutionId → rejected", async () => {
+    await expectInvalid(SelectDirectionDto, {}, "solutionId");
+  });
+
+  test("solutionId over max → rejected", async () => {
+    await expectInvalid(SelectDirectionDto, { solutionId: str(MAX_EXTERNAL_ID_LENGTH + 1) }, "solutionId");
+  });
+});
+
+// ─── UpdateDiscoverySettingsDto (TASK-0040) ────────────────────────────────────
+
+describe("UpdateDiscoverySettingsDto — validation", () => {
+  test("empty body passes (both fields optional)", async () => {
+    await expectValid(UpdateDiscoverySettingsDto, {});
+  });
+
+  test("confidenceThreshold in range passes", async () => {
+    await expectValid(UpdateDiscoverySettingsDto, { confidenceThreshold: 0.7 });
+  });
+
+  test("confidenceThreshold below min → rejected", async () => {
+    await expectInvalid(UpdateDiscoverySettingsDto, { confidenceThreshold: 0.05 }, "confidenceThreshold");
+  });
+
+  test("confidenceThreshold above max → rejected", async () => {
+    await expectInvalid(UpdateDiscoverySettingsDto, { confidenceThreshold: 0.95 }, "confidenceThreshold");
+  });
+
+  test("orgContext at exact max passes", async () => {
+    await expectValid(UpdateDiscoverySettingsDto, { orgContext: str(MAX_ORG_CONTEXT_LENGTH) });
+  });
+
+  test("orgContext over max → rejected", async () => {
+    await expectInvalid(UpdateDiscoverySettingsDto, { orgContext: str(MAX_ORG_CONTEXT_LENGTH + 1) }, "orgContext");
   });
 });
 

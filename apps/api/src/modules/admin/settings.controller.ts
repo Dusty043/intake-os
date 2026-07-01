@@ -10,13 +10,9 @@ import { SkipThrottle } from "@nestjs/throttler";
 import { CurrentActor } from "../auth/auth.decorators.js";
 import type { AuthenticatedActor } from "../auth/auth.types.js";
 import { GlobalSettingsService } from "./global-settings.service.js";
+import { UpdateDiscoverySettingsDto } from "./dto/update-discovery-settings.dto.js";
 
 const ADMIN_ROLES = new Set(["admin", "devops_lead"]);
-
-interface UpdateDiscoverySettingsDto {
-  confidenceThreshold?: number;
-  orgContext?: string;
-}
 
 @SkipThrottle()
 @ApiTags("admin")
@@ -44,8 +40,8 @@ export class SettingsController {
     }
 
     if (body.confidenceThreshold !== undefined) {
-      const clamped = Math.max(0.1, Math.min(0.9, Number(body.confidenceThreshold)));
-      await this.settings.set("discovery.confidence_threshold", String(clamped));
+      // Range is enforced by UpdateDiscoverySettingsDto's @Min/@Max — no need to re-clamp here.
+      await this.settings.set("discovery.confidence_threshold", String(body.confidenceThreshold));
     }
 
     if (body.orgContext !== undefined) {

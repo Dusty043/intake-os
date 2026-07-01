@@ -201,7 +201,7 @@ await check("POST /intakes/:id/approvals (Gate 1) transitions to devops_review",
   if (!accepted) throw new Error("no accepted intake");
   gate1 = await post(
     `/intakes/${accepted.id}/approvals`,
-    { decision: "approved", comment: "Smoke test: Gate 1 approved." },
+    { comment: "Smoke test: Gate 1 approved." },
     intakeOwnerHeaders,
     201,
   );
@@ -214,7 +214,7 @@ await check("POST /intakes/:id/approvals (Gate 2) transitions to approved", asyn
   if (!gate1) throw new Error("no gate1 intake");
   gate2 = await post(
     `/intakes/${gate1.id}/approvals`,
-    { decision: "approved", comment: "Smoke test: Gate 2 approved." },
+    { comment: "Smoke test: Gate 2 approved." },
     devopsHeaders,
     201,
   );

@@ -15,3 +15,7 @@ export const MAX_EMAIL_BODY_LENGTH = 50_000;
 export const MAX_EMAIL_FROM_LENGTH = 255;
 
 export const MAX_CHAT_MESSAGE_LENGTH = 10_000;
+
+// Org context is injected into every discovery agent's system prompt, so it's bounded
+// but deliberately more generous than a single structured field.
+export const MAX_ORG_CONTEXT_LENGTH = 4_000;

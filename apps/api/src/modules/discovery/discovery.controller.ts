@@ -10,13 +10,24 @@ import {
   Query,
 } from "@nestjs/common";
 import { ApiOperation, ApiTags } from "@nestjs/swagger";
+import { Throttle } from "@nestjs/throttler";
 import type { DiscoveryController } from "../../../../../src/application/discovery/index.js";
 import type { ProjectIntakeRecord } from "../../../../../src/application/types.js";
 import { IntakeWorkflowService } from "../../../../../src/application/intake-workflow-service.js";
 import { CurrentActor } from "../auth/auth.decorators.js";
 import type { AuthenticatedActor } from "../auth/auth.types.js";
+import { loadRateLimitConfig } from "../../config/rate-limit.config.js";
+import { DiscoveryMessageDto } from "./dto/discovery-message.dto.js";
+import { AnswerClarificationDto } from "./dto/answer-clarification.dto.js";
+import { SelectDirectionDto } from "./dto/select-direction.dto.js";
 
 const DISCOVERY_SYSTEM_ACTOR = { id: "discovery-engine", role: "intake_owner" as const, name: "Discovery Engine" };
+
+const rlConfig = loadRateLimitConfig();
+// Discovery routes that can invoke a real LLM call (when AI_PROVIDER≠mock) share the same
+// aiEvaluation tier the intake evaluation pipeline uses — one AI-call budget, not a second
+// unthrottled path into the same provider.
+const AI_THROTTLE = { global: { ttl: rlConfig.aiEvaluation.ttl * 1000, limit: rlConfig.aiEvaluation.limit } };
 
 @ApiTags("discovery")
 @Controller("discovery")
@@ -31,9 +42,10 @@ export class DiscoveryHttpController {
 
   // POST /discovery
   @Post()
+  @Throttle(AI_THROTTLE)
   @ApiOperation({ summary: "Start a new discovery session" })
   startDiscovery(
-    @Body() body: { message: string },
+    @Body() body: DiscoveryMessageDto,
     @CurrentActor() actor: AuthenticatedActor,
   ) {
     return this.discovery.startDiscovery({ userId: actor.id, message: body.message });
@@ -55,13 +67,15 @@ export class DiscoveryHttpController {
 
   // POST /discovery/:id/message
   @Post(":id/message")
+  @Throttle(AI_THROTTLE)
   @ApiOperation({ summary: "Add a follow-up message to a discovery session" })
-  addMessage(@Param("id") id: string, @Body() body: { message: string }) {
+  addMessage(@Param("id") id: string, @Body() body: DiscoveryMessageDto) {
     return this.discovery.addMessage(id, { message: body.message });
   }
 
   // POST /discovery/:id/solutions
   @Post(":id/solutions")
+  @Throttle(AI_THROTTLE)
   @ApiOperation({ summary: "Generate solution options for a discovery session" })
   generateSolutions(@Param("id") id: string) {
     return this.discovery.generateSolutions(id);
@@ -73,7 +87,7 @@ export class DiscoveryHttpController {
   @ApiOperation({ summary: "Answer a clarification question in a discovery session" })
   answerClarification(
     @Param("id") id: string,
-    @Body() body: { questionId: string; answer: string },
+    @Body() body: AnswerClarificationDto,
   ) {
     return this.discovery.answerClarification(id, {
       questionId: body.questionId,
@@ -92,12 +106,13 @@ export class DiscoveryHttpController {
   // POST /discovery/:id/direction
   @Post(":id/direction")
   @ApiOperation({ summary: "Select a solution direction for a discovery session" })
-  selectDirection(@Param("id") id: string, @Body() body: { solutionId: string }) {
+  selectDirection(@Param("id") id: string, @Body() body: SelectDirectionDto) {
     return this.discovery.selectDirection(id, { solutionId: body.solutionId });
   }
 
   // POST /discovery/:id/proposal
   @Post(":id/proposal")
+  @Throttle(AI_THROTTLE)
   @ApiOperation({ summary: "Compose a proposal for the selected direction" })
   composeProposal(@Param("id") id: string) {
     return this.discovery.composeProposal(id);
@@ -105,6 +120,7 @@ export class DiscoveryHttpController {
 
   // POST /discovery/:id/manifest
   @Post(":id/manifest")
+  @Throttle(AI_THROTTLE)
   @ApiOperation({ summary: "Generate a provisioning manifest for the session proposal" })
   generateManifest(@Param("id") id: string) {
     return this.discovery.generateManifest(id);
@@ -112,6 +128,7 @@ export class DiscoveryHttpController {
 
   // POST /discovery/:id/send-to-evaluation
   @Post(":id/send-to-evaluation")
+  @Throttle(AI_THROTTLE)
   @ApiOperation({ summary: "Send the discovery session to evaluation, returning session and intake record" })
   async sendToEvaluation(@Param("id") id: string) {
     const result = await this.discovery.sendToEvaluation(id);

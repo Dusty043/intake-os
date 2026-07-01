@@ -25,29 +25,40 @@ The app owns the governance spine. Monday and GitHub receive the output. Develop
 
 ## Build state
 
-Feature-complete for the defined scope. Running on oreochiserver in `dev_headers` auth mode. Waiting for external credentials to activate live integrations.
+The governance spine (intake → evaluation → approval → dry-run distribution) is feature-complete
+and running on oreochiserver in `dev_headers` auth mode. Live external write integrations
+(Monday, GitHub, email intake, Chat slash command) are **not implemented** — only their specs
+and mock executors exist. Don't provision real credentials for those expecting code to activate;
+it doesn't exist yet.
+
+Status buckets: **Built** (real, in the running app) · **Built, mock-only** (real code path, but
+writes to a mock/in-memory implementation, not an external system) · **Built, env-gated** (real
+code, inactive until a credential/env var is set — setting it does activate it) · **Spec-ready,
+not implemented** (a task doc and contract exist; no executable code) · **Future** (unbuilt idea,
+no spec yet).
 
 | Subsystem | Status |
 |-----------|--------|
-| Intake lifecycle + governance | Complete |
-| Discovery Engine (ambiguity resolution) | Complete — live OpenAI agents (gpt-5.5 orchestration / gpt-5.4-mini tasks) |
-| AI evaluation orchestrator (multi-agent) | Complete — mock agents |
-| Multi-gate approval | Complete |
-| Distribution preview (dry-run) | Complete |
-| Provisioning execution + retry | Complete — mock executors |
-| Monday adapter | Built — waiting for `MONDAY_API_TOKEN` + board config |
-| GitHub adapter | Built — waiting for `GITHUB_PAT` + org config |
-| Google Chat notifications | Built — waiting for `GOOGLE_CHAT_WEBHOOK_URL` |
-| Email intake | Built — waiting for service choice + `INTAKE_WEBHOOK_SECRET` |
-| Google Chat slash command | Built — waiting for GCP credentials |
-| Google OAuth | Built — waiting for `AUTH_GOOGLE_CLIENT_ID` + `AUTH_GOOGLE_CLIENT_SECRET` |
-| Roster API integration | Built — waiting for `ROSTER_API_URL` |
-| Rate limiting | Complete |
-| AI cost governance + usage dashboard | Complete |
-| Post-distribution lifecycle | Complete |
-| Developer assignment + override | Complete |
+| Intake lifecycle + governance | Built |
+| Discovery Engine (ambiguity resolution) | Built — mock agents by default; live OpenAI/Anthropic/Bedrock via `AI_PROVIDER` |
+| AI evaluation orchestrator (multi-agent) | Built — mock agents by default; `ANALYSIS_ENGINE=orchestrator` + `AI_PROVIDER` for live models |
+| Multi-gate approval | Built |
+| Distribution preview (dry-run) | Built |
+| Provisioning execution + retry (incl. scheduled background retry) | Built, mock-only — `src/application/provisioning/mock-executor.ts`, no live Monday/GitHub executor exists |
+| Monday adapter | Spec-ready, not implemented — see `docs/ai/tasks/TASK-0023D-monday-adapter.md`; no `MondayProvisioningExecutor` in code |
+| GitHub adapter | Spec-ready, not implemented — see `docs/ai/tasks/TASK-0023E-github-adapter.md`; no GitHub provisioning executor in code |
+| Email intake | Spec-ready, not implemented — see `docs/ai/tasks/TASK-0025-email-intake.md`; no `/intake-sources/email` route exists |
+| Google Chat slash command | Spec-ready, not implemented — see `docs/ai/tasks/TASK-0026-google-chat-intake.md`; no `/intake-sources/chat` route exists |
+| Google Chat notifications (outbound) | Built, env-gated — waiting for `GOOGLE_CHAT_WEBHOOK_URL` |
+| Google OAuth | Built, env-gated — waiting for `AUTH_GOOGLE_CLIENT_ID` + `AUTH_GOOGLE_CLIENT_SECRET`; startup now fails fast if either is missing under `AUTH_MODE=google` |
+| Roster API integration | Built, env-gated — client + scoring built, waiting for `ROSTER_API_URL`/`ROSTER_API_KEY`; upstream contract itself is still unverified (see `docs/EXTERNAL-NEEDS.md` §8) |
+| Rate limiting | Built |
+| AI cost governance + usage dashboard | Built |
+| Post-distribution lifecycle | Built |
+| Developer assignment + override | Built |
 
-See `docs/EXTERNAL-NEEDS.md` for the complete activation checklist, ordered by effort.
+See `docs/EXTERNAL-NEEDS.md` for the credential/decision checklist for the env-gated items —
+it does not cover Monday/GitHub/email/Chat-slash-command, since those need code, not just credentials.
 
 ---
 
@@ -76,7 +87,8 @@ npm run prisma:generate
 npm run prisma:migrate
 
 # 5. Verify
-npm run check          # typecheck + 685 tests
+npm run check          # typecheck + full test suite (738 tests; 5 known pre-existing
+                        # failures in discovery workflow-status defaults, tracked in BUILD_LOG)
 
 # 6. Build and start API
 npm run api:build
@@ -155,8 +167,9 @@ Swagger/OpenAPI: **http://localhost:3000/docs**
 | GET | /intakes/:id/evaluations | List evaluations |
 | GET | /admin/ai-usage | AI usage by model and role |
 | GET | /admin/ai-usage/summary | Monthly AI usage summary |
-| POST | /intake-sources/email | Inbound email webhook |
-| POST | /intake-sources/chat | Google Chat slash command webhook |
+
+`/intake-sources/email` and `/intake-sources/chat` do not exist yet — they're spec-ready
+(`docs/ai/tasks/TASK-0025-email-intake.md`, `TASK-0026-google-chat-intake.md`), not implemented.
 
 ---
 
@@ -167,7 +180,8 @@ src/domain/                   Workflow state machine, permissions, project types
 src/application/              Workflow service, evaluation orchestrator, provisioning executor
 src/application/agents/       Mock evaluation agents (risk, work breakdown, clarification, assignment)
 src/application/roster/       Roster API client, scoring algorithm, types
-src/application/provisioning/ Provisioning executor, retry + backoff, Monday and GitHub adapters
+src/application/provisioning/ Provisioning executor, retry + backoff — mock executors only;
+                               Monday/GitHub adapter contracts are specs in docs/ai/tasks/, not code
 src/application/notifications/ Google Chat notifier
 src/application/providers/    AI provider router (OpenAI, Anthropic, Bedrock, mock)
 
@@ -176,7 +190,7 @@ apps/api/prisma/              Schema and migrations
 apps/web/src/                 Next.js 15 review UI
 apps/web/src/components/      Shared UI components (EvaluationPanel, AssignmentCard, etc.)
 
-tests/                        Node test runner — 685 tests
+tests/                        Node test runner — 738 tests (5 known pre-existing failures)
 scripts/                      Demo scripts, smoke tests, seed data
 deploy/                       Server deployment scripts and healthcheck
 
@@ -238,7 +252,7 @@ See `docs/EXTERNAL-NEEDS.md` for the full list of env vars and where to get each
 | Script | Description |
 |--------|-------------|
 | `npm run check` | Typecheck + full test suite |
-| `npm test` | Run 685 unit tests |
+| `npm test` | Run the full unit test suite |
 | `npm run typecheck` | TypeScript check only |
 | `npm run build:core` | Compile domain + application layer |
 | `npm run api:build` | Compile NestJS API |
