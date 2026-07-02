@@ -45,7 +45,7 @@ function parseRole(value: string): UserRole {
   throw new BadRequestException(`Invalid x-actor-role header: ${value}`);
 }
 
-function singleHeader(value: HeaderValue): string | undefined {
+export function singleHeader(value: HeaderValue): string | undefined {
   if (Array.isArray(value)) {
     return value[0]?.trim() || undefined;
   }

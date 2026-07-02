@@ -1760,3 +1760,37 @@ GitHub repos: only for Web App, Chrome Extension, SaaS
 **One more finding after Slice F, before committing**: `git status`/`git ls-files` showed only `migration_lock.toml` tracked under `apps/api/prisma/migrations/` — every actual `migration.sql` (all 5 pre-existing, plus the new one from Slice E) was untracked. `.gitignore` had a bare `*.sql` rule (meant for local Postgres backup dumps) that also matched every migration file anywhere in the tree — same root-cause pattern as the `task-*.md` bug found in TASK-0039 (an unanchored glob meant for one location swallowing a different, legitimate one). This would have made the Slice E fix (`prisma migrate deploy`) non-functional on a real deploy: the actual flow is `git pull` then `docker build`, so a fresh pull would never bring the migration files regardless of what's on disk locally. Fixed by scoping the rule to `backups/*.sql`/`backups/*.dump`.
 
 **Follow-up**: None blocking — all spec acceptance criteria met. Worth a future look: whether the schema drift found in Slice E (lifecycle-status enum values, dead-letter columns) also needs applying to the live shared `~/intake-os` deployment via `migrate deploy` next time its `api`/`postgres` containers restart — and now that migrations are actually tracked, `git pull` there will bring them.
+
+## 2026-07-02 — TASK-0041: Land Hardening Pass on Main, Baseline Production Migrations, Self-Healing Cron
+
+**Status:** Complete
+
+Picked up the Slice E/F follow-up above. Found the hardening-pass commit had never actually reached `main` — PR #2 merged into `feature/scheduled-retry-backoff` two minutes *after* that branch was already merged into `main` via PR #1, so `main` (what oreochiserver tracks) stayed behind. Opened and merged PR #3 to close the gap (self-merge to `main` required explicit user go-ahead — blocked once by the auto-mode classifier without it).
+
+While checking migration state on the live server, found `api`/`postgres` had been exited for ~24h (`web`/`local-proxy` still up) — logs showed a manual stop (graceful `postgres` shutdown + `SIGKILL` on `api`, same second), not a reboot. `restart: unless-stopped` (already configured) intentionally doesn't recover from an explicit stop. Data was intact; recovered via `docker compose up -d` (no config change).
+
+Confirmed via direct schema inspection that production's actual database already matched `schema.prisma` exactly — the "drift" from TASK-0040 was real relative to the migration *files*, but production itself had already accumulated the same columns via years of `db push`. The real gap: `_prisma_migrations` had 0 rows. Shipping Slice E's `migrate deploy` switch as-is would have crash-looped the next deploy (tries to run all 6 migrations from scratch against a schema that already has them). Rebuilt the `api` image from `main`, baselined migration history via `prisma migrate resolve --applied` for all 6 migrations (metadata-only, run against a throwaway container — didn't touch the live `api` service until baseline was verified clean), then deployed. Confirmed clean boot ("No pending migrations to apply"), zero restarts, data intact, `/intakes` returns 200.
+
+Added a `*/5 * * * *` + `@reboot` cron reconciler (`docker compose up -d`, idempotent) matching an existing convention already on that host — closes the actual gap that caused the outage (manual stop + no daemon restart = nothing brings it back without something watching).
+
+**Task log**: `docs/ai/tasks/TASK-0041-production-deploy-and-self-healing.md`
+
+**Follow-up**: None blocking — deploy/ops only, no application code changed.
+
+## 2026-07-02 — TASK-0042: Service Token Auth for Non-Human Callers
+
+**Status:** Complete
+
+Follow-up to a question during TASK-0041: with only `dev_headers` (forbidden in production) and `google` (OAuth, still env-gated per GAP-007) as auth modes, none of the existing automation (`smoke-runtime-workflow.mjs`, `smoke-api.mjs`, CI) would be able to authenticate at all once Google auth is actually turned on — they only know how to send `x-actor-role`, which `google` mode rejects outright. User confirmed the fix should be an additional strategy alongside Google, not a replacement, scoped to non-human callers only (`integrations/bitrix24` explicitly excluded — not active dev).
+
+Added `AUTH_SERVICE_TOKENS="name:token:role,..."` as a bearer-token check in `AuthGuard`, evaluated before the `AUTH_MODE`-specific branch so it works under either mode. Role comes only from server-side config, never from a client header — verified live that a token mapped to `request_creator` still resolves to `request_creator` even when the request also sends a spoofed `x-actor-role: admin` header. Unrecognized bearer tokens are rejected outright (401) rather than silently falling through to the mode-specific path.
+
+Also fixed a stale, actively-wrong comment in `.env.server.example` ("Set to dev_headers for seeding/smoke scripts") — that file sets `NODE_ENV=production`, under which `AUTH_MODE=dev_headers` hard-crashes startup by design. Replaced with a pointer to `AUTH_SERVICE_TOKENS`.
+
+**Tests**: `npm run typecheck` clean. `npm test` — 752 tests (14 new), 747 pass, 5 fail (same pre-existing discovery workflow-status-default failures, unchanged baseline). Live verification against a disposable local Postgres container + API instance (`AUTH_MODE=dev_headers` + `AUTH_SERVICE_TOKENS` set, torn down after): valid token → 200; unknown token → 401; no `Authorization` header → existing `dev_headers` behavior unaffected; created a real intake via a service token, confirmed audit trail attributed it correctly (`role` from server config, `displayName` from header); confirmed role can't be escalated via a spoofed header.
+
+**Dual-mode follow-up (same day)**: user asked explicitly for confirmation that service tokens are additive, not a this-or-that choice with Google OAuth — added `tests/auth-guard-dual-mode.test.mjs` (6 tests, instantiates `AuthGuard` directly with a mock `SessionService`, no DB/DI needed) proving: under `AUTH_MODE=google`, a service token authenticates without ever calling `validateSession`, AND a request with no bearer token still validates via the real session-cookie path on the same running instance; same pair of checks for `AUTH_MODE=dev_headers`; an unrecognized bearer token is rejected even when a valid session cookie is also present on the same request; spoofed `x-actor-role` cannot escalate a lower-privileged token. This was already true by construction (the bearer check runs before the `AUTH_MODE` branch) — the tests make it a locked-in guarantee instead of an implementation detail.
+
+**Task log**: `docs/ai/tasks/TASK-0042-service-token-auth.md`
+
+**Follow-up**: `AUTH_SERVICE_TOKENS` is not yet set on oreochiserver (local-only verification in this task) — generating and setting real tokens there is a separate operator action. If this ever needs to serve external/multi-tenant callers, static tokens should be replaced with short-lived signed tokens.

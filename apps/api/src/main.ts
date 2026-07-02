@@ -7,6 +7,7 @@ import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 import { AppModule } from "./app.module.js";
 import { validateAuthConfig } from "../../../src/auth-config-validator.js";
 import { loadRateLimitConfig } from "./config/rate-limit.config.js";
+import { parseServiceTokens } from "./modules/auth/service-token-resolver.js";
 
 async function bootstrap(): Promise<void> {
   // Validate auth config before any module initializes — crashes on bad production config
@@ -14,6 +15,13 @@ async function bootstrap(): Promise<void> {
   console.log(
     `[Auth] Auth mode: ${authConfig.mode} (NODE_ENV: ${process.env.NODE_ENV ?? "development"})`,
   );
+
+  // Parses (and fail-fasts on malformed) AUTH_SERVICE_TOKENS up front rather than on first request.
+  const serviceTokens = parseServiceTokens(process.env.AUTH_SERVICE_TOKENS);
+  if (serviceTokens.size > 0) {
+    const names = [...serviceTokens.values()].map((t) => `${t.name}(${t.role})`).join(", ");
+    console.log(`[Auth] Service tokens configured: ${names}`);
+  }
 
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
@@ -51,6 +59,7 @@ async function bootstrap(): Promise<void> {
       .addApiKey({ type: "apiKey", name: "x-actor-id", in: "header" }, "actor-id")
       .addApiKey({ type: "apiKey", name: "x-actor-role", in: "header" }, "actor-role")
       .addApiKey({ type: "apiKey", name: "x-actor-name", in: "header" }, "actor-name")
+      .addBearerAuth({ type: "http", scheme: "bearer" }, "service-token")
       .build();
 
     const document = SwaggerModule.createDocument(app, swaggerConfig);

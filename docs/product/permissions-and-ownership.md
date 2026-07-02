@@ -311,6 +311,21 @@ Server-side checks must enforce role and state rules.
 
 ---
 
+## Non-Human Callers (Service Tokens)
+
+Scripts, CI, and webhooks (not browser-based humans) authenticate via a
+server-configured bearer token instead of a login flow (`AUTH_SERVICE_TOKENS`,
+TASK-0042). This works under any `AUTH_MODE` — it is checked before the
+`dev_headers`/`google` branch, not a third value of `AUTH_MODE` itself.
+
+The role granted to a service-token caller comes only from the server-side
+token config, never from a client-supplied header. A caller cannot claim a
+higher role than the token it presents was configured with — this is the same
+"do not trust the client for authority" principle as the rest of this
+document, just applied to a non-human caller instead of a browser session.
+
+---
+
 ## Required Tests
 
 Permissions implementation must include tests for:

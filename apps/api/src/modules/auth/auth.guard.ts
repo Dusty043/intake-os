@@ -6,10 +6,11 @@ import {
   UnauthorizedException,
 } from "@nestjs/common";
 import { Reflector } from "@nestjs/core";
-import { actorFromHeaders } from "../../common/actor.js";
+import { actorFromHeaders, singleHeader } from "../../common/actor.js";
 import type { AuthenticatedActor } from "./auth.types.js";
 import { IS_PUBLIC_KEY } from "./auth.decorators.js";
 import { SessionService } from "./session.service.js";
+import { parseServiceTokens } from "./service-token-resolver.js";
 
 type IncomingRequest = {
   headers: Record<string, string | string[] | undefined>;
@@ -35,6 +36,29 @@ export class AuthGuard implements CanActivate {
     if (isPublic) return true;
 
     const request = context.switchToHttp().getRequest<IncomingRequest>();
+
+    const bearerToken = parseBearerToken(singleHeader(request.headers["authorization"]));
+    if (bearerToken) {
+      const serviceTokens = parseServiceTokens(process.env.AUTH_SERVICE_TOKENS);
+      const match = serviceTokens.get(bearerToken);
+      if (!match) {
+        throw new UnauthorizedException({
+          message: "Invalid service token",
+          code: "AUTH_REQUIRED",
+        });
+      }
+
+      request.actor = {
+        id: singleHeader(request.headers["x-actor-id"]) || `service:${match.name}`,
+        email: "",
+        name: singleHeader(request.headers["x-actor-name"]) || match.name,
+        role: match.role,
+        authProvider: "service_token",
+        authSubject: match.name,
+      };
+      return true;
+    }
+
     const authMode = process.env.AUTH_MODE ?? "dev_headers";
 
     if (authMode === "dev_headers") {
@@ -72,4 +96,9 @@ export class AuthGuard implements CanActivate {
     request.actor = actor;
     return true;
   }
+}
+
+function parseBearerToken(header: string | undefined): string | undefined {
+  if (!header?.startsWith("Bearer ")) return undefined;
+  return header.slice("Bearer ".length).trim() || undefined;
 }
