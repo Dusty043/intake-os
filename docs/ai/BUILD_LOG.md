@@ -1794,3 +1794,17 @@ Also fixed a stale, actively-wrong comment in `.env.server.example` ("Set to dev
 **Task log**: `docs/ai/tasks/TASK-0042-service-token-auth.md`
 
 **Follow-up**: `AUTH_SERVICE_TOKENS` is not yet set on oreochiserver (local-only verification in this task) — generating and setting real tokens there is a separate operator action. If this ever needs to serve external/multi-tenant callers, static tokens should be replaced with short-lived signed tokens.
+
+## 2026-07-02 — TASK-0043: Fix Stale Discovery Test Assertions
+
+**Status:** Complete
+
+User asked for a proper state report rather than the repeated "5 known pre-existing failures" label. Traced each failure via its actual assertion output instead of trusting the existing description: 3 failures in `tests/discovery-phase-1.test.mjs` were message-count checks (`1≠2`, `2≠4`) that predate `DiscoveryOrchestrator.runAnalysis` appending an `"ai"`-role reply to session history after every turn. The other 2, in `tests/discovery-phase-3.test.mjs`, expected `status === "draft"` — `git log -p` on `proposal-to-intake-adapter.ts` showed this was deliberately changed to `"submitted"` in commit `1325c3e` ("auto-submit and auto-evaluate intake when sending discovery to evaluation"), and these two tests were never updated for it.
+
+Both root causes are prior intentional product decisions, not regressions — fixed the 5 stale assertions (with a comment at each explaining why), no application code touched. Removed the two "5 known pre-existing failures" callouts from `README.md`.
+
+**Tests**: `npm run typecheck` clean. `npm test` — **752/752 passing, 0 failures**, now that this fix is combined with TASK-0042's 14 new tests via rebase onto `main`.
+
+**Task log**: `docs/ai/tasks/TASK-0043-fix-stale-discovery-tests.md`
+
+**Follow-up**: None — suite is fully green.

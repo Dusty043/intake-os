@@ -88,8 +88,7 @@ npm run prisma:generate
 npm run prisma:migrate
 
 # 5. Verify
-npm run check          # typecheck + full test suite (738 tests; 5 known pre-existing
-                        # failures in discovery workflow-status defaults, tracked in BUILD_LOG)
+npm run check          # typecheck + full test suite (752 tests, all passing)
 
 # 6. Build and start API
 npm run api:build
@@ -193,7 +192,7 @@ apps/api/prisma/              Schema and migrations
 apps/web/src/                 Next.js 15 review UI
 apps/web/src/components/      Shared UI components (EvaluationPanel, AssignmentCard, etc.)
 
-tests/                        Node test runner — 738 tests (5 known pre-existing failures)
+tests/                        Node test runner — 752 tests, all passing
 scripts/                      Demo scripts, smoke tests, seed data
 deploy/                       Server deployment scripts and healthcheck
 
