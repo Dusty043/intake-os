@@ -51,6 +51,7 @@ no spec yet).
 | Google Chat slash command | Spec-ready, not implemented — see `docs/ai/tasks/TASK-0026-google-chat-intake.md`; no `/intake-sources/chat` route exists |
 | Google Chat notifications (outbound) | Built, env-gated — waiting for `GOOGLE_CHAT_WEBHOOK_URL` |
 | Google OAuth | Built, env-gated — waiting for `AUTH_GOOGLE_CLIENT_ID` + `AUTH_GOOGLE_CLIENT_SECRET`; startup now fails fast if either is missing under `AUTH_MODE=google` |
+| Service token auth (non-human callers) | Built, env-gated — waiting for `AUTH_SERVICE_TOKENS`; works under either `AUTH_MODE` |
 | Roster API integration | Built, env-gated — client + scoring built, waiting for `ROSTER_API_URL`/`ROSTER_API_KEY`; upstream contract itself is still unverified (see `docs/EXTERNAL-NEEDS.md` §8) |
 | Rate limiting | Built |
 | AI cost governance + usage dashboard | Built |
@@ -132,6 +133,8 @@ The server runs `AUTH_MODE=dev_headers` by default. A role switcher in the botto
 Roles: `request_creator` `intake_owner` `devops_lead` `developer` `admin`
 
 To use real Google auth, set `AUTH_MODE=google` and provide the GCP credentials from `docs/EXTERNAL-NEEDS.md`.
+
+Non-human callers (scripts, CI, webhooks) use `AUTH_SERVICE_TOKENS` instead — a bearer token checked before either mode, with a role fixed by server config rather than a client header. Not yet set on oreochiserver.
 
 ---
 

@@ -5,6 +5,9 @@
  *   npm run smoke:api
  *   API_BASE_URL=http://localhost:3000 node scripts/smoke-api.mjs
  *
+ * Against an AUTH_MODE=google target, set SERVICE_TOKEN to a token matching an entry
+ * in that server's AUTH_SERVICE_TOKENS instead of relying on dev_headers.
+ *
  * Checks:
  *   1. GET /health
  *   2. GET /docs-json (Swagger OpenAPI JSON)
@@ -55,11 +58,18 @@ async function post(path, body, headers = {}, expectedStatus = 201) {
   return res.json();
 }
 
-const actorHeaders = {
-  "x-actor-id": "smoke-test-user",
-  "x-actor-role": "intake_owner",
-  "x-actor-name": "Smoke Test",
-};
+// SERVICE_TOKEN works under AUTH_MODE=google, which rejects dev_headers-only x-actor-role.
+const actorHeaders = process.env.SERVICE_TOKEN
+  ? {
+      Authorization: `Bearer ${process.env.SERVICE_TOKEN}`,
+      "x-actor-id": "smoke-test-user",
+      "x-actor-name": "Smoke Test",
+    }
+  : {
+      "x-actor-id": "smoke-test-user",
+      "x-actor-role": "intake_owner",
+      "x-actor-name": "Smoke Test",
+    };
 
 console.log(`\nProject Intake OS — API Smoke Test`);
 console.log(`Target: ${BASE}\n`);

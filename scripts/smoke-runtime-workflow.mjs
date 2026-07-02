@@ -23,6 +23,10 @@
  *   npm run smoke:runtime
  *   API_BASE_URL=http://localhost:3000 node scripts/smoke-runtime-workflow.mjs
  *
+ * Against an AUTH_MODE=google target, dev_headers actor headers are rejected — set
+ * SERVICE_TOKEN_REQUEST_CREATOR / SERVICE_TOKEN_INTAKE_OWNER / SERVICE_TOKEN_DEVOPS_LEAD
+ * to tokens matching entries in that server's AUTH_SERVICE_TOKENS instead.
+ *
  * Exit code 0 = all required checks passed.
  * Exit code 1 = one or more required checks failed.
  */
@@ -64,23 +68,18 @@ async function post(path, body, headers = {}, expectedStatus = 201) {
   return res.json();
 }
 
-const creatorHeaders = {
-  "x-actor-id": "smoke-creator",
-  "x-actor-role": "request_creator",
-  "x-actor-name": "Smoke Creator",
-};
+// Prefers a service token (works under AUTH_MODE=google) over dev_headers-only
+// x-actor-role, which AUTH_MODE=google rejects outright.
+function actorHeaders(role, id, name) {
+  const token = process.env[`SERVICE_TOKEN_${role.toUpperCase()}`];
+  return token
+    ? { Authorization: `Bearer ${token}`, "x-actor-id": id, "x-actor-name": name }
+    : { "x-actor-id": id, "x-actor-role": role, "x-actor-name": name };
+}
 
-const intakeOwnerHeaders = {
-  "x-actor-id": "smoke-intake-owner",
-  "x-actor-role": "intake_owner",
-  "x-actor-name": "Smoke Intake Owner",
-};
-
-const devopsHeaders = {
-  "x-actor-id": "smoke-devops",
-  "x-actor-role": "devops_lead",
-  "x-actor-name": "Smoke DevOps Lead",
-};
+const creatorHeaders = actorHeaders("request_creator", "smoke-creator", "Smoke Creator");
+const intakeOwnerHeaders = actorHeaders("intake_owner", "smoke-intake-owner", "Smoke Intake Owner");
+const devopsHeaders = actorHeaders("devops_lead", "smoke-devops", "Smoke DevOps Lead");
 
 console.log(`\nProject Intake OS — Runtime Workflow Smoke Test`);
 console.log(`Target: ${BASE}\n`);
