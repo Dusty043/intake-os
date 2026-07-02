@@ -61,6 +61,7 @@ Generated at: 2026-06-09T14:53:20.716Z
 - `docs/ai/tasks/TASK-0040-hardening-pass-truth-sync.md`
 - `docs/ai/tasks/TASK-0041-production-deploy-and-self-healing.md`
 - `docs/ai/tasks/TASK-0042-service-token-auth.md`
+- `docs/ai/tasks/TASK-0043-fix-stale-discovery-tests.md`
 
 ## Deployment Docs
 

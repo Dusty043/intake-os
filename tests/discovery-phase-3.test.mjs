@@ -223,12 +223,14 @@ describe("proposalToIntakeRecord adapter", () => {
     assert.equal(record.source.rawPayload?.origin, "discovery_engine");
   });
 
-  test("status is 'draft'", async () => {
+  test("status is 'submitted'", async () => {
     const { orchestrator } = makeOrchestrator();
     const directed = await startAndSelectDirection(orchestrator, "Invoice process is slow.");
     const session = await orchestrator.composeProposal(directed.id);
     const record = proposalToIntakeRecord(session.proposal, session, idFactory, fixedNow());
-    assert.equal(record.status, "draft");
+    // Discovery-composed intakes skip the manual draft step and go straight to
+    // evaluation (commit 1325c3e) — discovery already did the drafting work.
+    assert.equal(record.status, "submitted");
   });
 
   test("projectType is mapped from intent type", async () => {
@@ -441,7 +443,8 @@ describe("DiscoveryOrchestrator.sendToEvaluation", () => {
     assert.ok(intakeRecord.id, "intakeRecord.id must be set");
     assert.ok(intakeRecord.title, "intakeRecord.title must be set");
     assert.ok(intakeRecord.description, "intakeRecord.description must be set");
-    assert.equal(intakeRecord.status, "draft");
+    // Discovery-composed intakes skip the manual draft step (commit 1325c3e).
+    assert.equal(intakeRecord.status, "submitted");
     assert.equal(intakeRecord.requester, "u1");
     assert.ok(intakeRecord.projectType, "intakeRecord.projectType must be set");
     assert.ok(intakeRecord.discovery, "intakeRecord.discovery must be set");

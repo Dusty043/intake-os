@@ -213,7 +213,8 @@ describe("DiscoveryOrchestrator.startDiscovery", () => {
 
     assert.ok(session.id);
     assert.equal(session.userId, "user_1");
-    assert.equal(session.messages.length, 1);
+    // 2, not 1: runAnalysis appends the assistant's reply to the same history.
+    assert.equal(session.messages.length, 2);
     assert.equal(session.messages[0].role, "user");
     assert.ok(session.messages[0].content.includes("same questions"));
   });
@@ -274,7 +275,8 @@ describe("DiscoveryOrchestrator.addMessage", () => {
       content: "Our finance team manually reviews invoices and it takes 3 days.",
     });
 
-    assert.equal(updated.messages.length, 2);
+    // 4: user+ai from startDiscovery, then user+ai again from addMessage.
+    assert.equal(updated.messages.length, 4);
     assert.ok(updated.problemFrame);
   });
 
@@ -363,7 +365,8 @@ describe("DiscoveryController", () => {
     const updated = await controller.addMessage(session.id, {
       message: "It affects the finance team and takes 5 days per invoice.",
     });
-    assert.equal(updated.messages.length, 2);
+    // 4: user+ai from startDiscovery, then user+ai again from addMessage.
+    assert.equal(updated.messages.length, 4);
   });
 });
 
