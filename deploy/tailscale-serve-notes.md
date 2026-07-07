@@ -1,44 +1,37 @@
-# Tailscale Serve — Private Access Notes
+# Tailnet Access Notes
 
-Tailscale Serve exposes the local proxy to devices on your tailnet only.
+The server hosts multiple unrelated projects, and Tailscale Serve only allows one proxy
+rule per port — a previous attempt to use Serve here (`tailscale serve --https=443
+http://127.0.0.1:8080`) got silently overwritten by another project's Serve rule on the
+same box, with no record of when. As of 2026-07-08, intake-os no longer depends on Serve:
+the `local-proxy` container's host port binding was changed from `127.0.0.1:8080` (loopback
+only, SSH-tunnel access) to `${PROXY_PORT:-8080}:8080` (all interfaces), so it's directly
+reachable at `oreochiserver:${PROXY_PORT:-8080}` over the tailnet without any Serve rule.
 
-## Prerequisites
+## What's exposed
 
-- SSH tunnel access is working first (verify before using Serve).
-- Tailscale is installed and authenticated on the server.
-- Local proxy is running on `127.0.0.1:8080`.
+Only the `local-proxy` container's port is bound to all interfaces. `api` (3000), `web`
+(3001 — also reserved for Uptime Kuma), and `postgres` (5432) have no host port binding at
+all and stay reachable only from other containers on the compose network.
 
-## What to expose
-
-Only expose the local proxy:
+## Access
 
 ```
-127.0.0.1:8080
+http://oreochiserver:8080          (or the tailscale IP directly)
 ```
 
-Do not expose raw API (3000), raw web (3001), or Postgres (5432).
+No SSH tunnel, no Tailscale Serve rule needed. Tailscale's own tailnet-only routing is the
+access control — this is not exposed to the public internet unless a Funnel is separately
+configured (see `tailscale-funnel-notes.md`), which this project does not use.
 
-## Enable Serve
+## Changing the port
 
-```bash
-tailscale status
-tailscale serve --https=443 http://127.0.0.1:8080
-tailscale serve status
-```
-
-Access from any tailnet device at the HTTPS URL shown by `tailscale serve status`.
-
-## Disable Serve
-
-```bash
-tailscale serve reset
-tailscale serve status
-```
+Set `PROXY_PORT` in `.env.server` if `8080` collides with another project's port on this
+box, then `docker compose -f docker-compose.server.yml --env-file .env.server up -d
+local-proxy`.
 
 ## Log
 
-| Date | Action | URL | Notes |
-|------|--------|-----|-------|
-|      |        |     |       |
-
-Update this table when Serve is enabled or disabled.
+| Date | Action | Notes |
+|------|--------|-------|
+| 2026-07-08 | Switched from SSH-tunnel/Serve to direct port binding | User requested every project on the box be reachable via `oreochiserver:[port]`; Serve's one-rule-per-port limit made per-project Serve rules impractical with multiple projects sharing the host. |
