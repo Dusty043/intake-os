@@ -5,6 +5,7 @@ import type { AgentRunRecord, EvaluationPersistenceBundle } from "./evaluation-p
 import type { IntakeEvaluation } from "./intake-evaluation.js";
 import { agentRunsFromEvaluation } from "./evaluation-persistence.js";
 import { validateIntakeEvaluation } from "./intake-evaluation.js";
+import { NotFoundError } from "./errors.js";
 
 export class InMemoryProjectIntakeStore implements ProjectIntakeStore {
   private readonly intakes = new Map<string, ProjectIntakeRecord>();
@@ -105,6 +106,22 @@ export class InMemoryProjectIntakeStore implements ProjectIntakeStore {
     return structuredClone(copy);
   }
 
+  async createProvisioningRunIfNoneExecuting(run: ProvisioningRun): Promise<ProvisioningRun | null> {
+    // No `await` between the check and the `set` below — this method runs to completion in
+    // one synchronous tick, so a concurrent caller can never observe the "no executing run"
+    // state in between. That's what makes this atomic where the old
+    // listProvisioningRuns() + saveProvisioningRun() pair (two separately awaited calls) was
+    // not: each `await` is a point where another queued call could interleave.
+    const hasExecuting = Array.from(this.provisioningRuns.values()).some(
+      (r) => r.intakeId === run.intakeId && r.status === "executing",
+    );
+    if (hasExecuting) return null;
+
+    const copy = structuredClone(run);
+    this.provisioningRuns.set(run.id, copy);
+    return structuredClone(copy);
+  }
+
   async listProvisioningRuns(intakeId: string): Promise<ProvisioningRun[]> {
     return Array.from(this.provisioningRuns.values())
       .filter((r) => r.intakeId === intakeId)
@@ -128,5 +145,6 @@ export class InMemoryProjectIntakeStore implements ProjectIntakeStore {
         return;
       }
     }
+    throw new NotFoundError("Provisioning target", targetId);
   }
 }

@@ -425,21 +425,15 @@ export class PrismaProjectIntakeStore implements ProjectIntakeStore {
     return run;
   }
 
-  // Issue #13: application-level mitigation for the executeDistribution/
-  // retryFailedProvisioningTargets TOCTOU race (see intake-workflow-service.ts). Re-checks
-  // "no run for this intake is executing" and inserts the new run inside one `$transaction`,
-  // which narrows the race window from "however long the caller takes between
-  // listProvisioningRuns() and saveProvisioningRun()" down to "however long this transaction
-  // takes to commit" — but does NOT fully close it. Prisma's default (READ COMMITTED)
-  // isolation still lets two concurrent transactions both pass the findFirst check before
-  // either one commits its create. Closing that requires a DB-level guarantee, e.g. a
-  // migration adding a partial unique index:
-  //   CREATE UNIQUE INDEX one_executing_run_per_intake
-  //     ON "ProvisioningRun" ("intakeId") WHERE status = 'executing';
-  // so the second concurrent INSERT fails at the database instead of relying on app timing.
-  // Not added here — no live migration is run from this session; a human should add it via
-  // `prisma migrate dev` and re-point this method at relying on the resulting unique
-  // constraint violation instead of (or in addition to) the findFirst check.
+  // Issue #13/#19: closes the TOCTOU window where a caller checking "no run is
+  // executing" via a separate listProvisioningRuns() call, then calling
+  // saveProvisioningRun(), left a gap for two near-simultaneous calls to both pass the
+  // check and both create an executing run. Doing the check inside the same transaction
+  // as the create narrows the window under Postgres's default READ COMMITTED isolation
+  // but doesn't fully close it — a real fix needs a partial unique index
+  // (`CREATE UNIQUE INDEX ... ON "ProvisioningRun" (intakeId) WHERE status = 'executing'`)
+  // so the database itself rejects the second insert as a unique-constraint violation
+  // instead of (or in addition to) the findFirst check.
   //
   // New runs are always created with `targets: []` (see the call sites in
   // intake-workflow-service.ts) — this intentionally doesn't replicate saveProvisioningRun's

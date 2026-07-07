@@ -25,24 +25,28 @@ export class InMemoryDiscoverySessionStore implements IDiscoverySessionStore {
   private readonly sessions = new Map<string, DiscoverySession>();
 
   async create(session: DiscoverySession): Promise<DiscoverySession> {
-    this.sessions.set(session.id, session);
-    return session;
+    const copy = structuredClone(session);
+    this.sessions.set(session.id, copy);
+    return structuredClone(copy);
   }
 
   async getById(id: string): Promise<DiscoverySession | null> {
-    return this.sessions.get(id) ?? null;
+    const session = this.sessions.get(id);
+    return session ? structuredClone(session) : null;
   }
 
   async update(id: string, patch: Partial<DiscoverySession>): Promise<DiscoverySession> {
     const existing = this.sessions.get(id);
     if (!existing) throw new NotFoundError("DiscoverySession", id);
-    const updated: DiscoverySession = { ...existing, ...patch };
+    const updated: DiscoverySession = { ...existing, ...structuredClone(patch) };
     this.sessions.set(id, updated);
-    return updated;
+    return structuredClone(updated);
   }
 
   async listByUser(userId: string): Promise<DiscoverySession[]> {
-    return Array.from(this.sessions.values()).filter((s) => s.userId === userId);
+    return Array.from(this.sessions.values())
+      .filter((s) => s.userId === userId)
+      .map((s) => structuredClone(s));
   }
 
   async listAllUsageRecords(

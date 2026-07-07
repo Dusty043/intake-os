@@ -76,7 +76,11 @@ function ClarificationCard({ question, onAnswer, disabled }: ClarificationCardPr
 
       {expanded && (
         <div className="px-3 pb-3 border-t border-gray-100 bg-white">
+          <label htmlFor={`clarification-answer-${question.id}`} className="sr-only">
+            Answer for: {question.question}
+          </label>
           <textarea
+            id={`clarification-answer-${question.id}`}
             value={answer}
             onChange={(e) => setAnswer(e.target.value)}
             placeholder="Type your answer…"
@@ -257,7 +261,11 @@ export function DiscoveryChat({
       {/* Input */}
       <div className="border-t border-gray-200 px-4 py-3 bg-white">
         <div className="flex gap-2 items-end">
+          <label htmlFor="discovery-message-input" className="sr-only">
+            Message
+          </label>
           <textarea
+            id="discovery-message-input"
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}

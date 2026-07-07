@@ -12,12 +12,12 @@ import type { IntakeWorkflowService } from "./intake-workflow-service.js";
 export class IntakeController {
   constructor(private readonly workflowService: IntakeWorkflowService) {}
 
-  list() {
-    return this.workflowService.listIntakes();
+  list(actor: Actor) {
+    return this.workflowService.listIntakes(actor);
   }
 
-  get(id: string) {
-    return this.workflowService.getIntake(id);
+  get(id: string, actor: Actor) {
+    return this.workflowService.getIntake(id, actor);
   }
 
   create(body: CreateIntakeInput, actor: Actor) {
@@ -52,8 +52,8 @@ export class IntakeController {
     return this.workflowService.markReadyForProvisioning(id, actor);
   }
 
-  audit(id: string) {
-    return this.workflowService.getAuditTrail(id);
+  audit(id: string, actor: Actor) {
+    return this.workflowService.getAuditTrail(id, actor);
   }
 
   previewBitrix24Intake(payload: Record<string, unknown>) {

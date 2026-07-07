@@ -12,7 +12,10 @@ import {
 import { ApiOperation, ApiTags } from "@nestjs/swagger";
 import { Throttle } from "@nestjs/throttler";
 import type { DiscoveryController } from "../../../../../src/application/discovery/index.js";
+import type { DiscoverySession } from "../../../../../src/domain/discovery.js";
+import { auditVisibilityForRole } from "../../../../../src/domain/permissions.js";
 import type { ProjectIntakeRecord } from "../../../../../src/application/types.js";
+import { NotFoundError } from "../../../../../src/application/errors.js";
 import { IntakeWorkflowService } from "../../../../../src/application/intake-workflow-service.js";
 import { CurrentActor } from "../auth/auth.decorators.js";
 import type { AuthenticatedActor } from "../auth/auth.types.js";
@@ -40,6 +43,27 @@ export class DiscoveryHttpController {
     private readonly workflowService: IntakeWorkflowService,
   ) {}
 
+  // No dedicated "view any discovery session" permission exists in
+  // permissions.ts yet — reuse the "full" audit-visibility tier (admin
+  // today) as the elevated-access signal, same as intake audit visibility.
+  // Give a role its own permission here if it needs cross-user session
+  // access without full audit visibility.
+  private canAccessAnySession(actor: AuthenticatedActor): boolean {
+    return auditVisibilityForRole(actor.role) === "full";
+  }
+
+  // Every :id route funnels through here so ownership is checked once.
+  // Throws the same NotFoundError as a missing session (not a 403) so a
+  // caller probing another user's session ID can't distinguish "not yours"
+  // from "doesn't exist".
+  private async requireOwnedSession(id: string, actor: AuthenticatedActor): Promise<DiscoverySession> {
+    const session = await this.discovery.getSession(id);
+    if (session.userId !== actor.id && !this.canAccessAnySession(actor)) {
+      throw new NotFoundError("DiscoverySession", id);
+    }
+    return session;
+  }
+
   // POST /discovery
   @Post()
   @Throttle(AI_THROTTLE)
@@ -55,21 +79,27 @@ export class DiscoveryHttpController {
   @Get()
   @ApiOperation({ summary: "List discovery sessions for the current user" })
   listSessions(@CurrentActor() actor: AuthenticatedActor, @Query("userId") userId?: string) {
-    return this.discovery.listSessions(userId ?? actor.id);
+    const targetUserId = this.canAccessAnySession(actor) ? (userId ?? actor.id) : actor.id;
+    return this.discovery.listSessions(targetUserId);
   }
 
   // GET /discovery/:id
   @Get(":id")
   @ApiOperation({ summary: "Get a discovery session by ID" })
-  getSession(@Param("id") id: string) {
-    return this.discovery.getSession(id);
+  getSession(@Param("id") id: string, @CurrentActor() actor: AuthenticatedActor) {
+    return this.requireOwnedSession(id, actor);
   }
 
   // POST /discovery/:id/message
   @Post(":id/message")
   @Throttle(AI_THROTTLE)
   @ApiOperation({ summary: "Add a follow-up message to a discovery session" })
-  addMessage(@Param("id") id: string, @Body() body: DiscoveryMessageDto) {
+  async addMessage(
+    @Param("id") id: string,
+    @Body() body: DiscoveryMessageDto,
+    @CurrentActor() actor: AuthenticatedActor,
+  ) {
+    await this.requireOwnedSession(id, actor);
     return this.discovery.addMessage(id, { message: body.message });
   }
 
@@ -77,7 +107,8 @@ export class DiscoveryHttpController {
   @Post(":id/solutions")
   @Throttle(AI_THROTTLE)
   @ApiOperation({ summary: "Generate solution options for a discovery session" })
-  generateSolutions(@Param("id") id: string) {
+  async generateSolutions(@Param("id") id: string, @CurrentActor() actor: AuthenticatedActor) {
+    await this.requireOwnedSession(id, actor);
     return this.discovery.generateSolutions(id);
   }
 
@@ -85,10 +116,12 @@ export class DiscoveryHttpController {
   @Post(":id/clarifications/answer")
   @HttpCode(200)
   @ApiOperation({ summary: "Answer a clarification question in a discovery session" })
-  answerClarification(
+  async answerClarification(
     @Param("id") id: string,
     @Body() body: AnswerClarificationDto,
+    @CurrentActor() actor: AuthenticatedActor,
   ) {
+    await this.requireOwnedSession(id, actor);
     return this.discovery.answerClarification(id, {
       questionId: body.questionId,
       answer: body.answer,
@@ -99,14 +132,20 @@ export class DiscoveryHttpController {
   @Post(":id/clarifications/skip")
   @HttpCode(200)
   @ApiOperation({ summary: "Skip remaining clarification questions and proceed with current confidence" })
-  skipClarifications(@Param("id") id: string) {
+  async skipClarifications(@Param("id") id: string, @CurrentActor() actor: AuthenticatedActor) {
+    await this.requireOwnedSession(id, actor);
     return this.discovery.skipClarifications(id);
   }
 
   // POST /discovery/:id/direction
   @Post(":id/direction")
   @ApiOperation({ summary: "Select a solution direction for a discovery session" })
-  selectDirection(@Param("id") id: string, @Body() body: SelectDirectionDto) {
+  async selectDirection(
+    @Param("id") id: string,
+    @Body() body: SelectDirectionDto,
+    @CurrentActor() actor: AuthenticatedActor,
+  ) {
+    await this.requireOwnedSession(id, actor);
     return this.discovery.selectDirection(id, { solutionId: body.solutionId });
   }
 
@@ -114,7 +153,8 @@ export class DiscoveryHttpController {
   @Post(":id/proposal")
   @Throttle(AI_THROTTLE)
   @ApiOperation({ summary: "Compose a proposal for the selected direction" })
-  composeProposal(@Param("id") id: string) {
+  async composeProposal(@Param("id") id: string, @CurrentActor() actor: AuthenticatedActor) {
+    await this.requireOwnedSession(id, actor);
     return this.discovery.composeProposal(id);
   }
 
@@ -122,7 +162,8 @@ export class DiscoveryHttpController {
   @Post(":id/manifest")
   @Throttle(AI_THROTTLE)
   @ApiOperation({ summary: "Generate a provisioning manifest for the session proposal" })
-  generateManifest(@Param("id") id: string) {
+  async generateManifest(@Param("id") id: string, @CurrentActor() actor: AuthenticatedActor) {
+    await this.requireOwnedSession(id, actor);
     return this.discovery.generateManifest(id);
   }
 
@@ -130,7 +171,8 @@ export class DiscoveryHttpController {
   @Post(":id/send-to-evaluation")
   @Throttle(AI_THROTTLE)
   @ApiOperation({ summary: "Send the discovery session to evaluation, returning session and intake record" })
-  async sendToEvaluation(@Param("id") id: string) {
+  async sendToEvaluation(@Param("id") id: string, @CurrentActor() actor: AuthenticatedActor) {
+    await this.requireOwnedSession(id, actor);
     const result = await this.discovery.sendToEvaluation(id);
     const intake = result.intakeRecord as ProjectIntakeRecord | null;
     if (intake?.id) {

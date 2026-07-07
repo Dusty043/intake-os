@@ -1808,3 +1808,92 @@ Both root causes are prior intentional product decisions, not regressions — fi
 **Task log**: `docs/ai/tasks/TASK-0043-fix-stale-discovery-tests.md`
 
 **Follow-up**: None — suite is fully green.
+
+## 2026-07-02 — TASK-0044: Service Tokens Provisioned on oreochiserver
+
+**Status:** Complete
+
+Generated one `AUTH_SERVICE_TOKENS` entry per canonical role (`svc-request-creator`, `svc-intake-owner`, `svc-devops-lead`, `svc-developer`, `svc-admin`, each `openssl rand -hex 32`) and appended them to `.env.server` on the live server. Restarting `api` showed no `[Auth] Service tokens configured` log line — the running image was still built from `d6693e7` (PR #3 only), predating PR #4/#5 which merged earlier in this same session, so the bearer-token code didn't exist in that image yet. With explicit go-ahead, pulled `main` and rebuilt: `prisma migrate deploy` still reported "No pending migrations to apply" (TASK-0041's baseline holds, no new migrations in PR #4/#5), zero restarts, data intact (16 intakes unchanged).
+
+Verified live through the proxy's actual `/api/*` path (not bare `/intakes`, which routes to the web app on this Caddyfile) — valid admin token → 200, invalid token → 401 `AUTH_REQUIRED`, a distinct `request_creator` token authenticated as its own identity. Token values delivered to the user directly, never committed or logged anywhere.
+
+**Task log**: `docs/ai/tasks/TASK-0044-service-tokens-provisioned.md`
+
+**Follow-up**: Token values are the user's to store securely and wire into whichever scripts/CI need them.
+
+## 2026-07-06 — TASK-0045 Step 1: Monday Config Schema + Validation
+
+**Status:** In progress (Step 1 of 5 complete)
+
+User provided the Dev Operations Workspace manager's guide PDF again alongside a reference to TASK-0045, flagging that Monday adapter wiring is still dead and we lack formal Monday API access. Confirmed this is the same PDF TASK-0038 already used to verify `MondayProjectType` against the actual board taxonomy — it documents board/column *concepts* (Team Directory, Projects Portfolio, Roadmap & Epics, Sprint Tasks, Credentials Vault, Microtasks & Ops), not real board/group/column IDs, so it cannot unblock `MONDAY_GROUP_ID` or `MONDAY_COLUMN_MAP_JSON` (those still require someone with real Monday access, per `HANDOFF-0023D-monday-credentials.md`).
+
+Asked the user to choose scope; they picked implementing TASK-0045 Step 1 only — the one step that needs no credentials. Wrote `src/application/provisioning/monday-config.ts` (`validateMondayConfig()`), TDD (RED test first in `tests/monday-config.test.mjs`, confirmed failing on missing export, then implemented to GREEN). Validates presence of all four env vars (`MONDAY_API_TOKEN`, `MONDAY_BOARD_ID`, `MONDAY_GROUP_ID`, `MONDAY_COLUMN_MAP_JSON`), parses/validates `MONDAY_COLUMN_MAP_JSON` as a JSON object (rejects malformed JSON and non-object JSON like arrays), defaults `apiVersion` to `2026-04` from `MONDAY_API_VERSION`. Exported from `src/index.ts`. Added `MONDAY_GROUP_ID=` and `MONDAY_COLUMN_MAP_JSON=` (blank) to `.env.example`'s existing "not active" block so the full four-var shape is visible — still inert.
+
+**Tests**: `npm run check` — typecheck clean, **761/761 passing** (9 new in `tests/monday-config.test.mjs`).
+
+**Task log**: `docs/ai/tasks/TASK-0045-monday-adapter-build-plan.md`
+
+**Follow-up**: Steps 2–5 (`monday-api-client.ts`, `monday-executor.ts`, runtime wiring, smoke script) remain blocked on `MONDAY_GROUP_ID`/`MONDAY_COLUMN_MAP_JSON` — need someone with real Monday board access to answer Q-M-1 through Q-M-6 in `HANDOFF-0023D-monday-credentials.md`.
+
+## 2026-07-07 — TASK-0046: Unit Tests for PrismaDiscoverySessionStore Optimistic Concurrency
+
+**Status:** Complete
+
+`PrismaDiscoverySessionStore.update()` (`apps/api/src/persistence/prisma-discovery-session-store.ts`) uses optimistic concurrency (compare-and-swap on `updatedAt` via `updateMany`, retry up to 3 times, `ConflictError` on exhaustion) but had no test coverage — `apps/api` has no test harness at all, unlike `src/`'s `tests/*.test.mjs` suite built via `npm run build:core`. Confirmed no existing apps/api test pattern (`find apps/api -iname "*.test.*"` empty) before deciding an approach.
+
+Followed the existing `tests/*.test.mjs` convention (import compiled `dist/` output, `node:test` + `node:assert/strict`, no mocking library) instead of introducing new tooling. Added `npm run test:api` (`api:build && node --test tests/api/*.test.mjs`) and placed the new test in `tests/api/` — a subdirectory the existing `npm test` glob (`tests/*.test.mjs`) doesn't match, so the default suite's build step stays untouched. `PrismaService` is mocked as a plain object with hand-rolled call-tracking functions (not `node:test`'s `mock.fn()`, to avoid version-specific API assumptions).
+
+**Tests**: `tests/api/prisma-discovery-session-store.test.mjs` — normal update succeeds; retries 3x with a fresh re-read snapshot each attempt and succeeds on the 3rd; throws `ConflictError` when all 3 attempts return `count: 0`. `npm run test:api` — **3/3 passing**. `npm test` unaffected (745/769 passing; the 24 failures are pre-existing in `tests/provisioning-scheduled-retry.test.mjs`, unrelated to this change, not investigated).
+
+**Task log**: `docs/ai/tasks/TASK-0046-prisma-discovery-session-store-tests.md`
+
+**Follow-up**: Future apps/api persistence adapter tests belong under `tests/api/` using `npm run test:api`.
+
+## 2026-07-07 — TASK-0047: Full Review Pass — GitHub Issues + Subagent Fixes
+
+**Status:** Complete (PR not yet opened; Prisma migration for new indexes not yet generated)
+
+Ran a full correctness/security/performance review (5 parallel specialist agents across
+`apps/api`, `apps/web`, `src/`) on top of an earlier `ponytail-audit` (over-engineering
+only, found an unused `packages/shared` scaffold and unused `class-transformer` dep — not
+tracked as issues, left as a follow-up). Filed 22 GitHub issues (#6–#27) on
+`Dusty043/intake-os`, 3 CRITICAL: `executeDistribution`/`retryFailedProvisioningTargets`
+missing permission checks (any actor could trigger real provisioning), and the Bitrix24
+intake endpoint being `@Public()` with client-forgeable actor headers and no DTO validation.
+Also HIGH: IDOR across all Discovery session endpoints, unenforced audit-visibility tiers,
+an unhandled-rejection risk in background provisioning retry, a TOCTOU double-provisioning
+race, a lost-update race in discovery session storage, a stale-actor-closure UI bug, plus
+several MEDIUM correctness/a11y items and 5 PERF items (N+1 writes, unbounded queries,
+missing indexes, sequential-instead-of-parallel LLM calls).
+
+Fixed all 22 via 10 parallel subagents on branch `fix/review-findings-batch-1`, each scoped
+to non-overlapping files (one agent per file cluster; `intake-workflow-service.ts` got one
+dedicated agent for its 6 issues). Full independent verification (not just per-agent
+self-checks) caught what the agents' own checks missed: `npx tsc --noEmit` across all three
+tsconfigs was clean, but the real test suite (`node --test tests/*.test.mjs`) showed 23
+pre-existing tests failing — 21 needed a now-required `actor` argument added to
+`getIntake`/`getAuditTrail` calls (mechanical, fixed directly across 10 test files), one
+needed its assertion flipped to match the intentional new behavior (issue #17:
+`updateProvisioningTargetResult` now throws `NotFoundError` instead of silently no-oping),
+and one surfaced a real bug: the issue #6/#7 fix used `canTriggerProvisioning`/
+`canRetryProvisioning` (`src/domain/permissions.ts`), which bundle the role check with
+request-state checks, so an authorized `devops_lead` got a misleading `PermissionDeniedError`
+instead of the correct `ValidationError` when the intake simply wasn't in the right state
+yet. Per `CLAUDE.md`'s "ask before modifying authorization" rule, confirmed with the user,
+then fixed by switching to this file's own established `ensurePermission(actor, action)`
+pure-role-check convention (already used ~10 other places) in `executeDistribution`,
+`retryFailedProvisioningTargets`, and `markReadyForProvisioning` (same latent bug,
+pre-existing, same fix applied for consistency at the user's choice).
+
+**Tests**: `npm run check` (typecheck + full suite) — **769/769 passing**, 0 failures.
+
+**Task log**: `docs/ai/tasks/TASK-0047-security-review-fixes.md`
+
+**Follow-up**: Open a PR (pending user decision on granularity). Generate a Prisma migration
+for the 3 new `@@index([createdAt])` additions (`ProjectIntake`, `AgentRun`) against a live
+dev DB — none available in this session. The Prisma-store TOCTOU mitigation for issue #13
+narrows but doesn't fully close the race under READ COMMITTED — a
+`CREATE UNIQUE INDEX ... WHERE status = 'executing'` migration is the real fix (documented
+inline). Audit-visibility tiers `"assigned"`/`"operational"` remain unenforced — no
+per-request assignee field exists to filter on (see Q-SEC-1). `ponytail-audit`'s findings
+were not addressed here (different task scope).

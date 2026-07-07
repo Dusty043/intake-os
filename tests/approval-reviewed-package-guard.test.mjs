@@ -65,7 +65,7 @@ test("Gate 1 approval is blocked when AI draft exists but reviewedProjectPackage
   );
 
   // Intake remains in intake_review
-  const record = await service.getIntake(withDraft.id);
+  const record = await service.getIntake(withDraft.id, devopsLead);
   assert.equal(record.status, "intake_review");
   assert.equal(record.approvals.gate_1, undefined);
   assert.equal(record.provisioningPlan, undefined);

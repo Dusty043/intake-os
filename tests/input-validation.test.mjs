@@ -37,6 +37,9 @@ const { SelectDirectionDto } = await import(
 const { UpdateDiscoverySettingsDto } = await import(
   "../dist/apps/api/src/modules/admin/dto/update-discovery-settings.dto.js"
 );
+const { Bitrix24IntakePayloadDto, assertValidBitrix24Payload } = await import(
+  "../dist/apps/api/src/modules/bitrix24/dto/bitrix24-intake-payload.dto.js"
+);
 const constants = await import(
   "../dist/apps/api/src/common/validation-constants.js"
 );
@@ -53,6 +56,7 @@ const {
   MAX_DISCOVERY_FIELD_LENGTH,
   MAX_EXTERNAL_ID_LENGTH,
   MAX_ORG_CONTEXT_LENGTH,
+  MAX_URL_LENGTH,
 } = constants;
 
 function str(n) {
@@ -354,6 +358,54 @@ describe("UpdateDiscoverySettingsDto — validation", () => {
 
   test("orgContext over max → rejected", async () => {
     await expectInvalid(UpdateDiscoverySettingsDto, { orgContext: str(MAX_ORG_CONTEXT_LENGTH + 1) }, "orgContext");
+  });
+});
+
+// ─── Bitrix24IntakePayloadDto / assertValidBitrix24Payload ────────────────────
+
+describe("Bitrix24IntakePayloadDto — bounds known fields, ignores unknown ones", () => {
+  test("valid known fields pass", async () => {
+    await expectValid(Bitrix24IntakePayloadDto, { TITLE: "A deal", COMMENTS: "Some notes" });
+  });
+
+  test("numeric id is coerced and accepted", async () => {
+    await expectValid(Bitrix24IntakePayloadDto, { ID: 4521 });
+  });
+
+  test("TITLE over max → rejected", async () => {
+    await expectInvalid(Bitrix24IntakePayloadDto, { TITLE: str(MAX_INTAKE_TITLE_LENGTH + 1) }, "TITLE");
+  });
+
+  test("COMMENTS over max → rejected", async () => {
+    await expectInvalid(Bitrix24IntakePayloadDto, { COMMENTS: str(MAX_INTAKE_DESCRIPTION_LENGTH + 1) }, "COMMENTS");
+  });
+
+  test("URL over max → rejected", async () => {
+    await expectInvalid(Bitrix24IntakePayloadDto, { URL: str(MAX_URL_LENGTH + 1) }, "URL");
+  });
+
+  test("unknown Bitrix CRM fields are not rejected even with forbidNonWhitelisted", async () => {
+    const instance = plainToInstance(Bitrix24IntakePayloadDto, { TITLE: "ok", STAGE_ID: "NEW", OPPORTUNITY: "1000" });
+    const errs = await validate(instance, { whitelist: false, forbidNonWhitelisted: true });
+    assert.equal(errs.length, 0);
+  });
+});
+
+describe("assertValidBitrix24Payload", () => {
+  test("resolves for a realistic, arbitrarily-shaped Bitrix payload", async () => {
+    await assertValidBitrix24Payload({
+      ID: 501,
+      TITLE: "New deal",
+      COMMENTS: "Customer requested a dashboard",
+      STAGE_ID: "NEW",
+      UF_CRM_1234: "custom field value",
+    });
+  });
+
+  test("rejects an oversized known field", async () => {
+    await assert.rejects(() =>
+      assertValidBitrix24Payload({ TITLE: str(MAX_INTAKE_TITLE_LENGTH + 1) }),
+    );
   });
 });
 

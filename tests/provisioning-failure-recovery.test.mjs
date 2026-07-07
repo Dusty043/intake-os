@@ -11,6 +11,7 @@ import {
   calculateBackoffMs,
   InMemoryProjectIntakeStore,
   IntakeWorkflowService,
+  NotFoundError,
 } from "../dist/src/index.js";
 
 // ---------------------------------------------------------------------------
@@ -223,10 +224,11 @@ describe("updateProvisioningTargetResult", () => {
     assert.equal(target.errorCategory, "auth_error");
   });
 
-  test("silently succeeds when target not found", async () => {
+  test("throws NotFoundError when target not found (issue #17: was a silent no-op)", async () => {
     const store = new InMemoryProjectIntakeStore();
-    await assert.doesNotReject(() =>
-      store.updateProvisioningTargetResult("nonexistent", { deadLettered: true }),
+    await assert.rejects(
+      () => store.updateProvisioningTargetResult("nonexistent", { deadLettered: true }),
+      NotFoundError,
     );
   });
 });

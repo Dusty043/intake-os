@@ -62,6 +62,11 @@ Generated at: 2026-06-09T14:53:20.716Z
 - `docs/ai/tasks/TASK-0041-production-deploy-and-self-healing.md`
 - `docs/ai/tasks/TASK-0042-service-token-auth.md`
 - `docs/ai/tasks/TASK-0043-fix-stale-discovery-tests.md`
+- `docs/ai/tasks/TASK-0044-service-tokens-provisioned.md`
+- `docs/ai/tasks/TASK-0045-monday-adapter-build-plan.md`
+- `docs/ai/tasks/TASK-0046-prisma-discovery-session-store-tests.md`
+- `docs/ai/tasks/TASK-0047-security-review-fixes.md`
+- `docs/ai/tasks/HANDOFF-0023D-monday-credentials.md`
 
 ## Deployment Docs
 

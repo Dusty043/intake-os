@@ -237,7 +237,7 @@ test("regeneration audit event includes guidance summary and count", async () =>
     intakeOwner,
   );
 
-  const audit = await service.getAuditTrail(withDraft.id);
+  const audit = await service.getAuditTrail(withDraft.id, devopsLead);
   const regenEvent = audit.find((e) => e.action === "ANALYSIS_DRAFT_REGENERATED");
   assert.ok(regenEvent, "ANALYSIS_DRAFT_REGENERATED event should exist");
   assert.equal(regenEvent.metadata.regenerationCount, 1);
