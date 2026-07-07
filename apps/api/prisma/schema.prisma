@@ -93,6 +93,7 @@ model ProjectIntake {
 
   @@index([status, updatedAt])
   @@index([sourceSystem, sourceExternalId])
+  @@index([createdAt])
 }
 
 model IntakeEvaluation {
@@ -168,6 +169,7 @@ model AgentRun {
   @@index([agentRole])
   @@index([provider])
   @@index([status])
+  @@index([createdAt])
 }
 
 model DiscoveryRecord {
