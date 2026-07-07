@@ -408,6 +408,48 @@ export class PrismaProjectIntakeStore implements ProjectIntakeStore {
     return run;
   }
 
+  // Issue #13/#19: closes the TOCTOU window where a caller checking "no run is
+  // executing" via a separate listProvisioningRuns() call, then calling
+  // saveProvisioningRun(), left a gap for two near-simultaneous calls to both pass the
+  // check and both create an executing run. Doing the check inside the same transaction
+  // as the create narrows the window under Postgres's default READ COMMITTED isolation
+  // but doesn't fully close it — a real fix needs a partial unique index
+  // (`CREATE UNIQUE INDEX ... ON "ProvisioningRun" (intakeId) WHERE status = 'executing'`)
+  // so the database itself rejects the second insert as a unique-constraint violation
+  // instead of (or in addition to) the findFirst check.
+  //
+  // New runs are always created with `targets: []` (see the call sites in
+  // intake-workflow-service.ts) — this intentionally doesn't replicate saveProvisioningRun's
+  // target-upsert loop, since there's nothing to upsert yet.
+  async createProvisioningRunIfNoneExecuting(run: ProvisioningRun): Promise<ProvisioningRun | null> {
+    return this.prisma.$transaction(async (tx) => {
+      const existing = await tx.provisioningRun.findFirst({
+        where: { intakeId: run.intakeId, status: "executing" },
+        select: { id: true },
+      });
+      if (existing) return null;
+
+      await tx.provisioningRun.create({
+        data: {
+          id: run.id,
+          intakeId: run.intakeId,
+          planId: run.planId,
+          status: run.status,
+          kind: run.kind,
+          retryOfRunId: run.retryOfRunId ?? null,
+          triggeredById: run.triggeredById,
+          triggeredByRole: run.triggeredByRole,
+          triggeredByName: run.triggeredByName,
+          startedAt: new Date(run.startedAt),
+          completedAt: run.completedAt ? new Date(run.completedAt) : null,
+          errorSummary: run.errorSummary ?? null,
+        },
+      });
+
+      return run;
+    });
+  }
+
   async listProvisioningRuns(intakeId: string): Promise<ProvisioningRun[]> {
     const rows = await this.prisma.provisioningRun.findMany({
       where: { intakeId },

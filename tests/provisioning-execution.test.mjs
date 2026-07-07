@@ -82,7 +82,7 @@ describe("provisioning execution — mock executor", () => {
     assert.equal(run.targets.length, 2);
     assert.ok(run.targets.every((t) => t.status === "succeeded"));
 
-    const updated = await service.getIntake(intake.id);
+    const updated = await service.getIntake(intake.id, devopsLead);
     assert.equal(updated.status, "distributed");
   });
 
@@ -95,7 +95,7 @@ describe("provisioning execution — mock executor", () => {
     assert.equal(run.status, "failed");
     assert.ok(run.targets.every((t) => t.status === "failed"));
 
-    const updated = await service.getIntake(intake.id);
+    const updated = await service.getIntake(intake.id, devopsLead);
     assert.equal(updated.status, "provisioning_failed");
   });
 
@@ -111,7 +111,7 @@ describe("provisioning execution — mock executor", () => {
     assert.equal(mondayTarget.status, "failed");
     assert.equal(githubTarget.status, "succeeded");
 
-    const updated = await service.getIntake(intake.id);
+    const updated = await service.getIntake(intake.id, devopsLead);
     assert.equal(updated.status, "provisioning_failed");
   });
 

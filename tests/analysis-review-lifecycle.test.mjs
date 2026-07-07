@@ -72,7 +72,7 @@ test("intake_owner can accept analysis draft and reviewed package is created", a
   assert.equal(reviewed.distributionPackage, undefined);
 
   // Audit events written
-  const audit = await service.getAuditTrail(withDraft.id);
+  const audit = await service.getAuditTrail(withDraft.id, devopsLead);
   const actions = audit.map((e) => e.action);
   assert.ok(actions.includes("ANALYSIS_DRAFT_ACCEPTED"), "should have ANALYSIS_DRAFT_ACCEPTED");
   assert.ok(actions.includes("REVIEWED_PROJECT_PACKAGE_CREATED"), "should have REVIEWED_PROJECT_PACKAGE_CREATED");
@@ -110,7 +110,7 @@ test("intake_owner can reject analysis draft with reason", async () => {
   assert.equal(rejected.provisioningPlan, undefined);
 
   // Audit event written
-  const audit = await service.getAuditTrail(withDraft.id);
+  const audit = await service.getAuditTrail(withDraft.id, devopsLead);
   const actions = audit.map((e) => e.action);
   assert.ok(actions.includes("ANALYSIS_DRAFT_REJECTED"), "should have ANALYSIS_DRAFT_REJECTED");
   const rejectEvent = audit.find((e) => e.action === "ANALYSIS_DRAFT_REJECTED");
@@ -168,7 +168,7 @@ test("reviewer can revise draft into a human-edited reviewed package", async () 
   assert.equal(revised.analysisDrafts[0].estimatedStoryPoints, originalDraftContent.estimatedStoryPoints);
 
   // Audit events written
-  const audit = await service.getAuditTrail(withDraft.id);
+  const audit = await service.getAuditTrail(withDraft.id, devopsLead);
   const actions = audit.map((e) => e.action);
   assert.ok(actions.includes("ANALYSIS_DRAFT_REVISED"), "should have ANALYSIS_DRAFT_REVISED");
   assert.ok(actions.includes("REVIEWED_PROJECT_PACKAGE_CREATED"), "should have REVIEWED_PROJECT_PACKAGE_CREATED");

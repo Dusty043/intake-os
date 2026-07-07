@@ -117,7 +117,7 @@ describe("generateEvaluation — happy path", () => {
     const submitted = await createAndSubmitIntake(service);
     const result = await service.generateEvaluation(submitted.id, { depth: "standard", provider: "mock" }, intakeOwner);
 
-    const auditTrail = await service.getAuditTrail(submitted.id);
+    const auditTrail = await service.getAuditTrail(submitted.id, intakeOwner);
     const evalEvent = auditTrail.find((e) => e.action === "EVALUATION_GENERATED");
     assert.ok(evalEvent, "EVALUATION_GENERATED audit event must exist");
     assert.ok(evalEvent.metadata?.evaluationId, "audit event must include evaluationId");
@@ -284,7 +284,7 @@ describe("regenerateAnalysisDraft — orchestrator routing", () => {
       intakeOwner,
     );
 
-    const audit = await service.getAuditTrail(submitted.id);
+    const audit = await service.getAuditTrail(submitted.id, intakeOwner);
     const regenEvent = audit.find((e) => e.action === "EVALUATION_REGENERATED");
     assert.ok(regenEvent, "EVALUATION_REGENERATED audit event must exist");
     assert.ok(regenEvent.metadata?.evaluationId, "must include evaluationId");

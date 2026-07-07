@@ -170,7 +170,7 @@ test("generateProvisioningPlan blocks if AI drafts exist but no reviewedProjectP
     ValidationError,
   );
 
-  const record = await service.getIntake(withDraft.id);
+  const record = await service.getIntake(withDraft.id, devopsLead);
   assert.equal(record.provisioningPlan, undefined);
 });
 
@@ -208,7 +208,7 @@ test("audit event for provisioning plan includes sourceType and sourceId", async
     devopsLead,
   );
 
-  const audit = await service.getAuditTrail(withPlan.id);
+  const audit = await service.getAuditTrail(withPlan.id, devopsLead);
   const planEvent = audit.find((e) => e.action === "PROVISIONING_PLAN_GENERATED");
   assert.ok(planEvent, "PROVISIONING_PLAN_GENERATED event should exist");
   assert.equal(planEvent.metadata.sourceType, "reviewed_project_package");

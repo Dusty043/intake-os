@@ -110,6 +110,24 @@ describe("GoogleChatNotifier", () => {
       assert.ok(body.text.includes("3 question(s)"), "should include detail");
     });
 
+    it("strips Chat markup characters from user-derived title, requester, and detail", async () => {
+      const notifier = new GoogleChatNotifier("https://webhook.example.com/chat");
+      await notifier.notify({
+        eventType: "intake_review",
+        intakeId: "REQ-001",
+        title: "<https://evil.example|Click *here*>",
+        requester: "*Bold* _Attacker_ ~Name~",
+        detail: "See <https://evil.example|this> for _details_",
+      });
+
+      const body = JSON.parse(lastFetchCall.options.body);
+      assert.ok(!body.text.includes("<"), "message should not contain unescaped '<'");
+      assert.ok(!body.text.includes("*Bold*"), "requester markup should be stripped, not preserved verbatim");
+      assert.ok(body.text.includes("Bold"), "sanitized requester text content should still be present");
+      assert.ok(body.text.includes("Attacker"), "sanitized requester text content should still be present");
+      assert.ok(body.text.includes("details"), "sanitized detail text content should still be present");
+    });
+
     it("does not throw when fetch fails — logs a warning and continues", async () => {
       fetchShouldFail = true;
       const notifier = new GoogleChatNotifier("https://webhook.example.com/chat");
