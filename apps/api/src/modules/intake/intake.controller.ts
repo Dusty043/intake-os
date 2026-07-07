@@ -219,7 +219,11 @@ export class IntakeHttpController {
 
   @Get(":id/distribution/runs")
   @ApiOperation({ summary: "List provisioning runs for an intake, newest first" })
-  async listProvisioningRuns(@Param("id") id: string) {
+  async listProvisioningRuns(@Param("id") id: string, @CurrentActor() actor: AuthenticatedActor) {
+    // getIntake enforces the same "own" visibility as GET /intakes/:id — this sub-resource
+    // route was missing that check entirely, letting any authenticated actor read another
+    // user's provisioning runs even though they can't view the parent intake itself.
+    await this.workflowService.getIntake(id, toDomainActor(actor));
     const runs = await this.workflowService.listProvisioningRuns(id);
     return { runs: runs.map(toProvisioningRunDto) };
   }
@@ -256,14 +260,17 @@ export class IntakeHttpController {
 
   @Get(":id/evaluations")
   @ApiOperation({ summary: "List all evaluations for an intake, newest first" })
-  async listEvaluations(@Param("id") id: string) {
+  async listEvaluations(@Param("id") id: string, @CurrentActor() actor: AuthenticatedActor) {
+    // See listProvisioningRuns above — same missing visibility check, same fix.
+    await this.workflowService.getIntake(id, toDomainActor(actor));
     const evaluations = await this.workflowService.listEvaluationsForIntake(id);
     return { evaluations: evaluations.map(toEvaluationSummaryDto) };
   }
 
   @Get(":id/evaluations/latest")
   @ApiOperation({ summary: "Get the latest evaluation for an intake" })
-  async getLatestEvaluation(@Param("id") id: string) {
+  async getLatestEvaluation(@Param("id") id: string, @CurrentActor() actor: AuthenticatedActor) {
+    await this.workflowService.getIntake(id, toDomainActor(actor));
     return this.workflowService.getLatestEvaluationForIntake(id);
   }
 
@@ -272,7 +279,9 @@ export class IntakeHttpController {
   async getEvaluation(
     @Param("id") id: string,
     @Param("evaluationId") evaluationId: string,
+    @CurrentActor() actor: AuthenticatedActor,
   ) {
+    await this.workflowService.getIntake(id, toDomainActor(actor));
     return this.workflowService.getEvaluationForIntake(id, evaluationId);
   }
 

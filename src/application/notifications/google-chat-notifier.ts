@@ -57,7 +57,7 @@ function buildMessage(
     lines.push(`Requester: ${sanitizeForChatMarkup(payload.requester)}`);
   }
   if (payload.detail) {
-    lines.push(payload.detail);
+    lines.push(sanitizeForChatMarkup(payload.detail));
   }
 
   if (intakeBaseUrl) {
