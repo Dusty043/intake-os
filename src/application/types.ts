@@ -303,7 +303,7 @@ export type { ProvisioningTargetResult } from "../domain/provisioning.js";
 export type { ProvisioningRunStatus, ProvisioningTargetStatus, ProvisioningTargetKind } from "../domain/provisioning.js";
 
 export interface ProjectIntakeStore {
-  listIntakes(): Promise<readonly ProjectIntakeRecord[]>;
+  listIntakes(pagination?: { take?: number; skip?: number }): Promise<readonly ProjectIntakeRecord[]>;
   getIntake(id: string): Promise<ProjectIntakeRecord | null>;
   saveIntake(record: ProjectIntakeRecord): Promise<ProjectIntakeRecord>;
   listAuditEvents(intakeId: string): Promise<readonly AuditEvent[]>;

@@ -13,8 +13,12 @@ export class InMemoryProjectIntakeStore implements ProjectIntakeStore {
   private readonly agentRunsByEvaluationId = new Map<string, AgentRunRecord[]>();
   private readonly provisioningRuns = new Map<string, ProvisioningRun>();
 
-  async listIntakes(): Promise<readonly ProjectIntakeRecord[]> {
-    return Array.from(this.intakes.values()).map((r) => structuredClone(r));
+  async listIntakes(pagination?: { take?: number; skip?: number }): Promise<readonly ProjectIntakeRecord[]> {
+    const sorted = Array.from(this.intakes.values()).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    const skip = pagination?.skip ?? 0;
+    const take = pagination?.take;
+    const page = take === undefined ? sorted.slice(skip) : sorted.slice(skip, skip + take);
+    return page.map((r) => structuredClone(r));
   }
 
   async getIntake(id: string): Promise<ProjectIntakeRecord | null> {

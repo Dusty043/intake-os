@@ -261,8 +261,8 @@ export class IntakeWorkflowService {
     return completedRun;
   }
 
-  async listIntakes(): Promise<readonly ProjectIntakeRecord[]> {
-    return this.store.listIntakes();
+  async listIntakes(pagination?: { take?: number; skip?: number }): Promise<readonly ProjectIntakeRecord[]> {
+    return this.store.listIntakes(pagination);
   }
 
   async getIntake(id: string): Promise<ProjectIntakeRecord> {

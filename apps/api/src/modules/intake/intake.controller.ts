@@ -1,9 +1,9 @@
-import { Body, Controller, Delete, Get, Param, Post, HttpCode } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Param, Post, HttpCode, Query } from "@nestjs/common";
 import { Throttle } from "@nestjs/throttler";
 import { loadRateLimitConfig } from "../../config/rate-limit.config.js";
 import { toEvaluationSummaryDto } from "./dto/evaluation.dto.js";
 import { toProvisioningRunDto } from "./dto/provisioning-run.dto.js";
-import { ApiOperation, ApiTags } from "@nestjs/swagger";
+import { ApiOperation, ApiQuery, ApiTags } from "@nestjs/swagger";
 import { IntakeWorkflowService } from "../../../../../src/application/intake-workflow-service.js";
 import type { Actor } from "../../../../../src/domain/types.js";
 import { CurrentActor } from "../auth/auth.decorators.js";
@@ -38,8 +38,13 @@ export class IntakeHttpController {
 
   @Get()
   @ApiOperation({ summary: "List project intakes" })
-  list() {
-    return this.workflowService.listIntakes();
+  @ApiQuery({ name: "take", required: false, description: "Page size (default 50)" })
+  @ApiQuery({ name: "skip", required: false, description: "Offset for pagination" })
+  list(@Query("take") take?: string, @Query("skip") skip?: string) {
+    return this.workflowService.listIntakes({
+      take: take !== undefined ? Number(take) : undefined,
+      skip: skip !== undefined ? Number(skip) : undefined,
+    });
   }
 
   @Get(":id")

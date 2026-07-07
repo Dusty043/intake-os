@@ -13,14 +13,22 @@ import {
 import { validateIntakeEvaluation } from "../../../../src/application/intake-evaluation.js";
 import { PrismaService } from "../prisma/prisma.service.js";
 
+const DEFAULT_LIST_INTAKES_TAKE = 50;
+// ponytail: safety cap for admin usage reports with no date range — prevents an
+// unbounded scan when callers omit startDate/endDate. Raise if legitimate reports
+// need more than this many rows.
+const MAX_AGENT_RUNS_TAKE = 500;
+
 @Injectable()
 export class PrismaProjectIntakeStore implements ProjectIntakeStore {
   constructor(private readonly prisma: PrismaService) {}
 
-  async listIntakes(): Promise<readonly ProjectIntakeRecord[]> {
+  async listIntakes(pagination?: { take?: number; skip?: number }): Promise<readonly ProjectIntakeRecord[]> {
     const rows = await this.prisma.projectIntake.findMany({
       orderBy: { createdAt: "desc" },
       select: { recordSnapshot: true },
+      take: pagination?.take ?? DEFAULT_LIST_INTAKES_TAKE,
+      skip: pagination?.skip,
     });
 
     return rows.map((row) => fromJson<ProjectIntakeRecord>(row.recordSnapshot));
@@ -127,27 +135,31 @@ export class PrismaProjectIntakeStore implements ProjectIntakeStore {
           },
         });
 
-        for (const action of plan.actions) {
-          await tx.provisioningPlanAction.upsert({
-            where: { id: action.id },
-            create: {
-              id: action.id,
-              planId: plan.id,
-              system: action.system,
-              action: action.action,
-              description: action.description,
-              dryRun: action.dryRun,
-              requiresCredential: action.requiresCredential,
-              idempotencyKey: action.idempotencyKey,
-              payload: toJson(action.payload),
-            },
-            update: {
-              description: action.description,
-              requiresCredential: action.requiresCredential,
-              payload: toJson(action.payload),
-            },
-          });
-        }
+        // Prisma has no batch upsert, so run the per-action upserts concurrently
+        // (same tx) rather than serially awaiting each round trip.
+        await Promise.all(
+          plan.actions.map((action) =>
+            tx.provisioningPlanAction.upsert({
+              where: { id: action.id },
+              create: {
+                id: action.id,
+                planId: plan.id,
+                system: action.system,
+                action: action.action,
+                description: action.description,
+                dryRun: action.dryRun,
+                requiresCredential: action.requiresCredential,
+                idempotencyKey: action.idempotencyKey,
+                payload: toJson(action.payload),
+              },
+              update: {
+                description: action.description,
+                requiresCredential: action.requiresCredential,
+                payload: toJson(action.payload),
+              },
+            }),
+          ),
+        );
       }
 
       return row;
@@ -204,9 +216,9 @@ export class PrismaProjectIntakeStore implements ProjectIntakeStore {
       });
 
       await tx.evaluationSection.deleteMany({ where: { evaluationId: evaluation.id } });
-      for (const section of evaluation.sections) {
-        await tx.evaluationSection.create({
-          data: {
+      if (evaluation.sections.length > 0) {
+        await tx.evaluationSection.createMany({
+          data: evaluation.sections.map((section) => ({
             id: section.id,
             evaluationId: section.evaluationId,
             sectionKind: section.kind,
@@ -215,14 +227,14 @@ export class PrismaProjectIntakeStore implements ProjectIntakeStore {
             version: section.version,
             supersededById: section.supersededById,
             createdAt: new Date(section.provenance.generatedAt),
-          },
+          })),
         });
       }
 
       await tx.agentRun.deleteMany({ where: { evaluationId: evaluation.id } });
-      for (const run of runs) {
-        await tx.agentRun.create({
-          data: {
+      if (runs.length > 0) {
+        await tx.agentRun.createMany({
+          data: runs.map((run) => ({
             id: run.id,
             evaluationId: run.evaluationId,
             sectionId: run.sectionId,
@@ -243,7 +255,7 @@ export class PrismaProjectIntakeStore implements ProjectIntakeStore {
             startedAt: run.startedAt ? new Date(run.startedAt) : undefined,
             completedAt: run.completedAt ? new Date(run.completedAt) : undefined,
             createdAt: new Date(run.createdAt),
-          },
+          })),
         });
       }
     });
@@ -297,6 +309,7 @@ export class PrismaProjectIntakeStore implements ProjectIntakeStore {
       },
       include: { evaluation: { select: { intakeId: true } } },
       orderBy: { createdAt: "desc" },
+      take: MAX_AGENT_RUNS_TAKE,
     });
     return rows.map((row) => ({
       ...fromAgentRunRow(row),
@@ -365,47 +378,99 @@ export class PrismaProjectIntakeStore implements ProjectIntakeStore {
         },
       });
 
-      for (const target of run.targets) {
-        await tx.provisioningTargetResult.upsert({
-          where: { idempotencyKey: target.idempotencyKey },
-          create: {
-            id: target.id,
-            runId: target.runId,
-            targetKind: target.targetKind,
-            status: target.status,
-            idempotencyKey: target.idempotencyKey,
-            externalId: target.externalId,
-            externalUrl: target.externalUrl,
-            errorMessage: target.errorMessage,
-            errorCategory: target.errorCategory ?? null,
-            attemptCount: target.attemptCount,
-            retryable: target.retryable,
-            deadLettered: target.deadLettered ?? false,
-            deadLetteredAt: target.deadLetteredAt ? new Date(target.deadLetteredAt) : null,
-            completedAt: target.completedAt ? new Date(target.completedAt) : null,
-          },
-          update: {
-            status: target.status,
-            // `?? null` (not left as `undefined`) on every nullable field below — Prisma
-            // treats `undefined` in an update payload as "leave the existing value alone",
-            // not "clear it". Q-FAR-3's background retry re-upserts the same row after an
-            // interim failed save; without this a target that fails then later succeeds kept
-            // its stale errorMessage/errorCategory from the earlier failed attempt.
-            externalId: target.externalId ?? null,
-            externalUrl: target.externalUrl ?? null,
-            errorMessage: target.errorMessage ?? null,
-            errorCategory: target.errorCategory ?? null,
-            attemptCount: target.attemptCount,
-            retryable: target.retryable,
-            deadLettered: target.deadLettered ?? false,
-            deadLetteredAt: target.deadLetteredAt ? new Date(target.deadLetteredAt) : null,
-            completedAt: target.completedAt ? new Date(target.completedAt) : null,
-          },
-        });
-      }
+      // Prisma has no batch upsert, so run the per-target upserts concurrently
+      // (same tx) rather than serially awaiting each round trip.
+      await Promise.all(
+        run.targets.map((target) =>
+          tx.provisioningTargetResult.upsert({
+            where: { idempotencyKey: target.idempotencyKey },
+            create: {
+              id: target.id,
+              runId: target.runId,
+              targetKind: target.targetKind,
+              status: target.status,
+              idempotencyKey: target.idempotencyKey,
+              externalId: target.externalId,
+              externalUrl: target.externalUrl,
+              errorMessage: target.errorMessage,
+              errorCategory: target.errorCategory ?? null,
+              attemptCount: target.attemptCount,
+              retryable: target.retryable,
+              deadLettered: target.deadLettered ?? false,
+              deadLetteredAt: target.deadLetteredAt ? new Date(target.deadLetteredAt) : null,
+              completedAt: target.completedAt ? new Date(target.completedAt) : null,
+            },
+            update: {
+              status: target.status,
+              // `?? null` (not left as `undefined`) on every nullable field below — Prisma
+              // treats `undefined` in an update payload as "leave the existing value alone",
+              // not "clear it". Q-FAR-3's background retry re-upserts the same row after an
+              // interim failed save; without this a target that fails then later succeeds kept
+              // its stale errorMessage/errorCategory from the earlier failed attempt.
+              externalId: target.externalId ?? null,
+              externalUrl: target.externalUrl ?? null,
+              errorMessage: target.errorMessage ?? null,
+              errorCategory: target.errorCategory ?? null,
+              attemptCount: target.attemptCount,
+              retryable: target.retryable,
+              deadLettered: target.deadLettered ?? false,
+              deadLetteredAt: target.deadLetteredAt ? new Date(target.deadLetteredAt) : null,
+              completedAt: target.completedAt ? new Date(target.completedAt) : null,
+            },
+          }),
+        ),
+      );
     });
 
     return run;
+  }
+
+  // Issue #13: application-level mitigation for the executeDistribution/
+  // retryFailedProvisioningTargets TOCTOU race (see intake-workflow-service.ts). Re-checks
+  // "no run for this intake is executing" and inserts the new run inside one `$transaction`,
+  // which narrows the race window from "however long the caller takes between
+  // listProvisioningRuns() and saveProvisioningRun()" down to "however long this transaction
+  // takes to commit" — but does NOT fully close it. Prisma's default (READ COMMITTED)
+  // isolation still lets two concurrent transactions both pass the findFirst check before
+  // either one commits its create. Closing that requires a DB-level guarantee, e.g. a
+  // migration adding a partial unique index:
+  //   CREATE UNIQUE INDEX one_executing_run_per_intake
+  //     ON "ProvisioningRun" ("intakeId") WHERE status = 'executing';
+  // so the second concurrent INSERT fails at the database instead of relying on app timing.
+  // Not added here — no live migration is run from this session; a human should add it via
+  // `prisma migrate dev` and re-point this method at relying on the resulting unique
+  // constraint violation instead of (or in addition to) the findFirst check.
+  //
+  // New runs are always created with `targets: []` (see the call sites in
+  // intake-workflow-service.ts) — this intentionally doesn't replicate saveProvisioningRun's
+  // target-upsert loop, since there's nothing to upsert yet.
+  async createProvisioningRunIfNoneExecuting(run: ProvisioningRun): Promise<ProvisioningRun | null> {
+    return this.prisma.$transaction(async (tx) => {
+      const existing = await tx.provisioningRun.findFirst({
+        where: { intakeId: run.intakeId, status: "executing" },
+        select: { id: true },
+      });
+      if (existing) return null;
+
+      await tx.provisioningRun.create({
+        data: {
+          id: run.id,
+          intakeId: run.intakeId,
+          planId: run.planId,
+          status: run.status,
+          kind: run.kind,
+          retryOfRunId: run.retryOfRunId ?? null,
+          triggeredById: run.triggeredById,
+          triggeredByRole: run.triggeredByRole,
+          triggeredByName: run.triggeredByName,
+          startedAt: new Date(run.startedAt),
+          completedAt: run.completedAt ? new Date(run.completedAt) : null,
+          errorSummary: run.errorSummary ?? null,
+        },
+      });
+
+      return run;
+    });
   }
 
   async listProvisioningRuns(intakeId: string): Promise<ProvisioningRun[]> {

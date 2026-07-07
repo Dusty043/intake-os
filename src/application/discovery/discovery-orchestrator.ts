@@ -188,8 +188,10 @@ export class DiscoveryOrchestrator {
       existingQuestions: session.clarificationQuestions,
     };
 
-    const solutions = await this.solutionAgent.generateSolutions(ctx, agentOpts);
-    const clarifications = await this.clarificationAgent.planClarifications(ctx, agentOpts);
+    const [solutions, clarifications] = await Promise.all([
+      this.solutionAgent.generateSolutions(ctx, agentOpts),
+      this.clarificationAgent.planClarifications(ctx, agentOpts),
+    ]);
 
     const nextStatus = this.resolveStatus(session.status, "solutions_generated");
     const newEvents: DiscoveryTimelineEvent[] = [];
