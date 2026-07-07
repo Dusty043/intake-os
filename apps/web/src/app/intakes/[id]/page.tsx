@@ -819,7 +819,9 @@ function ApprovalsTab({
                 Cannot approve Gate 1 until an analysis draft has been accepted or revised into a reviewed project package.
               </p>
             )}
+            <label htmlFor="g1-comment" className="sr-only">Gate 1 approval comment</label>
             <input
+              id="g1-comment"
               type="text"
               value={g1Comment}
               onChange={(e) => setG1Comment(e.target.value)}
@@ -837,7 +839,8 @@ function ApprovalsTab({
                 {busy === "reject_gate1" ? "Rejecting…" : "Reject"}
               </button>
             </div>
-            <input type="text" value={g1Reject} onChange={(e) => setG1Reject(e.target.value)} className="form-input" placeholder="Rejection reason (if rejecting)…" />
+            <label htmlFor="g1-reject-reason" className="sr-only">Gate 1 rejection reason</label>
+            <input id="g1-reject-reason" type="text" value={g1Reject} onChange={(e) => setG1Reject(e.target.value)} className="form-input" placeholder="Rejection reason (if rejecting)…" />
           </div>
         )}
       </div>
@@ -868,7 +871,9 @@ function ApprovalsTab({
                 Gate 2 requires Gate 1 approval.
               </p>
             )}
+            <label htmlFor="g2-comment" className="sr-only">Gate 2 approval comment</label>
             <input
+              id="g2-comment"
               type="text"
               value={g2Comment}
               onChange={(e) => setG2Comment(e.target.value)}
@@ -892,8 +897,10 @@ function ApprovalsTab({
                 {busy === "request_changes" ? "Requesting changes…" : "Request Changes"}
               </button>
             </div>
-            <input type="text" value={g2Reject} onChange={(e) => setG2Reject(e.target.value)} className="form-input" placeholder="Rejection reason (permanent — archives intake)…" />
-            <input type="text" value={g2ReqChanges} onChange={(e) => setG2ReqChanges(e.target.value)} className="form-input" placeholder="Request changes reason (routes back to intake review)…" />
+            <label htmlFor="g2-reject-reason" className="sr-only">Gate 2 rejection reason</label>
+            <input id="g2-reject-reason" type="text" value={g2Reject} onChange={(e) => setG2Reject(e.target.value)} className="form-input" placeholder="Rejection reason (permanent — archives intake)…" />
+            <label htmlFor="g2-request-changes-reason" className="sr-only">Gate 2 request changes reason</label>
+            <input id="g2-request-changes-reason" type="text" value={g2ReqChanges} onChange={(e) => setG2ReqChanges(e.target.value)} className="form-input" placeholder="Request changes reason (routes back to intake review)…" />
           </div>
         )}
       </div>
@@ -1008,7 +1015,7 @@ function DistributionTab({
   const plan = intake.provisioningPlan;
   const [busy, setBusy] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
-  const [teamPrefix, setTeamPrefix] = useState("sb");
+  const [teamPrefix, setTeamPrefix] = useState(""); // ponytail: no org-config source for a default prefix exists yet; require explicit entry instead of hardcoding one org's abbreviation
   const [runs, setRuns] = useState<ProvisioningRun[] | null>(null);
   const [runsLoading, setRunsLoading] = useState(false);
   const [retryingRunId, setRetryingRunId] = useState<string | null>(null);
@@ -1066,8 +1073,9 @@ function DistributionTab({
     try {
       const data = await listProvisioningRuns(intake.id, actor);
       setRuns(data);
-    } catch { /* non-fatal */ }
-    finally { setRunsLoading(false); }
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Failed to load provisioning runs.");
+    } finally { setRunsLoading(false); }
   }
 
   useEffect(() => { void loadRuns(); }, [intake.id]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -1075,6 +1083,12 @@ function DistributionTab({
   // Q-FAR-3: a run can come back "executing" with a target still "pending_retry" — the
   // backend keeps auto-retrying in the background rather than blocking the original request.
   // Poll until it settles so this view doesn't go stale while that happens.
+  //
+  // `actor` is included below (unlike the effect above) because polling must use the
+  // currently-selected persona's headers. ACTORS entries are stable references from a
+  // static array (see ActorSelector/ACTORS in lib/actors.ts) and setActor always assigns
+  // one of those, so `actor` only changes identity when the user actually switches persona
+  // — not on every render — so this cannot spin into an infinite loop.
   const hasExecutingRun = runs?.some((r) => r.status === "executing") ?? false;
   useEffect(() => {
     if (!hasExecutingRun) return;
@@ -1083,10 +1097,12 @@ function DistributionTab({
       void import("@/lib/api-client")
         .then((m) => m.getIntake(intake.id, actor))
         .then(onIntakeUpdate)
-        .catch(() => { /* non-fatal */ });
+        .catch((e) => {
+          setErr(e instanceof Error ? e.message : "Failed to refresh distribution status.");
+        });
     }, 2000);
     return () => clearInterval(interval);
-  }, [hasExecutingRun, intake.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [hasExecutingRun, intake.id, actor]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="space-y-4">
@@ -1127,12 +1143,14 @@ function DistributionTab({
           {gate2Done && (
             <div className="flex flex-col items-center gap-3">
               <div className="flex items-center gap-2">
-                <label className="text-xs text-brand-muted font-medium whitespace-nowrap">Team prefix</label>
+                <label htmlFor="team-prefix" className="text-xs text-brand-muted font-medium whitespace-nowrap">Team prefix (required)</label>
                 <input
+                  id="team-prefix"
                   type="text"
                   value={teamPrefix}
                   onChange={(e) => setTeamPrefix(e.target.value.trim())}
-                  placeholder="sb"
+                  placeholder="e.g. sb"
+                  required
                   className="border border-brand-border rounded px-2 py-1 text-sm w-24 text-center"
                 />
               </div>
