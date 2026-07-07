@@ -68,7 +68,7 @@ test("mock AI analysis draft is generated as review-only state", async () => {
   assert.ok(reviewed.latestAnalysisDraft.requiredEvaluationSections.includes("architecture_sketch"));
   assert.deepEqual(validateIntakeAnalysisDraft(reviewed.latestAnalysisDraft), { valid: true, errors: [] });
 
-  const audit = await service.getAuditTrail(reviewed.id);
+  const audit = await service.getAuditTrail(reviewed.id, devopsLead);
   assert.deepEqual(
     audit.map((event) => event.action),
     ["INTAKE_CREATED", "submit", "generate_evaluation", "ANALYSIS_DRAFT_GENERATED", "success"],

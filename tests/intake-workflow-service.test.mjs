@@ -79,7 +79,7 @@ test("full MVP lifecycle reaches dry-run ready state with audit trail", async ()
   assert.equal(ready.status, "approved");
   assert.equal(ready.provisioningPlan.status, "ready_for_provisioning");
 
-  const audit = await service.getAuditTrail(approved.id);
+  const audit = await service.getAuditTrail(approved.id, devopsLead);
   assert.deepEqual(
     audit.map((event) => event.action),
     [

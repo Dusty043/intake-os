@@ -1,4 +1,9 @@
-import { canApproveGate1, canApproveGate2, canTriggerProvisioning, hasPermission } from "../domain/permissions.js";
+import {
+  auditVisibilityForRole,
+  canApproveGate1,
+  canApproveGate2,
+  hasPermission,
+} from "../domain/permissions.js";
 import { getProjectTypeDefinition } from "../domain/project-type-registry.js";
 import type { Actor, ApprovalGate, AuditEvent, RequestStatus, WorkflowAction } from "../domain/types.js";
 import { applyWorkflowTransition, isApprovalComplete } from "../domain/workflow.js";
@@ -143,7 +148,15 @@ export class IntakeWorkflowService {
         const canAutoRetry = this.isAutoRetryableResult(first) && maxAttempts > 1;
         if (!canAutoRetry) return first;
 
-        void this.settleBackgroundRetry(executor, ctx, first, maxAttempts);
+        // Issue #12: settleBackgroundRetry runs detached from this call (by design — it
+        // backs off across multiple attempts and must not block the caller). Without a
+        // .catch() here, a rejection (including the executor's execute() throwing on a
+        // network/auth error, rather than returning a "failed" result) becomes an unhandled
+        // promise rejection and leaves this target — and the whole run — stuck in
+        // "pending_retry"/"executing" forever, since nothing else will ever finalize it.
+        void this.settleBackgroundRetry(executor, ctx, first, maxAttempts).catch((error) =>
+          this.handleBackgroundRetryCrash(executor, ctx, first, error),
+        );
         return { ...first, status: "pending_retry" as const };
       }),
     );
@@ -179,6 +192,43 @@ export class IntakeWorkflowService {
 
     if (updatedTargets.some((t) => t.status === "pending_retry")) {
       // another target is still backing off — persist this one's outcome and wait for it too
+      await this.store.saveProvisioningRun(updatedRun);
+      return;
+    }
+
+    await this.finalizeProvisioningRun(updatedRun, ctx.actor);
+  }
+
+  // Issue #12: catch handler for settleBackgroundRetry's detached promise. Marks the target
+  // that crashed as failed (non-retryable — we don't know what state the executor left
+  // things in) and routes through the same "is anything else still pending_retry" check
+  // settleBackgroundRetry itself uses, so the run either waits for its remaining targets or
+  // gets finalized as failed/partial_success instead of being stranded in "executing".
+  private async handleBackgroundRetryCrash(
+    executor: ProvisioningExecutor,
+    ctx: ProvisioningContext,
+    lastKnownResult: ProvisioningTargetResult,
+    error: unknown,
+  ): Promise<void> {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(
+      `[provisioning] background retry crashed for target "${executor.targetKind}" (intake ${ctx.intakeId}, run ${ctx.runId}): ${message}`,
+    );
+
+    const run = await this.store.getProvisioningRun(ctx.intakeId, ctx.runId);
+    if (!run) return; // defensive — run should always exist by the time this fires
+
+    const failedTarget: ProvisioningTargetResult = {
+      ...lastKnownResult,
+      status: "failed",
+      errorMessage: message,
+      errorCategory: normalizeProvisioningError(error).category,
+      retryable: false,
+    };
+    const updatedTargets = run.targets.map((t) => (t.targetKind === executor.targetKind ? failedTarget : t));
+    const updatedRun: ProvisioningRun = { ...run, targets: updatedTargets };
+
+    if (updatedTargets.some((t) => t.status === "pending_retry")) {
       await this.store.saveProvisioningRun(updatedRun);
       return;
     }
@@ -261,16 +311,26 @@ export class IntakeWorkflowService {
     return completedRun;
   }
 
-  async listIntakes(): Promise<readonly ProjectIntakeRecord[]> {
-    return this.store.listIntakes();
+  async listIntakes(
+    actor: Actor,
+    pagination?: { take?: number; skip?: number },
+  ): Promise<readonly ProjectIntakeRecord[]> {
+    const all = await this.store.listIntakes(pagination);
+    return filterIntakesForVisibility(all, actor);
   }
 
-  async getIntake(id: string): Promise<ProjectIntakeRecord> {
-    return this.requireIntake(id);
+  async getIntake(id: string, actor: Actor): Promise<ProjectIntakeRecord> {
+    const record = await this.requireIntake(id);
+    ensureCanViewIntake(record, actor, id);
+    return record;
   }
 
-  async getAuditTrail(id: string): Promise<readonly AuditEvent[]> {
-    await this.requireIntake(id);
+  async getAuditTrail(id: string, actor: Actor): Promise<readonly AuditEvent[]> {
+    const record = await this.requireIntake(id);
+    ensureCanViewIntake(record, actor, id);
+    // "none" visibility (developer, by default) gets no audit history even for
+    // requests it can otherwise reach.
+    if (auditVisibilityForRole(actor.role) === "none") return [];
     return this.store.listAuditEvents(id);
   }
 
@@ -989,9 +1049,7 @@ export class IntakeWorkflowService {
       throw new ValidationError(`Provisioning plan is invalid: ${record.provisioningPlan.validation.errors.join(", ")}`);
     }
 
-    if (!canTriggerProvisioning(actor, record)) {
-      throw new PermissionDeniedError("trigger_provisioning");
-    }
+    ensurePermission(actor, "trigger_provisioning");
 
     const now = this.clock();
     const updated: ProjectIntakeRecord = {
@@ -1072,6 +1130,12 @@ export class IntakeWorkflowService {
   async executeDistribution(id: string, actor: Actor): Promise<ProvisioningRun> {
     const record = await this.requireIntake(id);
 
+    // Issue #6: this was missing entirely — any authenticated actor could execute real
+    // provisioning. Role-only check (not canTriggerProvisioning, which also bundles
+    // request-state checks and would mask a state-guard failure below as a permission
+    // error for an actor who is actually authorized).
+    ensurePermission(actor, "trigger_provisioning");
+
     if (record.status !== "approved") {
       throw new ValidationError(`Distribution execution requires approved status. Current status: ${record.status}.`);
     }
@@ -1090,11 +1154,6 @@ export class IntakeWorkflowService {
 
     if (!this.provisioningRegistry || this.provisioningRegistry.size === 0) {
       throw new ValidationError("No provisioning executors are registered.");
-    }
-
-    const existingRuns = await this.store.listProvisioningRuns(id);
-    if (existingRuns.some((r) => r.status === "executing")) {
-      throw new ConflictError("A provisioning run is already in progress.");
     }
 
     if (!record.reviewedProjectPackage) {
@@ -1118,7 +1177,23 @@ export class IntakeWorkflowService {
       targets: [],
     };
 
-    await this.store.saveProvisioningRun(run);
+    // Issue #13: listProvisioningRuns() + saveProvisioningRun() used to be two separate
+    // round trips, leaving a window where two near-simultaneous calls could both see no
+    // executing run and both create one, double-triggering real external provisioning.
+    // createProvisioningRunIfNoneExecuting does the check-and-insert as one store call.
+    const created = await this.store.createProvisioningRunIfNoneExecuting(run);
+    if (!created) {
+      throw new ConflictError("A provisioning run is already in progress.");
+    }
+
+    // Issue #19: the run insert above and this intake-status transition are still two
+    // separate writes with no shared transaction. If the process crashes in between, the
+    // run is left "executing" while the intake record still reads "approved" — detectable
+    // via reconciliation (an "executing" run whose intake is not "provisioning") but not
+    // automatically recovered. Run-creation is ordered first deliberately: if it fails
+    // (ConflictError above), we haven't mutated intake state yet, so that's the safer
+    // partial-failure state to risk. Wrap both writes in one DB transaction once this store
+    // is backed by Postgres/Prisma.
     await this.applyTransitionToRecord(record, "start_provisioning", actor, now);
     await this.audit({
       record,
@@ -1153,6 +1228,12 @@ export class IntakeWorkflowService {
   ): Promise<ProvisioningRun> {
     const record = await this.requireIntake(intakeId);
 
+    // Issue #7: same gap as executeDistribution (issue #6) — retrying provisioning had no
+    // permission check at all. Role-only check, same reasoning as executeDistribution:
+    // canRetryProvisioning also bundles a request-state check that would mask the
+    // state-guard failures below as a permission error for an authorized actor.
+    ensurePermission(actor, "retry_provisioning");
+
     if (record.status !== "provisioning_failed") {
       throw new ValidationError(
         `Retry requires provisioning_failed status. Current status: ${record.status}.`,
@@ -1173,11 +1254,6 @@ export class IntakeWorkflowService {
 
     if (!this.provisioningRegistry || this.provisioningRegistry.size === 0) {
       throw new ValidationError("No provisioning executors are registered.");
-    }
-
-    const existingRuns = await this.store.listProvisioningRuns(intakeId);
-    if (existingRuns.some((r) => r.status === "executing")) {
-      throw new ConflictError("A provisioning run is already in progress.");
     }
 
     const originalRun = await this.store.getProvisioningRun(intakeId, originalRunId);
@@ -1219,7 +1295,14 @@ export class IntakeWorkflowService {
       targets: [],
     };
 
-    await this.store.saveProvisioningRun(retryRun);
+    // Issue #13/#19: same atomic check-and-insert as executeDistribution, and the same
+    // residual crash-window gap between the run insert and the intake transition below —
+    // see the comments there for the full rationale.
+    const createdRetryRun = await this.store.createProvisioningRunIfNoneExecuting(retryRun);
+    if (!createdRetryRun) {
+      throw new ConflictError("A provisioning run is already in progress.");
+    }
+
     await this.applyTransitionToRecord(record, "retry", actor, now);
     await this.audit({
       record,
@@ -1280,6 +1363,11 @@ export class IntakeWorkflowService {
     actor: Actor,
     note?: string,
   ): Promise<void> {
+    // Issue #9: had no permission check at all. This is a manual override of provisioning
+    // state (docs/product/permissions-and-ownership.md calls this "manual provisioning
+    // recovery"), gated to the same roles (devops_lead, admin) as retry_provisioning —
+    // reusing that permission rather than adding a new constant for an identical role set.
+    ensurePermission(actor, "retry_provisioning");
     const record = await this.requireIntake(intakeId);
     const now = this.clock();
 
@@ -1468,6 +1556,40 @@ function ensurePermission(actor: Actor, action: Parameters<typeof hasPermission>
 function ensureNonEmpty(value: string, fieldName: string): void {
   if (!value.trim()) {
     throw new ValidationError(`${fieldName} is required.`);
+  }
+}
+
+// Issue #11: auditVisibilityForRole was defined but never enforced, so GET
+// /intakes, GET /intakes/:id, and GET /intakes/:id/audit returned every
+// record to every role. "own" (request_creator) is the one tier with an
+// unambiguous field to filter on (createdBy). "assigned"/"operational"
+// (intake_owner/devops_lead) are documented in
+// docs/product/permissions-and-ownership.md as "assigned or intake-stage
+// requests" / "operationally relevant requests", but ProjectIntakeRecord has
+// no per-request assignee field to filter on yet (assignmentOverride is a
+// developer override, not an intake/devops owner) — left unrestricted
+// (matches prior behavior) until that field exists. "full" (admin) is the
+// existing elevated-access tier and stays unrestricted.
+function canViewIntake(record: ProjectIntakeRecord, actor: Actor): boolean {
+  if (auditVisibilityForRole(actor.role) === "own") {
+    return record.createdBy.id === actor.id;
+  }
+  return true;
+}
+
+function filterIntakesForVisibility(
+  records: readonly ProjectIntakeRecord[],
+  actor: Actor,
+): readonly ProjectIntakeRecord[] {
+  return records.filter((record) => canViewIntake(record, actor));
+}
+
+// Rejects with NotFoundError (not PermissionDeniedError) so a request_creator
+// probing another user's intake ID can't distinguish "not mine" from
+// "doesn't exist" — standard IDOR mitigation.
+function ensureCanViewIntake(record: ProjectIntakeRecord, actor: Actor, id: string): void {
+  if (!canViewIntake(record, actor)) {
+    throw new NotFoundError("Project intake", id);
   }
 }
 

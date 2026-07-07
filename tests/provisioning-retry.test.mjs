@@ -75,7 +75,7 @@ describe("provisioning retry", () => {
     assert.equal(githubTarget.status, "failed");
     assert.equal(githubTarget.retryable, true);
 
-    const failedIntake = await service.getIntake(intake.id);
+    const failedIntake = await service.getIntake(intake.id, devopsLead);
     assert.equal(failedIntake.status, "provisioning_failed");
 
     const retryRun = await service.retryFailedProvisioningTargets(intake.id, initialRun.id, devopsLead);
@@ -87,7 +87,7 @@ describe("provisioning retry", () => {
     assert.equal(retryRun.targets[0].targetKind, "github_repo");
     assert.equal(retryRun.targets[0].status, "succeeded");
 
-    const distributed = await service.getIntake(intake.id);
+    const distributed = await service.getIntake(intake.id, devopsLead);
     assert.equal(distributed.status, "distributed");
   });
 
@@ -108,7 +108,7 @@ describe("provisioning retry", () => {
     assert.equal(retryRun.targets[0].targetKind, "monday_project_item");
     assert.equal(retryRun.targets[0].status, "succeeded");
 
-    const distributed = await service.getIntake(intake.id);
+    const distributed = await service.getIntake(intake.id, devopsLead);
     assert.equal(distributed.status, "distributed");
   });
 
@@ -127,7 +127,7 @@ describe("provisioning retry", () => {
     assert.equal(retryRun.targets.length, 2);
     assert.ok(retryRun.targets.every((t) => t.status === "succeeded"));
 
-    const distributed = await service.getIntake(intake.id);
+    const distributed = await service.getIntake(intake.id, devopsLead);
     assert.equal(distributed.status, "distributed");
   });
 
@@ -144,7 +144,7 @@ describe("provisioning retry", () => {
     assert.equal(retryRun.kind, "retry");
     assert.ok(retryRun.targets.every((t) => t.status === "failed"));
 
-    const stillFailed = await service.getIntake(intake.id);
+    const stillFailed = await service.getIntake(intake.id, devopsLead);
     assert.equal(stillFailed.status, "provisioning_failed");
   });
 
@@ -202,7 +202,7 @@ describe("provisioning retry", () => {
     const run = await service.executeDistribution(intake.id, devopsLead);
     assert.equal(run.status, "completed");
 
-    const distributed = await service.getIntake(intake.id);
+    const distributed = await service.getIntake(intake.id, devopsLead);
     assert.equal(distributed.status, "distributed");
 
     await assert.rejects(

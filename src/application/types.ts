@@ -303,7 +303,7 @@ export type { ProvisioningTargetResult } from "../domain/provisioning.js";
 export type { ProvisioningRunStatus, ProvisioningTargetStatus, ProvisioningTargetKind } from "../domain/provisioning.js";
 
 export interface ProjectIntakeStore {
-  listIntakes(): Promise<readonly ProjectIntakeRecord[]>;
+  listIntakes(pagination?: { take?: number; skip?: number }): Promise<readonly ProjectIntakeRecord[]>;
   getIntake(id: string): Promise<ProjectIntakeRecord | null>;
   saveIntake(record: ProjectIntakeRecord): Promise<ProjectIntakeRecord>;
   listAuditEvents(intakeId: string): Promise<readonly AuditEvent[]>;
@@ -321,4 +321,13 @@ export interface ProjectIntakeStore {
   listProvisioningRuns(intakeId: string): Promise<ProvisioningRun[]>;
   getProvisioningRun(intakeId: string, runId: string): Promise<ProvisioningRun | undefined>;
   updateProvisioningTargetResult(targetId: string, updates: Partial<ProvisioningTargetResult>): Promise<void>;
+  // Atomically checks "no run for this intake is currently executing" and inserts `run` as
+  // a single store operation, closing the TOCTOU window that existed when callers did
+  // listProvisioningRuns() then saveProvisioningRun() as two separate round trips. Returns
+  // null if a run for run.intakeId is already "executing" (caller should surface a
+  // ConflictError). A Postgres/Prisma-backed implementation must enforce this with a
+  // transaction (SELECT ... FOR UPDATE, or a partial unique index on (intakeId) WHERE
+  // status = 'executing') — an in-memory implementation gets it "for free" only because it
+  // can do the check-and-insert without an internal `await`.
+  createProvisioningRunIfNoneExecuting(run: ProvisioningRun): Promise<ProvisioningRun | null>;
 }

@@ -142,7 +142,7 @@ describe("provisioning — scheduled background retry (Q-FAR-3)", () => {
     assert.equal(settled.targets[0].status, "succeeded");
     assert.equal(settled.targets[0].attemptCount, 2);
 
-    const intake = await service.getIntake(ready.id);
+    const intake = await service.getIntake(ready.id, devopsLead);
     assert.equal(intake.status, "distributed");
   });
 
@@ -158,7 +158,7 @@ describe("provisioning — scheduled background retry (Q-FAR-3)", () => {
     assert.equal(settled.targets[0].status, "failed");
     assert.equal(settled.targets[0].attemptCount, 3); // AUTO_RETRY_MAX
 
-    const intake = await service.getIntake(ready.id);
+    const intake = await service.getIntake(ready.id, devopsLead);
     assert.equal(intake.status, "provisioning_failed");
   });
 });

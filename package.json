@@ -9,6 +9,7 @@
     "build:core": "tsc -p tsconfig.json",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "npm run build:core && node --test tests/*.test.mjs",
+    "test:api": "npm run api:build && node --test tests/api/*.test.mjs",
     "check": "npm run typecheck && npm test",
     "check:core": "npm run check",
     "demo:mvp": "npm run build:core && node scripts/demo-iteration-2.mjs",
@@ -82,5 +83,8 @@
     "@types/node": "^22.0.0",
     "prisma": "^6.0.0",
     "typescript": "^5.8.0"
+  },
+  "overrides": {
+    "multer": "2.2.0"
   }
 }

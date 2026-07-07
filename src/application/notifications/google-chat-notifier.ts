@@ -32,6 +32,15 @@ const EVENT_ICONS: Record<ChatEventType, string> = {
   distributed: "✅",
 };
 
+// Google Chat text messages interpret <...>, *, _, and ~ as markup (links,
+// bold, italic, strikethrough). title/requester/detail originate from
+// user-submitted intake or Bitrix24 data, so they must be neutralized before
+// interpolation to prevent a requester from forging trusted-looking links
+// (e.g. `<https://evil.example|Approve here>`) in a reviewer's notification.
+function sanitizeForChatMarkup(text: string): string {
+  return text.replace(/[<>*_~]/g, "");
+}
+
 function buildMessage(
   payload: ChatNotificationPayload,
   intakeBaseUrl: string | undefined,
@@ -41,11 +50,11 @@ function buildMessage(
 
   const lines: string[] = [
     `${icon} *${label}*`,
-    `*${payload.title}*`,
+    `*${sanitizeForChatMarkup(payload.title)}*`,
   ];
 
   if (payload.requester) {
-    lines.push(`Requester: ${payload.requester}`);
+    lines.push(`Requester: ${sanitizeForChatMarkup(payload.requester)}`);
   }
   if (payload.detail) {
     lines.push(payload.detail);
