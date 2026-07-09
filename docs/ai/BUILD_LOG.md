@@ -2100,3 +2100,40 @@ test file + task doc on `feat/discovery-live-streaming`.
 
 **Task log**: `docs/ai/tasks/TASK-0046-prisma-discovery-session-store-tests.md` (test-only,
 no application code changed).
+
+## 2026-07-09 — PR #33 merged + deployed; live bug found and fixed (TASK-0053)
+
+Merged PR #33 (Discovery live-streaming, Q-UX-1) to `main` and deployed to oreochiserver.
+The deploy itself hit two unrelated snags before succeeding: (1) used the wrong compose file
+first (`docker-compose.yml`, dev-only) instead of `docker-compose.server.yml` +
+`deploy/deploy-server.sh`, causing host-port collisions with unrelated containers on the
+shared server (`nodens-postgres` on 5433, `nodens-live-web-1` on 3000) — resolved by finding
+and using the correct deploy script, which uses no host ports at all except the Caddy proxy.
+Healthcheck passed clean after that (`bash deploy/healthcheck-server.sh`).
+
+User then found a real bug live: a brand-new Discovery session got stuck at `problem_framed`
+with `solutionOptions: []`, "Solutions" stuck on `Pending` forever, no manual fallback button
+anywhere. Root cause: `discovery/page.tsx`'s `handleStart` (first message, creates the
+session) never had the auto-chain-to-`generateSolutions()` check that
+`discovery/[id]/page.tsx`'s `handleSendMessage` (follow-up messages) already has — so any
+session whose *first* message landed directly in `problem_framed` (confirmed happens with the
+real OpenAI provider — intent + problem frame generated in one call) had zero path forward.
+Fixed by mirroring the same check in `handleStart`. See `docs/ai/tasks/TASK-0053-*.md` for
+full detail.
+
+Also verified, in the same session, PR #33's core claim end-to-end against the *real* OpenAI
+API (not mock, not the local-Ollama fallback used for two earlier failed attempts): `POST
+/discovery` → `HTTP 201` in 21.7s, and `GET /discovery/:id/stream` delivered 441 real `token`
+SSE events plus a `stage-end` event during generation — closing the "live-browser
+verification with a real provider" gap PR #33 had left open.
+
+**Tests**: `npx tsc --noEmit` (apps/web) clean for the TASK-0053 fix. Live-verified via direct
+API calls against both the deployed server and a local mock-provider preview.
+
+**Task log**: `docs/ai/tasks/TASK-0053-discovery-initial-message-solutions-gap.md`
+
+**Follow-up**: no manual "Generate Solutions" fallback exists in the UI — if another status
+transition is ever added without a matching auto-chain, sessions can get stuck the same way
+with no recovery path. Also flagged separately: `deploy-oreochi` skill should special-case
+intake-os's `deploy-server.sh` instead of defaulting to plain `docker compose up -d`
+(spawned as a background task, `task_fc87b8b7`).
