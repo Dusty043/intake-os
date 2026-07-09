@@ -102,6 +102,32 @@ cp apps/web/.env.local.example apps/web/.env.local
 npm run web:dev        # http://localhost:3001/intakes
 ```
 
+### Running a real (non-mock) AI provider locally, without an API key
+
+`AI_PROVIDER=mock` never calls a real model — it can't exercise streaming, token
+usage, or provider-specific behavior. To run the real `openai` provider code
+path locally without paying for or holding an `OPENAI_API_KEY`, point the
+OpenAI SDK at a local [Ollama](https://ollama.com) server instead — the SDK
+reads `OPENAI_BASE_URL` natively, so no application code branches on this:
+
+```bash
+ollama pull qwen3.5:4b   # or any OpenAI-compatible local model
+ollama serve             # http://localhost:11434
+
+AI_PROVIDER=openai \
+OPENAI_API_KEY=ollama-local-no-key-needed \
+OPENAI_BASE_URL=http://localhost:11434/v1 \
+OPENAI_MODEL=qwen3.5:4b \
+npm run api:start:dev
+```
+
+Local CPU inference is slow (single inference slot, ~5 tokens/sec for a 4B
+model on typical hardware) — expect a single Discovery agent call to take
+30–120+ seconds, and give any test client a multi-minute timeout accordingly.
+This does not change the default: a real `OPENAI_API_KEY` against the actual
+OpenAI API still works exactly as before, this is purely a `OPENAI_BASE_URL`
+override for local dev.
+
 ---
 
 ## Seeded demo data
