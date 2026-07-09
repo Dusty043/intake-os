@@ -2086,3 +2086,17 @@ unrelated failure; `caddy validate` — Valid configuration.
 verification with a real OpenAI provider (never done this session — local Postgres port
 conflict + `.env` is `AI_PROVIDER=mock` locally), and opening a PR. 5 commits on
 `feat/discovery-live-streaming`, all tests passing.
+
+## TASK-0046 — folded in: PrismaDiscoverySessionStore optimistic-concurrency tests
+
+A prior background session implemented `tests/api/prisma-discovery-session-store.test.mjs`
+(3 tests covering the update()/updateMany compare-and-swap retry path — normal, retry, and
+exhaustion-throws-ConflictError) but left it uncommitted, and the `test:api` script it
+documented adding to `package.json` was never actually added. Added the missing script
+(`"test:api": "npm run api:build && node --test tests/api/*.test.mjs"`) and committed the
+test file + task doc on `feat/discovery-live-streaming`.
+
+**Tests**: `npm run test:api` — 3/3 passing.
+
+**Task log**: `docs/ai/tasks/TASK-0046-prisma-discovery-session-store-tests.md` (test-only,
+no application code changed).
