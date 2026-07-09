@@ -1,9 +1,15 @@
 :8080 {
-  handle_path /api/* {
-    reverse_proxy api:3000
-  }
+	handle_path /api/* {
+		# flush_interval -1: flush every write immediately instead of buffering.
+		# Required for the Discovery SSE route (GET /discovery/:id/stream) to
+		# deliver chunks live instead of arriving all-at-once when the response
+		# finally completes — harmless for normal JSON responses (single write).
+		reverse_proxy api:3000 {
+			flush_interval -1
+		}
+	}
 
-  handle {
-    reverse_proxy web:3001
-  }
+	handle {
+		reverse_proxy web:3001
+	}
 }

@@ -10,11 +10,16 @@ export class OpenAiLlmClient implements LlmClient {
   }
 
   async completeStructured<T>(params: StructuredCompletionParams): Promise<StructuredCompletionResult<T>> {
-    const { model, systemPrompt, userPrompt, schemaName, schema, maxTokens = 2500 } = params;
+    const { model, systemPrompt, userPrompt, schemaName, schema, maxTokens = 2500, onToken } = params;
 
-    const response = await this.client.chat.completions.create({
+    // Always streams internally — same final result (accumulated content is
+    // parsed identically to a non-streaming call), but lets Discovery forward
+    // live fragments via onToken while other callers simply don't pass it.
+    const stream = await this.client.chat.completions.create({
       model,
       max_completion_tokens: maxTokens,
+      stream: true,
+      stream_options: { include_usage: true },
       response_format: {
         type: "json_schema",
         json_schema: { name: schemaName, strict: true, schema },
@@ -25,7 +30,25 @@ export class OpenAiLlmClient implements LlmClient {
       ],
     });
 
-    const raw = response.choices[0]?.message?.content;
+    let raw = "";
+    let finishReason = "unknown";
+    let inputTokens = 0;
+    let outputTokens = 0;
+
+    for await (const chunk of stream) {
+      const delta = chunk.choices[0]?.delta?.content;
+      if (delta) {
+        raw += delta;
+        onToken?.(delta);
+      }
+      const reason = chunk.choices[0]?.finish_reason;
+      if (reason) finishReason = reason;
+      if (chunk.usage) {
+        inputTokens = chunk.usage.prompt_tokens ?? 0;
+        outputTokens = chunk.usage.completion_tokens ?? 0;
+      }
+    }
+
     if (!raw) throw new Error(`OpenAI returned empty content for ${schemaName}`);
 
     let parsed: unknown;
@@ -37,9 +60,9 @@ export class OpenAiLlmClient implements LlmClient {
 
     return {
       content: parsed as T,
-      inputTokens: response.usage?.prompt_tokens ?? 0,
-      outputTokens: response.usage?.completion_tokens ?? 0,
-      finishReason: response.choices[0]?.finish_reason ?? "unknown",
+      inputTokens,
+      outputTokens,
+      finishReason,
     };
   }
 }

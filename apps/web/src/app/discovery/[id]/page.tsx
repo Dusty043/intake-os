@@ -19,7 +19,9 @@ import {
   sendMessage,
   sendToEvaluation,
   skipClarifications,
+  streamDiscoverySession,
 } from "@/lib/discovery-client";
+import type { DiscoveryStreamEvent } from "@/lib/discovery-client";
 import type { DiscoverySession } from "@/lib/discovery-types";
 
 // Statuses where the AI is actively processing — poll until we leave these.
@@ -42,6 +44,7 @@ export default function DiscoverySessionPage() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [linkedIntakeId, setLinkedIntakeId] = useState<string | null>(null);
+  const [activeStages, setActiveStages] = useState<Set<string>>(new Set());
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const stopPolling = useCallback(() => {
@@ -97,6 +100,31 @@ export default function DiscoverySessionPage() {
     if (session && AI_PROCESSING_STATUSES.has(session.status)) startPolling();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session?.status]);
+
+  // Live progress stream — one connection per session view, persists across
+  // turns. Failure (network error, connection drop) just leaves activeStages
+  // empty; the UI falls back to the existing static busy indicator.
+  useEffect(() => {
+    const controller = new AbortController();
+    streamDiscoverySession(
+      id,
+      actor,
+      (event: DiscoveryStreamEvent) => {
+        setActiveStages((prev) => {
+          const next = new Set(prev);
+          if (event.type === "stage-start") next.add(event.stage);
+          else if (event.type === "stage-end" || event.type === "error") next.delete(event.stage);
+          return next;
+        });
+      },
+      controller.signal,
+    ).catch(() => {
+      // Connection failed, was aborted, or the server closed it — fine, the
+      // static indicator covers this.
+    });
+    return () => controller.abort();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, actor.id]);
 
   // ── Handlers ─────────────────────────────────────────────────────────────
 
@@ -271,6 +299,7 @@ export default function DiscoverySessionPage() {
               clarificationQuestions={session.clarificationQuestions}
               confidence={session.confidence}
               busy={busy}
+              activeStages={activeStages}
               onSendMessage={handleSendMessage}
               onAnswerClarification={handleAnswerClarification}
               onSkipClarifications={handleSkipClarifications}

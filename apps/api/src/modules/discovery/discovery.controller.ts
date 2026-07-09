@@ -5,13 +5,18 @@ import {
   HttpCode,
   Inject,
   Logger,
+  Optional,
   Param,
   Post,
   Query,
+  Sse,
+  type MessageEvent,
 } from "@nestjs/common";
 import { ApiOperation, ApiTags } from "@nestjs/swagger";
 import { Throttle } from "@nestjs/throttler";
+import { Observable } from "rxjs";
 import type { DiscoveryController } from "../../../../../src/application/discovery/index.js";
+import { DiscoveryStreamRegistry } from "../../../../../src/application/discovery/index.js";
 import type { DiscoverySession } from "../../../../../src/domain/discovery.js";
 import { auditVisibilityForRole } from "../../../../../src/domain/permissions.js";
 import type { ProjectIntakeRecord } from "../../../../../src/application/types.js";
@@ -25,6 +30,11 @@ import { AnswerClarificationDto } from "./dto/answer-clarification.dto.js";
 import { SelectDirectionDto } from "./dto/select-direction.dto.js";
 
 const DISCOVERY_SYSTEM_ACTOR = { id: "discovery-engine", role: "intake_owner" as const, name: "Discovery Engine" };
+
+const DISCOVERY_STREAM_HEARTBEAT_MS = 15_000;
+// Injectable override for tests only — production never provides this token,
+// so the constructor's default (DISCOVERY_STREAM_HEARTBEAT_MS) always applies.
+export const DISCOVERY_STREAM_HEARTBEAT_MS_TOKEN = "DISCOVERY_STREAM_HEARTBEAT_MS";
 
 const rlConfig = loadRateLimitConfig();
 // Discovery routes that can invoke a real LLM call (when AI_PROVIDER≠mock) share the same
@@ -41,6 +51,10 @@ export class DiscoveryHttpController {
     @Inject("DISCOVERY_CONTROLLER")
     private readonly discovery: DiscoveryController,
     private readonly workflowService: IntakeWorkflowService,
+    private readonly streamRegistry: DiscoveryStreamRegistry,
+    @Optional()
+    @Inject(DISCOVERY_STREAM_HEARTBEAT_MS_TOKEN)
+    private readonly heartbeatMs?: number,
   ) {}
 
   // No dedicated "view any discovery session" permission exists in
@@ -88,6 +102,36 @@ export class DiscoveryHttpController {
   @ApiOperation({ summary: "Get a discovery session by ID" })
   getSession(@Param("id") id: string, @CurrentActor() actor: AuthenticatedActor) {
     return this.requireOwnedSession(id, actor);
+  }
+
+  // GET /discovery/:id/stream — live progress events (SSE) for a discovery
+  // session. Same ownership check as every other :id route, run before the
+  // stream opens; a caller who doesn't own the session gets the same 404 a
+  // missing session would, not a distinguishable 403.
+  @Get(":id/stream")
+  @Sse()
+  @ApiOperation({ summary: "Live progress stream for a discovery session" })
+  async streamSession(
+    @Param("id") id: string,
+    @CurrentActor() actor: AuthenticatedActor,
+  ): Promise<Observable<MessageEvent>> {
+    await this.requireOwnedSession(id, actor);
+    return new Observable<MessageEvent>((subscriber) => {
+      const unsubscribe = this.streamRegistry.subscribe(id, (event) => {
+        subscriber.next({ type: event.type, data: event });
+      });
+      // Idle gaps between stages (e.g. a long framing call) risk the proxy
+      // or browser treating the connection as dead with no traffic. A
+      // heartbeat every 15s keeps it alive — the frontend already ignores
+      // unrecognized event types, so no client-side handling is required.
+      const heartbeat = setInterval(() => {
+        subscriber.next({ type: "heartbeat", data: {} });
+      }, this.heartbeatMs ?? DISCOVERY_STREAM_HEARTBEAT_MS);
+      return () => {
+        unsubscribe();
+        clearInterval(heartbeat);
+      };
+    });
   }
 
   // POST /discovery/:id/message

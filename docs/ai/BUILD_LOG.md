@@ -1897,3 +1897,206 @@ narrows but doesn't fully close the race under READ COMMITTED — a
 inline). Audit-visibility tiers `"assigned"`/`"operational"` remain unenforced — no
 per-request assignee field exists to filter on (see Q-SEC-1). `ponytail-audit`'s findings
 were not addressed here (different task scope).
+
+## 2026-07-10 — TASK-0048 (T1 of Q-UX-1): DiscoveryStreamRegistry (branch: feat/discovery-live-streaming)
+
+**Status:** Complete (T1 of 6 — registry only, not yet wired to anything)
+
+Implementing Q-UX-1 (surface AI reasoning/progress during Discovery) per the eng-reviewed
+design doc. That review's outside-voice pass (Codex) found the original plan's premise was
+wrong — every Discovery LLM call is strict-schema JSON via a shared `completeStructured`
+helper, so there's no free-form-prose step to stream cheaply, and the synchronous
+`POST /message` pipeline had no way to connect to a separately-subscribed SSE stream. The
+corrected plan's missing piece is a session-scoped event bus; built that in isolation first,
+per the design doc's explicit Assignment, before touching the orchestrator or any agent.
+
+Added `DiscoveryStreamRegistry` (`src/application/discovery/discovery-stream-registry.ts`) —
+`subscribe`/`publish`/`hasSubscribers` over an in-memory `Map<sessionId, Set<listener>>`.
+`publish()` on a session with no subscriber is a no-op (keeps future orchestrator wiring
+simple — it can call `publish()` unconditionally). Multiple listeners per session are
+supported by construction, covering the two-tabs-open case the outside-voice review flagged
+as a correctness risk. 7 new unit tests cover no-op-when-unsubscribed, delivery, session
+isolation, multi-listener fanout, scoped unsubscribe, cleanup-on-last-listener-leave, and
+error-event delivery.
+
+**Tests**: `npm run build:core` clean; `node --test tests/discovery-stream-registry.test.mjs`
+— 7/7 passing; full suite `npm test` — 768/769 passing. The one failure
+(`tests/monday-config.test.mjs`) is pre-existing, unrelated work-in-progress from a different
+session (confirmed via `git stash` that it fails independent of this change).
+
+**Task log**: `docs/ai/tasks/TASK-0048-discovery-live-streaming.md`
+
+**Follow-up**: T2 (SSE controller + `requireOwnedSession` auth check + this repo's first
+`*.e2e-spec.ts`), T3 (wire `stream: true` through `OpenAILlmClient.completeStructured`,
+forwarding chunks into this registry, across all 6 Discovery agents), T4 (frontend
+`fetch`+`ReadableStream` consumer, not `EventSource` — native `EventSource` can't carry this
+app's `x-actor-*` auth headers), T5 (Caddy buffering config), T6 (heartbeat). The
+`generateSolutions`/`planClarifications` concurrency decision (serialize vs. multi-indicator
+UI) is still open and needed before T3.
+
+## 2026-07-10 — TASK-0049 (T2 of Q-UX-1): SSE controller + auth + first NestJS e2e test (branch: feat/discovery-live-streaming)
+
+**Status:** Complete (T2 of 6)
+
+Decided the concurrency open question first: keep `generateSolutions`/`planClarifications`
+concurrent (not serialized) — serializing would add real latency to every turn hitting that
+path in exchange for a marginally simpler frontend model, which works against the whole
+point of this feature. Frontend will track `activeStages: Set<string>` instead of one
+`currentStage` string.
+
+Added `GET /discovery/:id/stream` (`discovery.controller.ts`) using NestJS's `@Sse()`
+decorator, gated by the same `requireOwnedSession` check every other `:id` route uses,
+subscribing to T1's `DiscoveryStreamRegistry` (now registered as a module provider).
+
+This repo had zero NestJS controller-level HTTP tests before this — existing API tests run
+via `node --test` against compiled `dist/` classes, bypassing the HTTP/auth layer entirely.
+Installed `@nestjs/testing` + `supertest` (new devDependencies) and wrote
+`discovery-stream.e2e-spec.ts`: a minimal standalone testing module (not the full
+`AppModule`, to avoid pulling in `PrismaService`/real DB via `AdminModule`) using the *real*
+`AuthGuard` and `ApplicationExceptionFilter` — confirmed `AUTH_MODE=dev_headers` (this app's
+default) never touches `SessionService`, so a stub there is safe without faking the auth
+path itself. 3 tests: rejects a non-owned session (404), rejects a nonexistent session (same
+404 — can't distinguish), and a full round-trip proving a real HTTP client receives events
+published into the registry, correctly framed as named SSE events. The round-trip test uses
+a `waitForSubscriber()` poll against the registry's own `hasSubscribers()` signal rather than
+a fixed `setTimeout`, to avoid a timing-flaky test — verified stable across 5 repeated runs.
+Added `api:test:e2e` npm script so this pattern is reusable for future controllers, not a
+one-off.
+
+**Tests**: `npm run api:build` + `npx tsc --noEmit -p apps/api/tsconfig.json` clean;
+`node --test dist/apps/api/src/modules/discovery/discovery-stream.e2e-spec.js` — 3/3 passing
+(x5 runs, no flakiness); full suite `npm test` — 768/769 passing, same pre-existing unrelated
+failure as TASK-0048.
+
+**Task log**: `docs/ai/tasks/TASK-0049-discovery-sse-controller.md`
+
+**Follow-up**: T3 next — wire `stream: true` through `OpenAILlmClient.completeStructured`,
+forwarding chunks into the registry, across all 6 Discovery agents (all strict-schema JSON,
+no prose subset — see the design doc's outside-voice correction). T4 (frontend) can start in
+parallel per the design doc's worktree lanes. Nothing publishes real events into the registry
+yet — this task only proved the wire works end-to-end with test-published events.
+
+## 2026-07-10 — TASK-0050 (T3 of Q-UX-1): wire real streaming through OpenAILlmClient (branch: feat/discovery-live-streaming)
+
+**Status:** Complete (T3 of 6)
+
+Made `OpenAiLlmClient.completeStructured` always stream internally (`stream: true` +
+`stream_options: {include_usage: true}`), forwarding each `delta.content` fragment via a new
+optional `onToken` param on `StructuredCompletionParams`. One implementation serves both
+Discovery (which passes `onToken`) and the separate, out-of-scope evaluation pipeline (which
+doesn't) — confirmed via grep this class has zero existing tests/mocks anywhere, so nothing
+could break from the internal request-shape change; the external result contract is
+identical either way.
+
+`completeWithUsage` (`discovery-agent-contract.ts`, the single wrapper every real Discovery
+agent calls) now brackets each call with `stage-start` → `token`\* → `stage-end` on success,
+or `stage-start` → `error` (no `stage-end`) on throw — reusing T1's `DiscoveryStreamEvent`
+type directly rather than a parallel shape. `DiscoveryOrchestrator` gained an optional
+`streamRegistry`; `trackUsage` now takes a `sessionId` and wires `onStreamEvent` to
+`registry.publish(sessionId, event)` across all 5 call sites (`runAnalysis`,
+`generateSolutions`, `answerClarification`, `composeProposal`, `generateManifest`).
+`discovery.module.ts` forwards the already-registered (T2) `DiscoveryStreamRegistry` into
+the orchestrator.
+
+No infra exists in this repo to unit-test the raw OpenAI SDK streaming loop (no seam to
+inject a fake `OpenAI` client, and no existing test does this for the non-streaming path
+either) — consistent with the rest of the codebase, tested at the `completeWithUsage`/
+orchestrator layer instead with a fake `LlmClient`, which is where the actual new logic
+(event bracketing, session-tagged forwarding) lives.
+
+**Tests**: `npm run build:core` + `npx tsc --noEmit -p apps/api/tsconfig.json` clean;
+`node --test tests/discovery-stream-wiring.test.mjs` — 5/5 passing; full suite `npm test` —
+773/774 passing, same pre-existing unrelated failure; T2's e2e-spec re-verified 3/3 passing
+after the `discovery.module.ts` changes.
+
+**Task log**: `docs/ai/tasks/TASK-0050-discovery-stream-wiring.md`
+
+**Follow-up**: T4 next — frontend `fetch`+`ReadableStream` consumer in `DiscoveryChat.tsx`,
+replacing the static pulse. The backend now genuinely streams real content end-to-end; T4 is
+the only remaining piece before a user can actually see it. T5 (Caddy buffering) and T6
+(heartbeat) remain after that.
+
+## 2026-07-10 — TASK-0051 (T4 of Q-UX-1): frontend stream consumer (branch: feat/discovery-live-streaming)
+
+**Status:** Complete (T4 of 6 — core feature now fully wired end-to-end)
+
+Resolved a UX fork the eng review flagged but left open: `token` events carry mid-stream
+JSON fragments (all 6 Discovery agents are strict-schema JSON per T3), not prose, so
+rendering them literally would look broken — decided with the user to show live stage
+transitions only (`stage-start`/`stage-end` driven friendly labels), not raw streamed text.
+
+Added `streamDiscoverySession()` (`discovery-client.ts`) — opens the T2 SSE route via
+`fetch` (carries `actorHeaders()`, not `EventSource`), manually parses `event:`/`data:` SSE
+frames from the raw `ReadableStream`. `discovery/[id]/page.tsx` opens one connection per
+page view (persists across turns, matching the registry's session-scoped lifetime, not
+request-scoped), tracked as `activeStages: Set<string>`. `DiscoveryChat.tsx`'s header
+indicator now shows live per-stage labels (e.g. "Understanding your request…", or joined
+when concurrent per the earlier concurrency decision) instead of a fixed string, falling
+back to the old generic text when the stream hasn't reported anything (or failed) —
+connection failure is silent by design, per the doc's progressive-enhancement requirement.
+
+**Tests**: `apps/web` `npx tsc --noEmit` clean; `npx vitest run` — 14/14 passing (11
+existing + 3 new for `streamDiscoverySession`: frame parsing, malformed-frame skip, non-OK
+rejection); `npm run web:build` — production build + lint clean.
+
+**Not verified in a live browser**: local Postgres (port 5432) is occupied by an unrelated
+project on this dev machine, and seeing the actual live labels requires a real OpenAI
+provider (`.env` has `AI_PROVIDER=mock` locally, under which mock agents never call
+`completeWithUsage` — no stage events would fire). Did not switch to a real API key without
+asking first.
+
+**Task log**: `docs/ai/tasks/TASK-0051-discovery-frontend-stream-consumer.md`
+
+**Follow-up**: T5 (Caddy buffering — without it, streamed chunks may arrive all-at-once
+through the production proxy instead of live) and T6 (heartbeat — without it, long idle gaps
+between stages could get the connection dropped) remain. The core feature (T1-T4) works
+without them at reduced reliability; live-browser verification is deferred to either a
+real-provider test environment or post-deployment.
+
+## 2026-07-10 — TASK-0052 (T5+T6 of Q-UX-1): Caddy buffering + heartbeat — all 6 tasks complete (branch: feat/discovery-live-streaming)
+
+**Status:** Complete — Q-UX-1's full implementation (T1-T6) is done
+
+T5: added `flush_interval -1` to the API `reverse_proxy` block in `deploy/Caddyfile.server`
+so SSE chunks flush immediately through the production proxy instead of buffering. No local
+Caddy CLI on this machine — validated (and reformatted) using the same `caddy:2` Docker image
+already pinned in `docker-compose.server.yml`.
+
+T6: heartbeat implemented as a named `heartbeat` event on the same SSE Observable (not a raw
+`: heartbeat\n\n` comment line as originally sketched — NestJS's `@Sse()`/`MessageEvent`
+abstraction has no first-class support for comment-only frames, and going lower-level would
+abandon the clean Observable pattern; a named event achieves the same keep-alive purpose,
+and the frontend's event-type switch already no-ops on anything unrecognized). Fires every
+15s for the connection's lifetime, torn down alongside the registry unsubscribe.
+
+First test attempt used `node:test`'s fake timers (`t.mock.timers.enable` + `.tick(15_000)`)
+— **this deadlocked the test process against the live HTTP stream** (had to `kill -9` it).
+Documented as a dead end rather than silently dropped. Fixed by making the heartbeat interval
+injectable (`@Optional() @Inject(DISCOVERY_STREAM_HEARTBEAT_MS_TOKEN)`, unused in production)
+so the test uses a real-but-short 30ms interval instead.
+
+**Tests**: `npm run api:build` + `npx tsc --noEmit -p apps/api/tsconfig.json` clean;
+`node --test dist/apps/api/src/modules/discovery/discovery-stream.e2e-spec.js` — 4/4 passing
+(3 from T2 + 1 new), x5 runs, stable; full core suite `npm test` — 773/774, same pre-existing
+unrelated failure; `caddy validate` — Valid configuration.
+
+**Task log**: `docs/ai/tasks/TASK-0052-discovery-stream-caddy-heartbeat.md`
+
+**Follow-up**: All 6 implementation tasks done. Remaining before this ships: live-browser
+verification with a real OpenAI provider (never done this session — local Postgres port
+conflict + `.env` is `AI_PROVIDER=mock` locally), and opening a PR. 5 commits on
+`feat/discovery-live-streaming`, all tests passing.
+
+## TASK-0046 — folded in: PrismaDiscoverySessionStore optimistic-concurrency tests
+
+A prior background session implemented `tests/api/prisma-discovery-session-store.test.mjs`
+(3 tests covering the update()/updateMany compare-and-swap retry path — normal, retry, and
+exhaustion-throws-ConflictError) but left it uncommitted, and the `test:api` script it
+documented adding to `package.json` was never actually added. Added the missing script
+(`"test:api": "npm run api:build && node --test tests/api/*.test.mjs"`) and committed the
+test file + task doc on `feat/discovery-live-streaming`.
+
+**Tests**: `npm run test:api` — 3/3 passing.
+
+**Task log**: `docs/ai/tasks/TASK-0046-prisma-discovery-session-store-tests.md` (test-only,
+no application code changed).

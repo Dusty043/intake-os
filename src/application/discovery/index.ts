@@ -1,4 +1,5 @@
 export * from "./discovery-session-store.js";
+export * from "./discovery-stream-registry.js";
 export * from "./discovery-orchestrator.js";
 export * from "./discovery-controller.js";
 export * from "./proposal-to-intake-adapter.js";

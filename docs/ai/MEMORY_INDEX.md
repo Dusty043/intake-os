@@ -66,6 +66,11 @@ Generated at: 2026-06-09T14:53:20.716Z
 - `docs/ai/tasks/TASK-0045-monday-adapter-build-plan.md`
 - `docs/ai/tasks/TASK-0046-prisma-discovery-session-store-tests.md`
 - `docs/ai/tasks/TASK-0047-security-review-fixes.md`
+- `docs/ai/tasks/TASK-0048-discovery-live-streaming.md`
+- `docs/ai/tasks/TASK-0049-discovery-sse-controller.md`
+- `docs/ai/tasks/TASK-0050-discovery-stream-wiring.md`
+- `docs/ai/tasks/TASK-0051-discovery-frontend-stream-consumer.md`
+- `docs/ai/tasks/TASK-0052-discovery-stream-caddy-heartbeat.md`
 - `docs/ai/tasks/HANDOFF-0023D-monday-credentials.md`
 
 ## Deployment Docs
