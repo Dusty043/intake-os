@@ -2015,3 +2015,40 @@ after the `discovery.module.ts` changes.
 replacing the static pulse. The backend now genuinely streams real content end-to-end; T4 is
 the only remaining piece before a user can actually see it. T5 (Caddy buffering) and T6
 (heartbeat) remain after that.
+
+## 2026-07-10 — TASK-0051 (T4 of Q-UX-1): frontend stream consumer (branch: feat/discovery-live-streaming)
+
+**Status:** Complete (T4 of 6 — core feature now fully wired end-to-end)
+
+Resolved a UX fork the eng review flagged but left open: `token` events carry mid-stream
+JSON fragments (all 6 Discovery agents are strict-schema JSON per T3), not prose, so
+rendering them literally would look broken — decided with the user to show live stage
+transitions only (`stage-start`/`stage-end` driven friendly labels), not raw streamed text.
+
+Added `streamDiscoverySession()` (`discovery-client.ts`) — opens the T2 SSE route via
+`fetch` (carries `actorHeaders()`, not `EventSource`), manually parses `event:`/`data:` SSE
+frames from the raw `ReadableStream`. `discovery/[id]/page.tsx` opens one connection per
+page view (persists across turns, matching the registry's session-scoped lifetime, not
+request-scoped), tracked as `activeStages: Set<string>`. `DiscoveryChat.tsx`'s header
+indicator now shows live per-stage labels (e.g. "Understanding your request…", or joined
+when concurrent per the earlier concurrency decision) instead of a fixed string, falling
+back to the old generic text when the stream hasn't reported anything (or failed) —
+connection failure is silent by design, per the doc's progressive-enhancement requirement.
+
+**Tests**: `apps/web` `npx tsc --noEmit` clean; `npx vitest run` — 14/14 passing (11
+existing + 3 new for `streamDiscoverySession`: frame parsing, malformed-frame skip, non-OK
+rejection); `npm run web:build` — production build + lint clean.
+
+**Not verified in a live browser**: local Postgres (port 5432) is occupied by an unrelated
+project on this dev machine, and seeing the actual live labels requires a real OpenAI
+provider (`.env` has `AI_PROVIDER=mock` locally, under which mock agents never call
+`completeWithUsage` — no stage events would fire). Did not switch to a real API key without
+asking first.
+
+**Task log**: `docs/ai/tasks/TASK-0051-discovery-frontend-stream-consumer.md`
+
+**Follow-up**: T5 (Caddy buffering — without it, streamed chunks may arrive all-at-once
+through the production proxy instead of live) and T6 (heartbeat — without it, long idle gaps
+between stages could get the connection dropped) remain. The core feature (T1-T4) works
+without them at reduced reliability; live-browser verification is deferred to either a
+real-provider test environment or post-deployment.

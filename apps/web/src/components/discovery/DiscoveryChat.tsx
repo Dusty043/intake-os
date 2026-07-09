@@ -15,6 +15,23 @@ function formatTime(iso: string): string {
   });
 }
 
+// Friendly labels for DiscoveryAgentRole stage names streamed from the backend.
+const STAGE_LABELS: Record<string, string> = {
+  intent_extraction: "Understanding your request",
+  problem_framing: "Framing the problem",
+  solution_generation: "Generating solution options",
+  clarification: "Planning clarifying questions",
+  proposal_composition: "Composing the proposal",
+  manifest_generation: "Generating the manifest",
+};
+
+// Live stage labels when we have them; falls back to a generic message when
+// the stream hasn't reported anything yet (or failed) but a request is busy.
+function progressText(activeStages: Set<string>): string {
+  const labels = Array.from(activeStages, (stage) => STAGE_LABELS[stage] ?? "Working");
+  return labels.length > 0 ? `${labels.join(" · ")}…` : "AI is thinking…";
+}
+
 type ClarificationCardProps = {
   question: ClarificationQuestion;
   onAnswer: (questionId: string, answer: string) => Promise<void>;
@@ -115,6 +132,7 @@ type Props = {
   clarificationQuestions: ClarificationQuestion[];
   confidence: DiscoveryConfidence;
   busy: boolean;
+  activeStages: Set<string>;
   onSendMessage: (text: string) => Promise<void>;
   onAnswerClarification: (questionId: string, answer: string) => Promise<void>;
   onSkipClarifications: () => Promise<void>;
@@ -125,6 +143,7 @@ export function DiscoveryChat({
   clarificationQuestions,
   confidence,
   busy,
+  activeStages,
   onSendMessage,
   onAnswerClarification,
   onSkipClarifications,
@@ -169,7 +188,7 @@ export function DiscoveryChat({
         {busy && (
           <span className="text-xs text-indigo-600 font-medium flex items-center gap-1.5">
             <span className="w-2 h-2 rounded-full bg-indigo-600 animate-pulse" />
-            AI is thinking…
+            {progressText(activeStages)}
           </span>
         )}
       </div>
