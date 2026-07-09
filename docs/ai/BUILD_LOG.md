@@ -2052,3 +2052,37 @@ through the production proxy instead of live) and T6 (heartbeat — without it, 
 between stages could get the connection dropped) remain. The core feature (T1-T4) works
 without them at reduced reliability; live-browser verification is deferred to either a
 real-provider test environment or post-deployment.
+
+## 2026-07-10 — TASK-0052 (T5+T6 of Q-UX-1): Caddy buffering + heartbeat — all 6 tasks complete (branch: feat/discovery-live-streaming)
+
+**Status:** Complete — Q-UX-1's full implementation (T1-T6) is done
+
+T5: added `flush_interval -1` to the API `reverse_proxy` block in `deploy/Caddyfile.server`
+so SSE chunks flush immediately through the production proxy instead of buffering. No local
+Caddy CLI on this machine — validated (and reformatted) using the same `caddy:2` Docker image
+already pinned in `docker-compose.server.yml`.
+
+T6: heartbeat implemented as a named `heartbeat` event on the same SSE Observable (not a raw
+`: heartbeat\n\n` comment line as originally sketched — NestJS's `@Sse()`/`MessageEvent`
+abstraction has no first-class support for comment-only frames, and going lower-level would
+abandon the clean Observable pattern; a named event achieves the same keep-alive purpose,
+and the frontend's event-type switch already no-ops on anything unrecognized). Fires every
+15s for the connection's lifetime, torn down alongside the registry unsubscribe.
+
+First test attempt used `node:test`'s fake timers (`t.mock.timers.enable` + `.tick(15_000)`)
+— **this deadlocked the test process against the live HTTP stream** (had to `kill -9` it).
+Documented as a dead end rather than silently dropped. Fixed by making the heartbeat interval
+injectable (`@Optional() @Inject(DISCOVERY_STREAM_HEARTBEAT_MS_TOKEN)`, unused in production)
+so the test uses a real-but-short 30ms interval instead.
+
+**Tests**: `npm run api:build` + `npx tsc --noEmit -p apps/api/tsconfig.json` clean;
+`node --test dist/apps/api/src/modules/discovery/discovery-stream.e2e-spec.js` — 4/4 passing
+(3 from T2 + 1 new), x5 runs, stable; full core suite `npm test` — 773/774, same pre-existing
+unrelated failure; `caddy validate` — Valid configuration.
+
+**Task log**: `docs/ai/tasks/TASK-0052-discovery-stream-caddy-heartbeat.md`
+
+**Follow-up**: All 6 implementation tasks done. Remaining before this ships: live-browser
+verification with a real OpenAI provider (never done this session — local Postgres port
+conflict + `.env` is `AI_PROVIDER=mock` locally), and opening a PR. 5 commits on
+`feat/discovery-live-streaming`, all tests passing.

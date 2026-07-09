@@ -6,7 +6,8 @@ export type DiscoveryStreamEvent =
   | { type: "stage-start"; stage: string }
   | { type: "token"; stage: string; text: string }
   | { type: "stage-end"; stage: string }
-  | { type: "error"; stage: string; message: string };
+  | { type: "error"; stage: string; message: string }
+  | { type: "heartbeat" };
 
 /**
  * Opens a live SSE stream for a Discovery session's progress and calls

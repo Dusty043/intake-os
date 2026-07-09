@@ -5,6 +5,7 @@ import {
   HttpCode,
   Inject,
   Logger,
+  Optional,
   Param,
   Post,
   Query,
@@ -30,6 +31,11 @@ import { SelectDirectionDto } from "./dto/select-direction.dto.js";
 
 const DISCOVERY_SYSTEM_ACTOR = { id: "discovery-engine", role: "intake_owner" as const, name: "Discovery Engine" };
 
+const DISCOVERY_STREAM_HEARTBEAT_MS = 15_000;
+// Injectable override for tests only — production never provides this token,
+// so the constructor's default (DISCOVERY_STREAM_HEARTBEAT_MS) always applies.
+export const DISCOVERY_STREAM_HEARTBEAT_MS_TOKEN = "DISCOVERY_STREAM_HEARTBEAT_MS";
+
 const rlConfig = loadRateLimitConfig();
 // Discovery routes that can invoke a real LLM call (when AI_PROVIDER≠mock) share the same
 // aiEvaluation tier the intake evaluation pipeline uses — one AI-call budget, not a second
@@ -46,6 +52,9 @@ export class DiscoveryHttpController {
     private readonly discovery: DiscoveryController,
     private readonly workflowService: IntakeWorkflowService,
     private readonly streamRegistry: DiscoveryStreamRegistry,
+    @Optional()
+    @Inject(DISCOVERY_STREAM_HEARTBEAT_MS_TOKEN)
+    private readonly heartbeatMs?: number,
   ) {}
 
   // No dedicated "view any discovery session" permission exists in
@@ -108,9 +117,20 @@ export class DiscoveryHttpController {
   ): Promise<Observable<MessageEvent>> {
     await this.requireOwnedSession(id, actor);
     return new Observable<MessageEvent>((subscriber) => {
-      return this.streamRegistry.subscribe(id, (event) => {
+      const unsubscribe = this.streamRegistry.subscribe(id, (event) => {
         subscriber.next({ type: event.type, data: event });
       });
+      // Idle gaps between stages (e.g. a long framing call) risk the proxy
+      // or browser treating the connection as dead with no traffic. A
+      // heartbeat every 15s keeps it alive — the frontend already ignores
+      // unrecognized event types, so no client-side handling is required.
+      const heartbeat = setInterval(() => {
+        subscriber.next({ type: "heartbeat", data: {} });
+      }, this.heartbeatMs ?? DISCOVERY_STREAM_HEARTBEAT_MS);
+      return () => {
+        unsubscribe();
+        clearInterval(heartbeat);
+      };
     });
   }
 

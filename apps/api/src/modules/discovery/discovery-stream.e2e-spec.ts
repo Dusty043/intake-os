@@ -13,7 +13,7 @@ import type { TestingModule } from "@nestjs/testing";
 import type { INestApplication } from "@nestjs/common";
 import { APP_GUARD, APP_FILTER } from "@nestjs/core";
 import request from "supertest";
-import { DiscoveryHttpController } from "./discovery.controller.js";
+import { DiscoveryHttpController, DISCOVERY_STREAM_HEARTBEAT_MS_TOKEN } from "./discovery.controller.js";
 import { AuthGuard } from "../auth/auth.guard.js";
 import { SessionService } from "../auth/session.service.js";
 import { ApplicationExceptionFilter } from "../../common/application-exception.filter.js";
@@ -139,5 +139,60 @@ describe("DiscoveryHttpController — GET /discovery/:id/stream (SSE)", () => {
     assert.match(rawBody, /event: token/);
     assert.match(rawBody, /"text":"hello"/);
     assert.match(rawBody, /event: stage-end/);
+  });
+
+  test("emits a heartbeat on an idle connection to keep it alive", async () => {
+    // Fake timers (node:test's t.mock.timers) don't compose safely with a
+    // live HTTP stream in this stack — advancing them deadlocked the
+    // request. Uses a real but short interval instead, injected only for
+    // this test module (production keeps the real DISCOVERY_STREAM_HEARTBEAT_MS).
+    const heartbeatModuleRef = await Test.createTestingModule({
+      controllers: [DiscoveryHttpController],
+      providers: [
+        { provide: "DISCOVERY_CONTROLLER", useValue: fakeDiscoveryController },
+        { provide: IntakeWorkflowService, useValue: {} },
+        { provide: SessionService, useValue: {} },
+        DiscoveryStreamRegistry,
+        { provide: APP_GUARD, useClass: AuthGuard },
+        { provide: APP_FILTER, useClass: ApplicationExceptionFilter },
+        { provide: DISCOVERY_STREAM_HEARTBEAT_MS_TOKEN, useValue: 30 },
+      ],
+    }).compile();
+    const heartbeatApp = heartbeatModuleRef.createNestApplication();
+    await heartbeatApp.init();
+
+    try {
+      const rawBody = await new Promise<string>((resolve, reject) => {
+        const req = request(heartbeatApp.getHttpServer())
+          .get("/discovery/DISC-owned/stream")
+          .set("x-actor-id", "user-1")
+          .set("x-actor-role", "request_creator")
+          .parse((res, callback) => {
+            const stream = res as unknown as NodeJS.ReadableStream & { destroy: () => void };
+            let raw = "";
+            stream.on("data", (chunk: Buffer) => {
+              raw += chunk.toString("utf8");
+              if (raw.includes("event: heartbeat")) {
+                stream.destroy();
+                callback(null, raw);
+              }
+            });
+            stream.on("error", () => {
+              // Expected once we destroy() above.
+            });
+          });
+
+        req.end((_err, res) => {
+          if (res?.body) resolve(res.body as string);
+        });
+        req.on("error", () => {});
+      });
+
+      // No stage events published — proves the heartbeat fires on its own
+      // during an otherwise-idle connection, not piggybacking on real traffic.
+      assert.match(rawBody, /event: heartbeat/);
+    } finally {
+      await heartbeatApp.close();
+    }
   });
 });
