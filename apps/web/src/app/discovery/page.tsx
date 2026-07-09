@@ -75,7 +75,7 @@ export default function DiscoveryListPage() {
   useEffect(() => { void load(); }, [load]);
 
   const handleStart = async (message: string) => {
-    const session = await startDiscovery(userId, message, actor);
+    const session = await startDiscovery(message, actor);
     router.push(`/discovery/${session.id}`);
   };
 
