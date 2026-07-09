@@ -1975,3 +1975,43 @@ forwarding chunks into the registry, across all 6 Discovery agents (all strict-s
 no prose subset — see the design doc's outside-voice correction). T4 (frontend) can start in
 parallel per the design doc's worktree lanes. Nothing publishes real events into the registry
 yet — this task only proved the wire works end-to-end with test-published events.
+
+## 2026-07-10 — TASK-0050 (T3 of Q-UX-1): wire real streaming through OpenAILlmClient (branch: feat/discovery-live-streaming)
+
+**Status:** Complete (T3 of 6)
+
+Made `OpenAiLlmClient.completeStructured` always stream internally (`stream: true` +
+`stream_options: {include_usage: true}`), forwarding each `delta.content` fragment via a new
+optional `onToken` param on `StructuredCompletionParams`. One implementation serves both
+Discovery (which passes `onToken`) and the separate, out-of-scope evaluation pipeline (which
+doesn't) — confirmed via grep this class has zero existing tests/mocks anywhere, so nothing
+could break from the internal request-shape change; the external result contract is
+identical either way.
+
+`completeWithUsage` (`discovery-agent-contract.ts`, the single wrapper every real Discovery
+agent calls) now brackets each call with `stage-start` → `token`\* → `stage-end` on success,
+or `stage-start` → `error` (no `stage-end`) on throw — reusing T1's `DiscoveryStreamEvent`
+type directly rather than a parallel shape. `DiscoveryOrchestrator` gained an optional
+`streamRegistry`; `trackUsage` now takes a `sessionId` and wires `onStreamEvent` to
+`registry.publish(sessionId, event)` across all 5 call sites (`runAnalysis`,
+`generateSolutions`, `answerClarification`, `composeProposal`, `generateManifest`).
+`discovery.module.ts` forwards the already-registered (T2) `DiscoveryStreamRegistry` into
+the orchestrator.
+
+No infra exists in this repo to unit-test the raw OpenAI SDK streaming loop (no seam to
+inject a fake `OpenAI` client, and no existing test does this for the non-streaming path
+either) — consistent with the rest of the codebase, tested at the `completeWithUsage`/
+orchestrator layer instead with a fake `LlmClient`, which is where the actual new logic
+(event bracketing, session-tagged forwarding) lives.
+
+**Tests**: `npm run build:core` + `npx tsc --noEmit -p apps/api/tsconfig.json` clean;
+`node --test tests/discovery-stream-wiring.test.mjs` — 5/5 passing; full suite `npm test` —
+773/774 passing, same pre-existing unrelated failure; T2's e2e-spec re-verified 3/3 passing
+after the `discovery.module.ts` changes.
+
+**Task log**: `docs/ai/tasks/TASK-0050-discovery-stream-wiring.md`
+
+**Follow-up**: T4 next — frontend `fetch`+`ReadableStream` consumer in `DiscoveryChat.tsx`,
+replacing the static pulse. The backend now genuinely streams real content end-to-end; T4 is
+the only remaining piece before a user can actually see it. T5 (Caddy buffering) and T6
+(heartbeat) remain after that.

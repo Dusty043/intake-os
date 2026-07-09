@@ -11,6 +11,7 @@ import type {
   SolutionOption,
 } from "../../../domain/discovery.js";
 import type { LlmClient, StructuredCompletionParams } from "../../llm-client.js";
+import type { DiscoveryStreamEvent } from "../discovery-stream-registry.js";
 
 // ─── Shared run context passed to every discovery agent ───────────────────────
 
@@ -41,9 +42,11 @@ export interface DiscoveryAgentOptions {
   orgContext?: string;
   /** Called by real agents after each LLM call so the orchestrator can log cost for reporting. */
   onUsage?: (usage: DiscoveryAgentUsageEvent) => void;
+  /** Called around each LLM call (stage-start, token, stage-end, error) so the orchestrator can forward live progress to a DiscoveryStreamRegistry subscriber. Optional — omit for no live progress. */
+  onStreamEvent?: (event: DiscoveryStreamEvent) => void;
 }
 
-/** Runs a structured LLM call and reports its usage via opts.onUsage. Shared by all real discovery agents. */
+/** Runs a structured LLM call, reports its usage via opts.onUsage, and brackets it with stage-start/token/stage-end/error events via opts.onStreamEvent. Shared by all real discovery agents. */
 export async function completeWithUsage<T>(
   client: LlmClient,
   opts: DiscoveryAgentOptions,
@@ -52,9 +55,21 @@ export async function completeWithUsage<T>(
   params: Omit<StructuredCompletionParams, "model">,
 ): Promise<T> {
   const startedAt = Date.now();
-  const { content, inputTokens, outputTokens } = await client.completeStructured<T>({ ...params, model });
-  opts.onUsage?.({ agentRole, model, inputTokens, outputTokens, latencyMs: Date.now() - startedAt });
-  return content;
+  opts.onStreamEvent?.({ type: "stage-start", stage: agentRole });
+  try {
+    const { content, inputTokens, outputTokens } = await client.completeStructured<T>({
+      ...params,
+      model,
+      onToken: (text) => opts.onStreamEvent?.({ type: "token", stage: agentRole, text }),
+    });
+    opts.onUsage?.({ agentRole, model, inputTokens, outputTokens, latencyMs: Date.now() - startedAt });
+    opts.onStreamEvent?.({ type: "stage-end", stage: agentRole });
+    return content;
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    opts.onStreamEvent?.({ type: "error", stage: agentRole, message });
+    throw err;
+  }
 }
 
 // ─── Intent extraction ────────────────────────────────────────────────────────

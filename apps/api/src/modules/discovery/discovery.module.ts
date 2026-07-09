@@ -26,6 +26,7 @@ import { AdminModule } from "../admin/admin.module.js";
 
 function buildOrchestrator(
   sessionStore: IDiscoverySessionStore,
+  streamRegistry: DiscoveryStreamRegistry,
   intakeStore?: ProjectIntakeStore,
   settingsService?: GlobalSettingsService,
 ): DiscoveryController {
@@ -81,6 +82,7 @@ function buildOrchestrator(
       getOrgContext: settingsService
         ? () => settingsService.getOrgContext()
         : undefined,
+      streamRegistry,
     },
   );
 
@@ -91,16 +93,17 @@ function buildOrchestrator(
   imports: [AdminModule],
   controllers: [DiscoveryHttpController],
   providers: [
+    DiscoveryStreamRegistry,
     {
       provide: "DISCOVERY_CONTROLLER",
-      inject: [DISCOVERY_SESSION_STORE, PROJECT_INTAKE_STORE, GlobalSettingsService],
+      inject: [DISCOVERY_SESSION_STORE, DiscoveryStreamRegistry, PROJECT_INTAKE_STORE, GlobalSettingsService],
       useFactory: (
         sessionStore: IDiscoverySessionStore,
+        streamRegistry: DiscoveryStreamRegistry,
         intakeStore: ProjectIntakeStore,
         settings: GlobalSettingsService,
-      ) => buildOrchestrator(sessionStore, intakeStore, settings),
+      ) => buildOrchestrator(sessionStore, streamRegistry, intakeStore, settings),
     },
-    DiscoveryStreamRegistry,
   ],
 })
 export class DiscoveryModule {}

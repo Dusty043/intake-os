@@ -25,6 +25,7 @@ import { proposalToIntakeRecord } from "./proposal-to-intake-adapter.js";
 import { loadModelCostConfig } from "../providers/model-cost-registry.js";
 import { estimateCost } from "../providers/token-cost.js";
 import { NotFoundError, ValidationError } from "../errors.js";
+import type { DiscoveryStreamRegistry } from "./discovery-stream-registry.js";
 
 // ─── Public input/output types ────────────────────────────────────────────────
 
@@ -63,6 +64,8 @@ export interface DiscoveryOrchestratorOptions {
   intakeStore?: ProjectIntakeStore;
   getConfidenceThreshold?: () => Promise<number>;
   getOrgContext?: () => Promise<string>;
+  /** When set, every real agent call publishes stage-start/token/stage-end/error events here, keyed by session ID. Optional — omit for no live progress (e.g. tests using mock agents). */
+  streamRegistry?: DiscoveryStreamRegistry;
 }
 
 // ─── Orchestrator ─────────────────────────────────────────────────────────────
@@ -75,6 +78,7 @@ export class DiscoveryOrchestrator {
   private readonly intakeStore: ProjectIntakeStore | undefined;
   private readonly getConfidenceThreshold: () => Promise<number>;
   private readonly getOrgContext: () => Promise<string>;
+  private readonly streamRegistry: DiscoveryStreamRegistry | undefined;
 
   constructor(
     private readonly store: IDiscoverySessionStore,
@@ -93,6 +97,7 @@ export class DiscoveryOrchestrator {
     this.intakeStore = opts.intakeStore;
     this.getConfidenceThreshold = opts.getConfidenceThreshold ?? (() => Promise.resolve(0.65));
     this.getOrgContext = opts.getOrgContext ?? (() => Promise.resolve(""));
+    this.streamRegistry = opts.streamRegistry;
   }
 
   // ─── Start a new discovery session ───────────────────────────────────────
@@ -174,7 +179,7 @@ export class DiscoveryOrchestrator {
     ]);
     if (!session) throw new NotFoundError("DiscoverySession", sessionId);
 
-    const { opts: agentOpts, events: usageEvents } = this.trackUsage({
+    const { opts: agentOpts, events: usageEvents } = this.trackUsage(sessionId, {
       provider: this.provider,
       idFactory: this.idFactory,
       now,
@@ -251,7 +256,7 @@ export class DiscoveryOrchestrator {
 
     // Plan next clarification round if confidence still low
     const [orgContext] = await Promise.all([this.getOrgContext()]);
-    const { opts: agentOpts, events: usageEvents } = this.trackUsage({
+    const { opts: agentOpts, events: usageEvents } = this.trackUsage(reanalysed.id, {
       provider: this.provider,
       idFactory: this.idFactory,
       now,
@@ -337,7 +342,7 @@ export class DiscoveryOrchestrator {
     }
 
     const orgContext = await this.getOrgContext();
-    const { opts: agentOpts, events: usageEvents } = this.trackUsage({
+    const { opts: agentOpts, events: usageEvents } = this.trackUsage(sessionId, {
       provider: this.provider,
       idFactory: this.idFactory,
       now,
@@ -426,7 +431,7 @@ export class DiscoveryOrchestrator {
     }
 
     const orgContext = await this.getOrgContext();
-    const { opts: agentOpts, events: usageEvents } = this.trackUsage({
+    const { opts: agentOpts, events: usageEvents } = this.trackUsage(sessionId, {
       provider: this.provider,
       idFactory: this.idFactory,
       now,
@@ -464,7 +469,7 @@ export class DiscoveryOrchestrator {
       this.getConfidenceThreshold(),
     ]);
 
-    const { opts: agentOpts, events: usageEvents } = this.trackUsage({
+    const { opts: agentOpts, events: usageEvents } = this.trackUsage(session.id, {
       provider: this.provider,
       idFactory: this.idFactory,
       now,
@@ -623,12 +628,21 @@ export class DiscoveryOrchestrator {
 
   // ─── AI usage → cost reporting ────────────────────────────────────────────
 
-  /** Builds agent options wired to collect usage events emitted via onUsage. */
+  /** Builds agent options wired to collect usage events emitted via onUsage, and (when a stream registry is configured) forward stage-start/token/stage-end/error events for this session. */
   private trackUsage(
-    base: Omit<DiscoveryAgentOptions, "onUsage">,
+    sessionId: string,
+    base: Omit<DiscoveryAgentOptions, "onUsage" | "onStreamEvent">,
   ): { opts: DiscoveryAgentOptions; events: DiscoveryAgentUsageEvent[] } {
     const events: DiscoveryAgentUsageEvent[] = [];
-    return { opts: { ...base, onUsage: (u) => events.push(u) }, events };
+    const registry = this.streamRegistry;
+    return {
+      opts: {
+        ...base,
+        onUsage: (u) => events.push(u),
+        onStreamEvent: registry ? (e) => registry.publish(sessionId, e) : undefined,
+      },
+      events,
+    };
   }
 
   private buildUsageRecords(events: DiscoveryAgentUsageEvent[], now: string): DiscoveryAgentUsageRecord[] {
