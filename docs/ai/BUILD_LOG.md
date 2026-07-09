@@ -1933,3 +1933,45 @@ forwarding chunks into this registry, across all 6 Discovery agents), T4 (fronte
 app's `x-actor-*` auth headers), T5 (Caddy buffering config), T6 (heartbeat). The
 `generateSolutions`/`planClarifications` concurrency decision (serialize vs. multi-indicator
 UI) is still open and needed before T3.
+
+## 2026-07-10 — TASK-0049 (T2 of Q-UX-1): SSE controller + auth + first NestJS e2e test (branch: feat/discovery-live-streaming)
+
+**Status:** Complete (T2 of 6)
+
+Decided the concurrency open question first: keep `generateSolutions`/`planClarifications`
+concurrent (not serialized) — serializing would add real latency to every turn hitting that
+path in exchange for a marginally simpler frontend model, which works against the whole
+point of this feature. Frontend will track `activeStages: Set<string>` instead of one
+`currentStage` string.
+
+Added `GET /discovery/:id/stream` (`discovery.controller.ts`) using NestJS's `@Sse()`
+decorator, gated by the same `requireOwnedSession` check every other `:id` route uses,
+subscribing to T1's `DiscoveryStreamRegistry` (now registered as a module provider).
+
+This repo had zero NestJS controller-level HTTP tests before this — existing API tests run
+via `node --test` against compiled `dist/` classes, bypassing the HTTP/auth layer entirely.
+Installed `@nestjs/testing` + `supertest` (new devDependencies) and wrote
+`discovery-stream.e2e-spec.ts`: a minimal standalone testing module (not the full
+`AppModule`, to avoid pulling in `PrismaService`/real DB via `AdminModule`) using the *real*
+`AuthGuard` and `ApplicationExceptionFilter` — confirmed `AUTH_MODE=dev_headers` (this app's
+default) never touches `SessionService`, so a stub there is safe without faking the auth
+path itself. 3 tests: rejects a non-owned session (404), rejects a nonexistent session (same
+404 — can't distinguish), and a full round-trip proving a real HTTP client receives events
+published into the registry, correctly framed as named SSE events. The round-trip test uses
+a `waitForSubscriber()` poll against the registry's own `hasSubscribers()` signal rather than
+a fixed `setTimeout`, to avoid a timing-flaky test — verified stable across 5 repeated runs.
+Added `api:test:e2e` npm script so this pattern is reusable for future controllers, not a
+one-off.
+
+**Tests**: `npm run api:build` + `npx tsc --noEmit -p apps/api/tsconfig.json` clean;
+`node --test dist/apps/api/src/modules/discovery/discovery-stream.e2e-spec.js` — 3/3 passing
+(x5 runs, no flakiness); full suite `npm test` — 768/769 passing, same pre-existing unrelated
+failure as TASK-0048.
+
+**Task log**: `docs/ai/tasks/TASK-0049-discovery-sse-controller.md`
+
+**Follow-up**: T3 next — wire `stream: true` through `OpenAILlmClient.completeStructured`,
+forwarding chunks into the registry, across all 6 Discovery agents (all strict-schema JSON,
+no prose subset — see the design doc's outside-voice correction). T4 (frontend) can start in
+parallel per the design doc's worktree lanes. Nothing publishes real events into the registry
+yet — this task only proved the wire works end-to-end with test-published events.

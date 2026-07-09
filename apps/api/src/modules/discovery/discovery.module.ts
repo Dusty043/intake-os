@@ -4,6 +4,7 @@ import type { IDiscoverySessionStore } from "../../../../../src/application/disc
 import {
   DiscoveryOrchestrator,
   DiscoveryController,
+  DiscoveryStreamRegistry,
   MockIntentExtractionAgent,
   MockProblemFramingAgent,
   MockSolutionGenerationAgent,
@@ -99,6 +100,7 @@ function buildOrchestrator(
         settings: GlobalSettingsService,
       ) => buildOrchestrator(sessionStore, intakeStore, settings),
     },
+    DiscoveryStreamRegistry,
   ],
 })
 export class DiscoveryModule {}

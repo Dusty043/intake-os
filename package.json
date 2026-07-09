@@ -14,6 +14,7 @@
     "demo:mvp": "npm run build:core && node scripts/demo-iteration-2.mjs",
     "ai:index": "node scripts/update-ai-index.mjs",
     "api:build": "npm run api:prisma:generate && tsc -p apps/api/tsconfig.json",
+    "api:test:e2e": "npm run api:build && node --test dist/apps/api/src/**/*.e2e-spec.js",
     "api:dev": "nest start --watch --config apps/api/nest-cli.json",
     "api:start:dev": "nest start --watch --config apps/api/nest-cli.json",
     "api:start": "node dist/apps/api/src/main.js",
@@ -77,10 +78,13 @@
   },
   "devDependencies": {
     "@nestjs/cli": "^11.0.0",
+    "@nestjs/testing": "^11.1.28",
     "@types/cookie-parser": "^1.4.10",
     "@types/express": "^5.0.0",
     "@types/node": "^22.0.0",
+    "@types/supertest": "^7.2.0",
     "prisma": "^6.0.0",
+    "supertest": "^7.2.2",
     "typescript": "^5.8.0"
   },
   "overrides": {
