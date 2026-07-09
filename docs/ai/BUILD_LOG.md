@@ -1897,3 +1897,39 @@ narrows but doesn't fully close the race under READ COMMITTED — a
 inline). Audit-visibility tiers `"assigned"`/`"operational"` remain unenforced — no
 per-request assignee field exists to filter on (see Q-SEC-1). `ponytail-audit`'s findings
 were not addressed here (different task scope).
+
+## 2026-07-10 — TASK-0048 (T1 of Q-UX-1): DiscoveryStreamRegistry (branch: feat/discovery-live-streaming)
+
+**Status:** Complete (T1 of 6 — registry only, not yet wired to anything)
+
+Implementing Q-UX-1 (surface AI reasoning/progress during Discovery) per the eng-reviewed
+design doc. That review's outside-voice pass (Codex) found the original plan's premise was
+wrong — every Discovery LLM call is strict-schema JSON via a shared `completeStructured`
+helper, so there's no free-form-prose step to stream cheaply, and the synchronous
+`POST /message` pipeline had no way to connect to a separately-subscribed SSE stream. The
+corrected plan's missing piece is a session-scoped event bus; built that in isolation first,
+per the design doc's explicit Assignment, before touching the orchestrator or any agent.
+
+Added `DiscoveryStreamRegistry` (`src/application/discovery/discovery-stream-registry.ts`) —
+`subscribe`/`publish`/`hasSubscribers` over an in-memory `Map<sessionId, Set<listener>>`.
+`publish()` on a session with no subscriber is a no-op (keeps future orchestrator wiring
+simple — it can call `publish()` unconditionally). Multiple listeners per session are
+supported by construction, covering the two-tabs-open case the outside-voice review flagged
+as a correctness risk. 7 new unit tests cover no-op-when-unsubscribed, delivery, session
+isolation, multi-listener fanout, scoped unsubscribe, cleanup-on-last-listener-leave, and
+error-event delivery.
+
+**Tests**: `npm run build:core` clean; `node --test tests/discovery-stream-registry.test.mjs`
+— 7/7 passing; full suite `npm test` — 768/769 passing. The one failure
+(`tests/monday-config.test.mjs`) is pre-existing, unrelated work-in-progress from a different
+session (confirmed via `git stash` that it fails independent of this change).
+
+**Task log**: `docs/ai/tasks/TASK-0048-discovery-live-streaming.md`
+
+**Follow-up**: T2 (SSE controller + `requireOwnedSession` auth check + this repo's first
+`*.e2e-spec.ts`), T3 (wire `stream: true` through `OpenAILlmClient.completeStructured`,
+forwarding chunks into this registry, across all 6 Discovery agents), T4 (frontend
+`fetch`+`ReadableStream` consumer, not `EventSource` — native `EventSource` can't carry this
+app's `x-actor-*` auth headers), T5 (Caddy buffering config), T6 (heartbeat). The
+`generateSolutions`/`planClarifications` concurrency decision (serialize vs. multi-indicator
+UI) is still open and needed before T3.
