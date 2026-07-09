@@ -3,14 +3,13 @@ import type { UiActor } from "./types";
 import { actorHeaders, request } from "./http";
 
 export async function startDiscovery(
-  userId: string,
   message: string,
   actor: UiActor,
 ): Promise<DiscoverySession> {
   return request("/discovery", {
     method: "POST",
     headers: actorHeaders(actor),
-    body: JSON.stringify({ userId, message }),
+    body: JSON.stringify({ message }),
   });
 }
 
