@@ -228,11 +228,17 @@ export class DiscoveryOrchestrator {
       q.id === input.questionId ? { ...q, answered: true, answer: input.answer } : q,
     );
 
-    // Append answer as a user message so framing re-runs with new context
+    // Append answer as a user message so framing re-runs with new context.
+    // Uses an unambiguous "\nAnswer: " marker (not " — ") — question text
+    // isn't guaranteed to end in "?" right before the answer (some templates
+    // have a trailing explanatory sentence), so a punctuation-based split
+    // would be unreliable. stripEchoedQuestion() in discovery-agent-contract
+    // relies on this exact marker to isolate the answer for mock agents'
+    // keyword extraction.
     const answerMessage = {
       id: this.idFactory("msg"),
       role: "user" as const,
-      content: `${question.question} — ${input.answer}`,
+      content: `${question.question}\nAnswer: ${input.answer}`,
       createdAt: now,
     };
 

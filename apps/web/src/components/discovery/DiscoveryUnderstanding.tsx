@@ -3,10 +3,7 @@
 import type {
   DiscoveryConfidence,
   DiscoveryIntent,
-  DiscoveryManifest,
   DiscoveryProblemFrame,
-  DiscoveryProposal,
-  DiscoveryStatus,
   SolutionOption,
 } from "@/lib/discovery-types";
 
@@ -118,35 +115,23 @@ function SolutionCard({ solution, isSelected, onSelect, disabled }: SolutionCard
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 type Props = {
-  status: DiscoveryStatus;
   intent: DiscoveryIntent | null;
   problemFrame: DiscoveryProblemFrame | null;
   confidence: DiscoveryConfidence;
   solutionOptions: SolutionOption[];
   selectedSolutionId: string | null;
-  proposal: DiscoveryProposal | null;
-  manifest: DiscoveryManifest | null;
   busy: boolean;
   onSelectDirection: (solutionId: string) => Promise<void>;
-  onGenerateProposal: () => Promise<void>;
-  onGenerateManifest: () => Promise<void>;
-  onSendToEvaluation: () => Promise<void>;
 };
 
 export function DiscoveryUnderstanding({
-  status,
   intent,
   problemFrame,
   confidence,
   solutionOptions,
   selectedSolutionId,
-  proposal,
-  manifest,
   busy,
   onSelectDirection,
-  onGenerateProposal,
-  onGenerateManifest,
-  onSendToEvaluation,
 }: Props) {
   const CONFIDENCE_DIMS: Array<{ key: keyof DiscoveryConfidence; label: string }> = [
     { key: "problemUnderstanding", label: "Problem Understanding" },
@@ -265,169 +250,6 @@ export function DiscoveryUnderstanding({
               ))}
             </div>
           </section>
-        )}
-
-        {/* Proposal */}
-        {proposal && (
-          <section>
-            <p className="section-label">Proposal</p>
-            <div className="card p-3 space-y-2">
-              <p className="text-sm font-semibold text-gray-800">{proposal.title}</p>
-
-              {proposal.suggestedEpics.length > 0 && (
-                <div>
-                  <p className="text-xs font-semibold text-gray-500 mb-0.5">Suggested Epics</p>
-                  <ul className="text-xs text-gray-600 space-y-0.5">
-                    {proposal.suggestedEpics.map((e, i) => (
-                      <li key={i} className="flex gap-1.5">
-                        <span className="text-indigo-400 shrink-0">▸</span>
-                        {e}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              {proposal.unknowns.length > 0 && (
-                <div>
-                  <p className="text-xs font-semibold text-gray-500 mb-0.5">Open Unknowns</p>
-                  <ul className="text-xs text-gray-600 space-y-0.5">
-                    {proposal.unknowns.map((u, i) => (
-                      <li key={i} className="flex gap-1.5">
-                        <span className="text-amber-400 shrink-0">?</span>
-                        {u}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </div>
-          </section>
-        )}
-
-        {/* Manifest */}
-        {manifest && (
-          <section>
-            <p className="section-label">Manifest</p>
-            <div className="card p-3 space-y-3">
-              {/* Action badge */}
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Action</span>
-                <span className="text-xs font-medium bg-indigo-100 text-indigo-700 border border-indigo-200 px-1.5 py-0.5 rounded">
-                  {manifest.recommendedAction.replace(/_/g, " ")}
-                </span>
-              </div>
-
-              {/* Monday summary */}
-              {(manifest.monday.roadmapEpics.length > 0 || manifest.monday.projectsPortfolio) && (
-                <div>
-                  <p className="text-xs font-semibold text-gray-500 mb-1">Monday</p>
-                  {manifest.monday.projectsPortfolio && (
-                    <div className="space-y-0.5 mb-1">
-                      <p className="text-xs text-gray-700">
-                        <span className="font-medium">Project:</span>{" "}
-                        {manifest.monday.projectsPortfolio.name}
-                        <span className="text-gray-400 ml-1">
-                          ({manifest.monday.projectsPortfolio.projectType})
-                        </span>
-                      </p>
-                      <p className="text-xs text-gray-600">
-                        <span className="font-medium">Status:</span>{" "}
-                        {manifest.monday.projectsPortfolio.status}
-                      </p>
-                      {manifest.monday.projectsPortfolio.techStack.length > 0 && (
-                        <p className="text-xs text-gray-600">
-                          <span className="font-medium">Stack:</span>{" "}
-                          {manifest.monday.projectsPortfolio.techStack.join(", ")}
-                        </p>
-                      )}
-                      {manifest.monday.projectsPortfolio.startDate && (
-                        <p className="text-xs text-gray-600">
-                          <span className="font-medium">Start:</span>{" "}
-                          {manifest.monday.projectsPortfolio.startDate}
-                        </p>
-                      )}
-                      {manifest.monday.projectsPortfolio.targetLaunch && (
-                        <p className="text-xs text-gray-600">
-                          <span className="font-medium">Target launch:</span>{" "}
-                          {manifest.monday.projectsPortfolio.targetLaunch}
-                        </p>
-                      )}
-                    </div>
-                  )}
-                  {manifest.monday.roadmapEpics.length > 0 && (
-                    <div className="space-y-0.5">
-                      {manifest.monday.roadmapEpics.map((epic, i) => (
-                        <div key={i} className="flex items-center justify-between text-xs text-gray-600">
-                          <span className="flex gap-1.5">
-                            <span className="text-indigo-400 shrink-0">▸</span>
-                            <span className="truncate">{epic.title}</span>
-                          </span>
-                          {epic.estimatedSP && (
-                            <span className="shrink-0 ml-1 text-gray-400">{epic.estimatedSP} SP</span>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  {manifest.monday.sprintTasks.length > 0 && (
-                    <p className="text-xs text-gray-500 mt-1">
-                      + {manifest.monday.sprintTasks.length} task{manifest.monday.sprintTasks.length !== 1 ? "s" : ""} → Backlog
-                    </p>
-                  )}
-                </div>
-              )}
-
-              {/* GitHub summary */}
-              {manifest.github.createRepo && (
-                <div>
-                  <p className="text-xs font-semibold text-gray-500 mb-1">GitHub</p>
-                  <p className="text-xs text-gray-700">
-                    <span className="font-medium">Repo:</span>{" "}
-                    <span className="font-mono">{manifest.github.repoName}</span>
-                  </p>
-                  {manifest.github.readme && (
-                    <p className="text-xs text-gray-500 mt-0.5">README · {manifest.github.labels.length} labels · {manifest.github.initialIssues.length} issues</p>
-                  )}
-                </div>
-              )}
-
-              {!manifest.readyForLiveAdapter && (
-                <p className="text-xs text-amber-600">
-                  Mock manifest — live adapter not yet connected
-                </p>
-              )}
-            </div>
-
-            <button
-              onClick={onSendToEvaluation}
-              disabled={busy || status === "sent_to_evaluation"}
-              className="btn-primary w-full mt-2 justify-center"
-            >
-              {status === "sent_to_evaluation" ? "Sent to Evaluation" : "Send to Evaluation"}
-            </button>
-          </section>
-        )}
-
-        {/* Action buttons for progression */}
-        {selectedSolutionId && !proposal && status !== "proposal_generated" && (
-          <button
-            onClick={onGenerateProposal}
-            disabled={busy}
-            className="btn-secondary w-full justify-center text-sm"
-          >
-            {busy ? "Generating proposal…" : "Generate Proposal"}
-          </button>
-        )}
-
-        {proposal && !manifest && status !== "sent_to_evaluation" && (
-          <button
-            onClick={onGenerateManifest}
-            disabled={busy}
-            className="btn-secondary w-full justify-center text-sm"
-          >
-            {busy ? "Generating manifest…" : "Generate Manifest"}
-          </button>
         )}
 
         {/* Empty state */}

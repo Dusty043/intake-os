@@ -46,6 +46,23 @@ export interface DiscoveryAgentOptions {
   onStreamEvent?: (event: DiscoveryStreamEvent) => void;
 }
 
+/**
+ * answerClarification stores follow-up messages as "<question>\nAnswer:
+ * <answer>" (role "user") so agents get next-turn context. Mock agents do
+ * naive keyword extraction over user message text — without stripping the
+ * echoed question, a question that mentions a term to ask about it (e.g.
+ * "internal staff, external customers, or both?") false-positive-matches
+ * even when the answer rules that term out. Real (LLM-based) agents don't
+ * need this: they read the full "Q\nAnswer: A" and correctly attribute
+ * meaning to the answer.
+ */
+export function stripEchoedQuestion(content: string): string {
+  const marker = "\nAnswer: ";
+  const idx = content.indexOf(marker);
+  if (idx === -1) return content;
+  return content.slice(idx + marker.length);
+}
+
 /** Runs a structured LLM call, reports its usage via opts.onUsage, and brackets it with stage-start/token/stage-end/error events via opts.onStreamEvent. Shared by all real discovery agents. */
 export async function completeWithUsage<T>(
   client: LlmClient,

@@ -2137,3 +2137,77 @@ transition is ever added without a matching auto-chain, sessions can get stuck t
 with no recovery path. Also flagged separately: `deploy-oreochi` skill should special-case
 intake-os's `deploy-server.sh` instead of defaulting to plain `docker compose up -d`
 (spawned as a background task, `task_fc87b8b7`).
+
+## 2026-07-10 — Discovery UI: automatic proposal/manifest + collapsed clarifications (TASK-0054)
+
+Two UX complaints after live use of the deployed Discovery flow: (1) proposal/manifest
+generation required manual "Generate Proposal"/"Generate Manifest" buttons in the right
+sidebar; (2) clarification question cards dominated too much of the chat panel.
+
+Fixed both. `discovery/[id]/page.tsx`'s `handleSelectDirection` now auto-chains into
+`generateManifest()` (which already auto-composes the proposal internally if missing — one
+API call gets both artifacts, no backend change needed) the moment a solution is selected —
+removed the two manual handlers entirely. Moved the Proposal/Manifest rendering (plus the
+"Send to Evaluation" button) from `DiscoveryUnderstanding.tsx`'s right sidebar into new
+`ProposalCard`/`ManifestCard` components inline in `DiscoveryChat.tsx`'s center message flow.
+Replaced the always-expanded clarification block with a `ClarificationDrawer` — a single
+collapsed-by-default summary row ("N questions to clarify ▼", red dot if any question is
+blocking) that expands to the existing card list on click.
+
+Used the `impeccable` skill (register: `product`) for this — read PRODUCT.md's design
+principles (density with clarity, no modal-as-first-thought, progressive disclosure) before
+implementing.
+
+**Tests**: `npx tsc --noEmit` + `npx vitest run` (14/14) + `npm run web:build` all clean.
+Live-verified end-to-end in a mock-provider browser preview: drove a full session through
+clarification (drawer collapse/expand + answer flow unchanged) → solutions → direction
+selection → confirmed Proposal + Manifest cards auto-appeared inline with zero manual clicks
+→ "Send to Evaluation" correctly created and navigated to a real intake. No console errors.
+
+**Task log**: `docs/ai/tasks/TASK-0054-discovery-auto-artifacts-and-clarification-drawer.md`
+
+**Follow-up**: None new.
+
+## 2026-07-10 — Discovery → Intake handoff fixes: "didn't transfer well" (TASK-0055)
+
+User reported the Discovery → Intake handoff didn't transfer well. Fetched the actual created
+intake record rather than guessing, and found three real, confirmed mock-agent-only bugs
+(verified the real OpenAI-backed agents don't share them) plus one structural, real gap:
+
+1. Proposal title truncated mid-word (`mock-proposal-composer-agent.ts` used `.slice(0, 60)`
+   with no word boundary — "...and not" instead of "...and notify ops 30 days before expiry").
+2. "Suggested Epics" were the selected solution's *dependencies* relabeled `Epic: X` (e.g.
+   "Epic: Engineering team") — not real epics.
+3. Stakeholder extraction false-positive: `answerClarification` echoes `"<question> —
+   <answer>"` into a new user message for agent context; when a question's own phrasing
+   mentions a term (e.g. "...internal staff, external customers, or both?"), the mock's naive
+   keyword scanner matched "customers" even when the answer explicitly ruled it out.
+4. Structural: `priorClarifications` (the full Discovery Q&A) was only ever rendered inside
+   `ClarificationPanel`, gated to `status === "clarification_required"` — a different,
+   later intake-level mechanism. Most Discovery-originated intakes land straight in
+   `intake_review` and never hit that status, so the context was on the record but invisible
+   to reviewers.
+
+Read `docs/product/ai-orchestration.md` first — confirmed a separate downstream Work
+Breakdown Agent is the designated authoritative source of epics during Evaluation, so
+deliberately did NOT copy `proposal.suggestedEpics`/manifest data into the intake record;
+that would duplicate/conflict with that agent's job. Scoped the fix to: (a) the 3 mock-only
+bugs, and (b) making the already-preserved `priorClarifications` visible via a new "From
+Discovery" card on the Overview tab, independent of status.
+
+Root-cause note: my first fix attempt for #3 used a punctuation heuristic (question ends in
+"?") plus `lastIndexOf` — both turned out wrong against the real repro (some question
+templates have a trailing explanatory sentence after the "?", and the answer text itself can
+contain the same " — " delimiter). Caught by testing against the actual repro case end-to-end
+in a browser, not just re-reading the diff — switched to an unambiguous "\nAnswer: " marker
+in the echoed message format instead of parsing punctuation.
+
+**Tests**: `npx tsc --noEmit` (core + apps/web) clean. `npm test` — 772/774, same 2
+pre-existing unrelated failures as before. Live-verified end-to-end in a mock-provider
+browser preview: repro'd all three original bugs first, then confirmed each fix (affectedUsers
+correctly excludes "customers"; title word-boundary truncated; epics list fixed) plus the
+"From Discovery" card rendering on an `intake_review`-status intake.
+
+**Task log**: `docs/ai/tasks/TASK-0055-discovery-to-intake-transfer-fixes.md`
+
+**Follow-up**: None new.

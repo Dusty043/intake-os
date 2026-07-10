@@ -238,6 +238,29 @@ function OverviewTab({
           )}
         </InfoCard>
       </div>
+
+      {/* ── Discovery context ────────────────────────────────────────────
+          Only ClarificationPanel (gated to clarification_required) rendered
+          priorClarifications before this — for the normal happy path (most
+          Discovery-originated intakes land straight in intake_review), the
+          questions the requester already answered during Discovery were
+          invisible to reviewers despite being on the record. Always visible
+          when present, independent of status. */}
+      {intake.priorClarifications && intake.priorClarifications.length > 0 && (
+        <InfoCard title="From Discovery">
+          <p className="text-xs text-gray-500 mb-3">
+            Answered during the Discovery conversation, before this intake was created.
+          </p>
+          <div className="space-y-3">
+            {intake.priorClarifications.map((c, i) => (
+              <div key={i} className="text-sm">
+                <p className="text-gray-500">{c.question}</p>
+                <p className="text-brand-text mt-0.5">{c.answer}</p>
+              </div>
+            ))}
+          </div>
+        </InfoCard>
+      )}
     </div>
   );
 }

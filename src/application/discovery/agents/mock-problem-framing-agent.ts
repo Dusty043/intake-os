@@ -4,6 +4,7 @@ import type {
   DiscoveryAgentOptions,
   IProblemFramingAgent,
 } from "./discovery-agent-contract.js";
+import { stripEchoedQuestion } from "./discovery-agent-contract.js";
 
 // ─── Dimension scoring helpers ────────────────────────────────────────────────
 
@@ -120,7 +121,7 @@ export class MockProblemFramingAgent implements IProblemFramingAgent {
     const userMessages = ctx.messages.filter((m) => m.role === "user");
     const substantiveMessages = userMessages.filter((m) => m.content.trim().length > 15);
     const rawText = (substantiveMessages.length > 0 ? substantiveMessages : userMessages)
-      .map((m) => m.content)
+      .map((m) => stripEchoedQuestion(m.content))
       .join(" ");
 
     const text = rawText.toLowerCase();
