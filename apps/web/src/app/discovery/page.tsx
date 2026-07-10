@@ -6,7 +6,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useActor } from "@/components/ActorProvider";
 import { ErrorBanner } from "@/components/ErrorBanner";
 import { DiscoveryStartModal } from "@/components/discovery/DiscoveryStartModal";
-import { listDiscoverySessions, startDiscovery } from "@/lib/discovery-client";
+import { generateSolutions, listDiscoverySessions, startDiscovery } from "@/lib/discovery-client";
 import type { DiscoverySession } from "@/lib/discovery-types";
 import { useAuth } from "@/components/AuthProvider";
 import { getDiscoveryStatusInfo } from "@/lib/status";
@@ -75,7 +75,13 @@ export default function DiscoveryListPage() {
   useEffect(() => { void load(); }, [load]);
 
   const handleStart = async (message: string) => {
-    const session = await startDiscovery(message, actor);
+    let session = await startDiscovery(message, actor);
+    // Mirrors the same auto-chain in [id]/page.tsx's handleSendMessage — the
+    // first message also lands in problem_framed with no solutions yet, and
+    // nothing else triggers generateSolutions for a brand-new session.
+    if (session.status === "problem_framed" && session.solutionOptions.length === 0) {
+      session = await generateSolutions(session.id, actor);
+    }
     router.push(`/discovery/${session.id}`);
   };
 
