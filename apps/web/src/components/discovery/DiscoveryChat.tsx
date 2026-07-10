@@ -1,7 +1,14 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { ClarificationQuestion, DiscoveryConfidence, DiscoveryMessage } from "@/lib/discovery-types";
+import type {
+  ClarificationQuestion,
+  DiscoveryConfidence,
+  DiscoveryManifest,
+  DiscoveryMessage,
+  DiscoveryProposal,
+  DiscoveryStatus,
+} from "@/lib/discovery-types";
 
 function overallConfidence(c: DiscoveryConfidence): number {
   const vals = Object.values(c) as number[];
@@ -127,26 +134,235 @@ function ClarificationCard({ question, onAnswer, disabled }: ClarificationCardPr
   );
 }
 
+// ─── Clarification drawer (collapsed by default — see DiscoveryChat) ─────────
+
+type ClarificationDrawerProps = {
+  pendingQuestions: ClarificationQuestion[];
+  answeredQuestions: ClarificationQuestion[];
+  canProceed: boolean;
+  busy: boolean;
+  sending: boolean;
+  onAnswerClarification: (questionId: string, answer: string) => Promise<void>;
+  onSkipClarifications: () => Promise<void>;
+};
+
+function ClarificationDrawer({
+  pendingQuestions,
+  answeredQuestions,
+  canProceed,
+  busy,
+  sending,
+  onAnswerClarification,
+  onSkipClarifications,
+}: ClarificationDrawerProps) {
+  const [expanded, setExpanded] = useState(false);
+  const hasBlocking = pendingQuestions.some((q) => q.impact === "blocking");
+
+  return (
+    <div className="border-t border-gray-100 bg-gray-50 shrink-0">
+      <div className="px-4 py-2.5 flex items-center justify-between gap-3">
+        <button
+          onClick={() => setExpanded(!expanded)}
+          className="flex items-center gap-2 text-sm text-gray-700 hover:text-gray-900 transition-colors"
+        >
+          <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${hasBlocking ? "bg-red-500" : "bg-amber-500"}`} />
+          {pendingQuestions.length > 0
+            ? `${pendingQuestions.length} question${pendingQuestions.length !== 1 ? "s" : ""} to clarify`
+            : "All clarifications answered"}
+          <span className="text-gray-400 text-xs">{expanded ? "▲" : "▼"}</span>
+        </button>
+
+        {canProceed && (
+          <button
+            onClick={onSkipClarifications}
+            disabled={busy || sending}
+            className="shrink-0 text-xs font-medium text-indigo-600 hover:text-indigo-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          >
+            Proceed with assumptions →
+          </button>
+        )}
+      </div>
+
+      {expanded && (
+        <div className="px-4 pb-3 space-y-2 max-h-56 overflow-y-auto">
+          {pendingQuestions.map((q) => (
+            <ClarificationCard
+              key={q.id}
+              question={q}
+              onAnswer={onAnswerClarification}
+              disabled={busy || sending}
+            />
+          ))}
+          {answeredQuestions.map((q) => (
+            <ClarificationCard
+              key={q.id}
+              question={q}
+              onAnswer={onAnswerClarification}
+              disabled={true}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Proposal / manifest cards (auto-generated, shown inline in the conversation) ──
+
+function ProposalCard({ proposal }: { proposal: DiscoveryProposal }) {
+  return (
+    <div className="flex justify-start">
+      <div className="w-full max-w-[92%] border border-gray-200 rounded-2xl rounded-tl-sm bg-white p-4 space-y-2.5">
+        <p className="text-xs font-semibold text-indigo-600 uppercase tracking-wide">Proposal</p>
+        <p className="text-sm font-semibold text-gray-900">{proposal.title}</p>
+
+        {proposal.suggestedEpics.length > 0 && (
+          <div>
+            <p className="text-xs font-semibold text-gray-500 mb-1">Suggested Epics</p>
+            <ul className="text-sm text-gray-700 space-y-1">
+              {proposal.suggestedEpics.map((e, i) => (
+                <li key={i} className="flex gap-1.5">
+                  <span className="text-indigo-400 shrink-0">▸</span>
+                  {e}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {proposal.unknowns.length > 0 && (
+          <div>
+            <p className="text-xs font-semibold text-gray-500 mb-1">Open Unknowns</p>
+            <ul className="text-sm text-gray-600 space-y-1">
+              {proposal.unknowns.map((u, i) => (
+                <li key={i} className="flex gap-1.5">
+                  <span className="text-amber-400 shrink-0">?</span>
+                  {u}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+type ManifestCardProps = {
+  manifest: DiscoveryManifest;
+  discoveryStatus: DiscoveryStatus;
+  busy: boolean;
+  onSendToEvaluation: () => Promise<void>;
+};
+
+function ManifestCard({ manifest, discoveryStatus, busy, onSendToEvaluation }: ManifestCardProps) {
+  return (
+    <div className="flex justify-start">
+      <div className="w-full max-w-[92%] border border-gray-200 rounded-2xl rounded-tl-sm bg-white p-4 space-y-3">
+        <div className="flex items-center justify-between">
+          <p className="text-xs font-semibold text-indigo-600 uppercase tracking-wide">Manifest</p>
+          <span className="text-xs font-medium bg-indigo-100 text-indigo-700 border border-indigo-200 px-1.5 py-0.5 rounded">
+            {manifest.recommendedAction.replace(/_/g, " ")}
+          </span>
+        </div>
+
+        {(manifest.monday.roadmapEpics.length > 0 || manifest.monday.projectsPortfolio) && (
+          <div>
+            <p className="text-xs font-semibold text-gray-500 mb-1">Monday</p>
+            {manifest.monday.projectsPortfolio && (
+              <div className="space-y-0.5 mb-1 text-sm">
+                <p className="text-gray-700">
+                  <span className="font-medium">Project:</span> {manifest.monday.projectsPortfolio.name}
+                  <span className="text-gray-400 ml-1">
+                    ({manifest.monday.projectsPortfolio.projectType})
+                  </span>
+                </p>
+                <p className="text-gray-600">
+                  <span className="font-medium">Status:</span> {manifest.monday.projectsPortfolio.status}
+                </p>
+              </div>
+            )}
+            {manifest.monday.roadmapEpics.length > 0 && (
+              <div className="space-y-0.5">
+                {manifest.monday.roadmapEpics.map((epic, i) => (
+                  <div key={i} className="flex items-center justify-between text-sm text-gray-600">
+                    <span className="flex gap-1.5 min-w-0">
+                      <span className="text-indigo-400 shrink-0">▸</span>
+                      <span className="truncate">{epic.title}</span>
+                    </span>
+                    {epic.estimatedSP && (
+                      <span className="shrink-0 ml-1 text-gray-400 text-xs">{epic.estimatedSP} SP</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+            {manifest.monday.sprintTasks.length > 0 && (
+              <p className="text-xs text-gray-500 mt-1">
+                + {manifest.monday.sprintTasks.length} task{manifest.monday.sprintTasks.length !== 1 ? "s" : ""} → Backlog
+              </p>
+            )}
+          </div>
+        )}
+
+        {manifest.github.createRepo && (
+          <div>
+            <p className="text-xs font-semibold text-gray-500 mb-1">GitHub</p>
+            <p className="text-sm text-gray-700">
+              <span className="font-medium">Repo:</span> <span className="font-mono">{manifest.github.repoName}</span>
+            </p>
+            {manifest.github.readme && (
+              <p className="text-xs text-gray-500 mt-0.5">
+                README · {manifest.github.labels.length} labels · {manifest.github.initialIssues.length} issues
+              </p>
+            )}
+          </div>
+        )}
+
+        {!manifest.readyForLiveAdapter && (
+          <p className="text-xs text-amber-600">Mock manifest — live adapter not yet connected</p>
+        )}
+
+        <button
+          onClick={onSendToEvaluation}
+          disabled={busy || discoveryStatus === "sent_to_evaluation"}
+          className="btn-primary w-full justify-center mt-1"
+        >
+          {discoveryStatus === "sent_to_evaluation" ? "Sent to Evaluation" : "Send to Evaluation"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 type Props = {
   messages: DiscoveryMessage[];
   clarificationQuestions: ClarificationQuestion[];
   confidence: DiscoveryConfidence;
+  proposal: DiscoveryProposal | null;
+  manifest: DiscoveryManifest | null;
+  discoveryStatus: DiscoveryStatus;
   busy: boolean;
   activeStages: Set<string>;
   onSendMessage: (text: string) => Promise<void>;
   onAnswerClarification: (questionId: string, answer: string) => Promise<void>;
   onSkipClarifications: () => Promise<void>;
+  onSendToEvaluation: () => Promise<void>;
 };
 
 export function DiscoveryChat({
   messages,
   clarificationQuestions,
   confidence,
+  proposal,
+  manifest,
+  discoveryStatus,
   busy,
   activeStages,
   onSendMessage,
   onAnswerClarification,
   onSkipClarifications,
+  onSendToEvaluation,
 }: Props) {
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
@@ -225,6 +441,16 @@ export function DiscoveryChat({
           </div>
         ))}
 
+        {proposal && <ProposalCard proposal={proposal} />}
+        {manifest && (
+          <ManifestCard
+            manifest={manifest}
+            discoveryStatus={discoveryStatus}
+            busy={busy}
+            onSendToEvaluation={onSendToEvaluation}
+          />
+        )}
+
         {/* Typing indicator */}
         {(sending || busy) && (
           <div className="flex justify-start">
@@ -241,40 +467,17 @@ export function DiscoveryChat({
         <div ref={bottomRef} />
       </div>
 
-      {/* Clarification questions */}
+      {/* Clarification questions — collapsed by default, doesn't dominate the chat */}
       {clarificationQuestions.length > 0 && (
-        <div className="border-t border-gray-100 bg-gray-50 shrink-0">
-          <div className="px-4 pt-3 pb-2 flex items-center justify-between gap-3">
-            <p className="section-label mb-0">Clarification Questions</p>
-            {canProceed && (
-              <button
-                onClick={onSkipClarifications}
-                disabled={busy || sending}
-                className="shrink-0 text-xs font-medium text-indigo-600 hover:text-indigo-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-              >
-                Proceed with assumptions →
-              </button>
-            )}
-          </div>
-          <div className="px-4 pb-3 space-y-2 max-h-56 overflow-y-auto">
-            {pendingQuestions.map((q) => (
-              <ClarificationCard
-                key={q.id}
-                question={q}
-                onAnswer={onAnswerClarification}
-                disabled={busy || sending}
-              />
-            ))}
-            {answeredQuestions.map((q) => (
-              <ClarificationCard
-                key={q.id}
-                question={q}
-                onAnswer={onAnswerClarification}
-                disabled={true}
-              />
-            ))}
-          </div>
-        </div>
+        <ClarificationDrawer
+          pendingQuestions={pendingQuestions}
+          answeredQuestions={answeredQuestions}
+          canProceed={canProceed}
+          busy={busy}
+          sending={sending}
+          onAnswerClarification={onAnswerClarification}
+          onSkipClarifications={onSkipClarifications}
+        />
       )}
 
       {/* Input */}

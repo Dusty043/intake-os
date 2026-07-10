@@ -2137,3 +2137,33 @@ transition is ever added without a matching auto-chain, sessions can get stuck t
 with no recovery path. Also flagged separately: `deploy-oreochi` skill should special-case
 intake-os's `deploy-server.sh` instead of defaulting to plain `docker compose up -d`
 (spawned as a background task, `task_fc87b8b7`).
+
+## 2026-07-10 — Discovery UI: automatic proposal/manifest + collapsed clarifications (TASK-0054)
+
+Two UX complaints after live use of the deployed Discovery flow: (1) proposal/manifest
+generation required manual "Generate Proposal"/"Generate Manifest" buttons in the right
+sidebar; (2) clarification question cards dominated too much of the chat panel.
+
+Fixed both. `discovery/[id]/page.tsx`'s `handleSelectDirection` now auto-chains into
+`generateManifest()` (which already auto-composes the proposal internally if missing — one
+API call gets both artifacts, no backend change needed) the moment a solution is selected —
+removed the two manual handlers entirely. Moved the Proposal/Manifest rendering (plus the
+"Send to Evaluation" button) from `DiscoveryUnderstanding.tsx`'s right sidebar into new
+`ProposalCard`/`ManifestCard` components inline in `DiscoveryChat.tsx`'s center message flow.
+Replaced the always-expanded clarification block with a `ClarificationDrawer` — a single
+collapsed-by-default summary row ("N questions to clarify ▼", red dot if any question is
+blocking) that expands to the existing card list on click.
+
+Used the `impeccable` skill (register: `product`) for this — read PRODUCT.md's design
+principles (density with clarity, no modal-as-first-thought, progressive disclosure) before
+implementing.
+
+**Tests**: `npx tsc --noEmit` + `npx vitest run` (14/14) + `npm run web:build` all clean.
+Live-verified end-to-end in a mock-provider browser preview: drove a full session through
+clarification (drawer collapse/expand + answer flow unchanged) → solutions → direction
+selection → confirmed Proposal + Manifest cards auto-appeared inline with zero manual clicks
+→ "Send to Evaluation" correctly created and navigated to a real intake. No console errors.
+
+**Task log**: `docs/ai/tasks/TASK-0054-discovery-auto-artifacts-and-clarification-drawer.md`
+
+**Follow-up**: None new.

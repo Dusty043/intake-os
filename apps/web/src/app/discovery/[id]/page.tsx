@@ -12,7 +12,6 @@ import { DiscoveryUnderstanding } from "@/components/discovery/DiscoveryUndersta
 import {
   answerClarification,
   generateManifest,
-  generateProposal,
   generateSolutions,
   getDiscoverySession,
   selectDirection,
@@ -166,15 +165,17 @@ export default function DiscoverySessionPage() {
   };
 
   const handleSelectDirection = async (solutionId: string) => {
-    await withBusy(() => selectDirection(id, solutionId, actor));
-  };
-
-  const handleGenerateProposal = async () => {
-    await withBusy(() => generateProposal(id, actor));
-  };
-
-  const handleGenerateManifest = async () => {
-    await withBusy(() => generateManifest(id, actor));
+    await withBusy(async () => {
+      const updated = await selectDirection(id, solutionId, actor);
+      // Proposal + manifest generation are automatic once a direction is
+      // picked — generateManifest composes the proposal itself if missing,
+      // so one call gets both. No manual "Generate Proposal"/"Generate
+      // Manifest" step for the user.
+      if (updated.status === "direction_selected" && !updated.manifest) {
+        return generateManifest(id, actor);
+      }
+      return updated;
+    });
   };
 
   const handleSendToEvaluation = async () => {
@@ -298,28 +299,26 @@ export default function DiscoverySessionPage() {
               messages={session.messages}
               clarificationQuestions={session.clarificationQuestions}
               confidence={session.confidence}
+              proposal={session.proposal}
+              manifest={session.manifest}
+              discoveryStatus={session.status}
               busy={busy}
               activeStages={activeStages}
               onSendMessage={handleSendMessage}
               onAnswerClarification={handleAnswerClarification}
               onSkipClarifications={handleSkipClarifications}
+              onSendToEvaluation={handleSendToEvaluation}
             />
           }
           right={
             <DiscoveryUnderstanding
-              status={session.status}
               intent={session.intent}
               problemFrame={session.problemFrame}
               confidence={session.confidence}
               solutionOptions={session.solutionOptions}
               selectedSolutionId={session.selectedSolutionId}
-              proposal={session.proposal}
-              manifest={session.manifest}
               busy={busy}
               onSelectDirection={handleSelectDirection}
-              onGenerateProposal={handleGenerateProposal}
-              onGenerateManifest={handleGenerateManifest}
-              onSendToEvaluation={handleSendToEvaluation}
             />
           }
         />
