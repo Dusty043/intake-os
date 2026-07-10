@@ -74,6 +74,7 @@ Generated at: 2026-06-09T14:53:20.716Z
 - `docs/ai/tasks/TASK-0053-discovery-initial-message-solutions-gap.md` — fix: first Discovery message never auto-chained to generateSolutions, stranding new sessions at problem_framed
 - `docs/ai/tasks/TASK-0054-discovery-auto-artifacts-and-clarification-drawer.md` — UI: automatic proposal/manifest generation moved to center chat panel, clarification questions collapsed by default
 - `docs/ai/tasks/TASK-0055-discovery-to-intake-transfer-fixes.md` — fix: mock proposal title truncation, fake epics-from-dependencies, false-positive stakeholder extraction; added always-visible "From Discovery" context on the intake Overview tab
+- `docs/ai/tasks/TASK-0056-model-tiering-gpt-5-6-sol-terra.md` — models updated to gpt-5.6-sol (higher)/gpt-5.6-terra (lesser), wired real per-agent tiering (previously specified in ai-cost-governance.md but never implemented — every agent shared one model)
 - `docs/ai/tasks/HANDOFF-0023D-monday-credentials.md`
 
 ## Deployment Docs

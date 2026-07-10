@@ -2211,3 +2211,47 @@ correctly excludes "customers"; title word-boundary truncated; epics list fixed)
 **Task log**: `docs/ai/tasks/TASK-0055-discovery-to-intake-transfer-fixes.md`
 
 **Follow-up**: None new.
+
+## 2026-07-11 — Model update: gpt-5.6-sol (higher) / gpt-5.6-terra (lesser) (TASK-0056)
+
+User asked to switch models: gpt-5.6-sol for higher-tier tasks, gpt-5.6-terra for lesser.
+Read `ai-cost-governance.md` first — found the two-tier principle and a full
+"Recommended Model Tier by Agent" table already specified there, but never actually wired
+up: `resolveModel(config)` was the only resolver in the codebase, so every Evaluation agent
+and every real Discovery agent received the exact same model string regardless of the
+table. `OPENAI_TASKS_MODEL` existed but acted as a full override of `model` itself when
+set — a latent bug, since the single-call intake analysis pipeline reads `config.openai.model`
+directly and, per TASK-0036, deliberately needs the higher tier; setting `OPENAI_TASKS_MODEL`
+for "lighter tasks" would have silently downgraded it too.
+
+Fixed both: added a `tasksModel` field that resolves independently from its own env var
+(`OPENAI_TASKS_MODEL ?? "gpt-5.6-terra"`, no longer overriding `model`), added
+`resolveTasksModel()` alongside `resolveModel()` (now defaulting to `"gpt-5.6-sol"`), and
+wired real per-agent routing: Solutions Architect/Custom Build/Risk-Security/Cost-Effort/
+Work-Breakdown/Final-Synthesis/Critic-QA (Evaluation) + Solution-Generation/Proposal-
+Composition (Discovery) → higher tier; Intake-Analyst/Clarification/Project-Classifier/
+Low-Code-Path/Distribution-Planner (Evaluation) + Intent-Extraction/Problem-Framing/
+Clarification (Discovery) → lower tier. `createAllEvaluationAgents()` gained a second
+parameter; its one call site updated.
+
+Deliberately did not add `model-cost-registry.ts` entries for either new model — no real
+per-1M-token pricing is known for them, and fabricating numbers for a cost-tracking feature
+would be actively misleading. Falls back to null cost (existing behavior for any
+unregistered model) until real pricing is added. Logged as Q-COST-3 in OPEN_QUESTIONS.md.
+Also did not touch the live server's `.env.server` — that needs separate explicit
+authorization to read/edit, asked the user rather than doing it unprompted.
+
+**Tests**: `npx tsc --noEmit` (core + apps/api + apps/web) clean. `npm test` — 772/774, same
+2 pre-existing unrelated failures. Updated 3 tests in `analysis-provider-config.test.mjs`
+that asserted the old default and the old override-bleed behavior; all pass against the new
+behavior now.
+
+**Requirements trace**: G-002/G-003 (`ai-cost-governance.md`'s model tiering) moved from
+`specified` to `implemented` — this is the first time per-agent tiering actually existed in
+code. G-007 moved to `in_progress` (routing done; section-regeneration cost-awareness still
+isn't).
+
+**Task log**: `docs/ai/tasks/TASK-0056-model-tiering-gpt-5-6-sol-terra.md`
+
+**Follow-up**: Q-COST-3 (real pricing for the two new models) — open. Live server
+`.env.server` not yet updated — pending explicit go-ahead.

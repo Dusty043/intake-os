@@ -31,7 +31,17 @@ export function createLlmClient(config: AnalysisProviderConfig): LlmClient {
   }
 }
 
-/** Extract the configured model name from any provider config. */
+/** Extract the configured higher-capability-tier model name from any provider config. */
 export function resolveModel(config: AnalysisProviderConfig): string {
-  return config.openai?.model ?? config.anthropic?.model ?? config.bedrock?.modelId ?? "gpt-5.5";
+  return config.openai?.model ?? config.anthropic?.model ?? config.bedrock?.modelId ?? "gpt-5.6-sol";
+}
+
+/**
+ * Extract the configured lower-cost-tier model name — used for
+ * classification, extraction, and clarification agents (see
+ * ai-cost-governance.md's model tiering table). Only OpenAI has a distinct
+ * tasks tier today; other providers fall back to the single model.
+ */
+export function resolveTasksModel(config: AnalysisProviderConfig): string {
+  return config.openai?.tasksModel ?? resolveModel(config);
 }

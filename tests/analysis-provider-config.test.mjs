@@ -34,7 +34,8 @@ test("returns openai config when key is provided", () => {
   const config = loadAnalysisProviderConfig({ AI_PROVIDER: "openai", OPENAI_API_KEY: "sk-test" });
   assert.equal(config.provider, "openai");
   assert.equal(config.openai?.apiKey, "sk-test");
-  assert.equal(config.openai?.model, "gpt-5.5");
+  assert.equal(config.openai?.model, "gpt-5.6-sol");
+  assert.equal(config.openai?.tasksModel, "gpt-5.6-terra");
 });
 
 test("treats blank AI_PROVIDER the same as unset (defaults to mock)", () => {
@@ -49,7 +50,8 @@ test("treats blank OPENAI_MODEL/OPENAI_TASKS_MODEL as unset and falls back to de
     OPENAI_MODEL: "  ",
     OPENAI_TASKS_MODEL: "",
   });
-  assert.equal(config.openai?.model, "gpt-5.5");
+  assert.equal(config.openai?.model, "gpt-5.6-sol");
+  assert.equal(config.openai?.tasksModel, "gpt-5.6-terra");
 });
 
 test("respects custom OPENAI_MODEL", () => {
@@ -57,14 +59,19 @@ test("respects custom OPENAI_MODEL", () => {
   assert.equal(config.openai?.model, "gpt-4o");
 });
 
-test("OPENAI_TASKS_MODEL overrides OPENAI_MODEL for lighter-weight tasks", () => {
+test("OPENAI_MODEL and OPENAI_TASKS_MODEL resolve independently — tasks no longer overrides the higher tier", () => {
   const config = loadAnalysisProviderConfig({
     AI_PROVIDER: "openai",
     OPENAI_API_KEY: "sk-x",
-    OPENAI_MODEL: "gpt-5.5",
-    OPENAI_TASKS_MODEL: "gpt-5.4-mini",
+    OPENAI_MODEL: "gpt-5.6-sol",
+    OPENAI_TASKS_MODEL: "gpt-5.6-terra",
   });
-  assert.equal(config.openai?.model, "gpt-5.4-mini");
+  // Previously OPENAI_TASKS_MODEL, when set, silently overrode `model` itself
+  // — downgrading the single-call intake analysis pipeline (which reads
+  // config.openai.model directly) even though it deliberately needs the
+  // higher tier. Each field must resolve from its own env var only.
+  assert.equal(config.openai?.model, "gpt-5.6-sol");
+  assert.equal(config.openai?.tasksModel, "gpt-5.6-terra");
 });
 
 test("throws ConfigurationError for anthropic without API key", () => {
