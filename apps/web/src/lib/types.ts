@@ -167,7 +167,7 @@ export type ProjectIntakeRecord = {
   reviewedProjectPackage?: ReviewedProjectPackage;
   provisioningPlan?: ProvisioningPlan;
   approvals?: ApprovalRecord;
-  source?: { system?: string; externalId?: string };
+  source?: { system?: string; externalId?: string; rawPayload?: Record<string, unknown> };
   pendingClarification?: {
     questions: PendingClarificationQuestion[];
     missingFields: string[];

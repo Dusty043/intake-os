@@ -4,6 +4,7 @@ import type {
   DiscoveryAgentOptions,
   IIntentExtractionAgent,
 } from "./discovery-agent-contract.js";
+import { stripEchoedQuestion } from "./discovery-agent-contract.js";
 
 // ─── Keyword signal tables ────────────────────────────────────────────────────
 
@@ -72,7 +73,7 @@ export class MockIntentExtractionAgent implements IIntentExtractionAgent {
     // ("yes", "exactly", "ok let's go") don't pollute the extracted problem.
     const substantiveMessages = userMessages.filter((m) => m.content.trim().length > 15);
     const sourceMessages = substantiveMessages.length > 0 ? substantiveMessages : userMessages;
-    const rawText = sourceMessages.map((m) => m.content).join(" ");
+    const rawText = sourceMessages.map((m) => stripEchoedQuestion(m.content)).join(" ");
 
     const text = normalize(rawText);
     const intentType = detectIntent(text);

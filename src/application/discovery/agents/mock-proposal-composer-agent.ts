@@ -28,6 +28,14 @@ function slot<T>(
   return s;
 }
 
+/** Truncates at a word boundary with an ellipsis, instead of cutting mid-word. */
+function truncateAtWord(text: string, maxLen: number): string {
+  if (text.length <= maxLen) return text;
+  const truncated = text.slice(0, maxLen);
+  const lastSpace = truncated.lastIndexOf(" ");
+  return `${(lastSpace > 0 ? truncated.slice(0, lastSpace) : truncated).trim()}…`;
+}
+
 // ─── NFR hints keyed by intent type ──────────────────────────────────────────
 
 type NfrHints = Partial<RequirementsSection["nonFunctional"]>;
@@ -107,8 +115,8 @@ export class MockProposalComposerAgent implements IProposalComposerAgent {
 
     // ── Title ─────────────────────────────────────────────────────────────
     proposal.title = selected
-      ? `${selected.title} — ${(intent?.underlyingProblem ?? "").slice(0, 60)}`
-      : (pf?.problemStatement ?? "Untitled Discovery Proposal").slice(0, 80);
+      ? `${selected.title} — ${truncateAtWord(intent?.underlyingProblem ?? "", 60)}`
+      : truncateAtWord(pf?.problemStatement ?? "Untitled Discovery Proposal", 80);
 
     // ── 1. Problem Frame ──────────────────────────────────────────────────
     if (pf) {
@@ -271,9 +279,15 @@ export class MockProposalComposerAgent implements IProposalComposerAgent {
     );
 
     // ── Epics, tasks, assumptions, unknowns ───────────────────────────────
-    proposal.suggestedEpics = selected?.dependencies.length
-      ? selected.dependencies.map((d) => `Epic: ${d}`)
-      : ["Epic: Requirements & Design", "Epic: Core Implementation", "Epic: Testing & QA"];
+    // Dependencies (people/prerequisites, e.g. "Engineering team") aren't
+    // epics (units of work) — always use a generic breakdown, matching the
+    // real (LLM-based) agent's guidance.
+    proposal.suggestedEpics = [
+      "Epic: Requirements & Design",
+      "Epic: Core Implementation",
+      "Epic: Integration & Testing",
+      "Epic: QA & Launch",
+    ];
 
     proposal.suggestedTasks = selected?.risks.length
       ? selected.risks.map((r) => `Mitigate: ${r}`)
