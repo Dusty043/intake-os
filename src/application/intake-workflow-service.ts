@@ -6,7 +6,7 @@ import {
 } from "../domain/permissions.js";
 import { getProjectTypeDefinition } from "../domain/project-type-registry.js";
 import type { Actor, ApprovalGate, AuditEvent, RequestStatus, WorkflowAction } from "../domain/types.js";
-import { applyWorkflowTransition, isApprovalComplete } from "../domain/workflow.js";
+import { applyWorkflowTransition, getNextStatus, isApprovalComplete } from "../domain/workflow.js";
 import type { LifecycleAction } from "../domain/lifecycle-transitions.js";
 import { validateLifecycleTransition } from "../domain/lifecycle-transitions.js";
 import { createAuditEvent } from "./audit.js";
@@ -64,6 +64,10 @@ export interface IntakeWorkflowServiceOptions {
   notifier?: GoogleChatNotifier;
   rosterClient?: RosterApiClient;
 }
+
+// Q-CONC-1: retry budget for applyTransitionToRecord's compare-and-swap write,
+// matching PrismaDiscoverySessionStore's MAX_UPDATE_ATTEMPTS convention.
+const MAX_TRANSITION_ATTEMPTS = 3;
 
 export class IntakeWorkflowService {
   private readonly store: ProjectIntakeStore;
@@ -567,13 +571,22 @@ export class IntakeWorkflowService {
     input: GenerateMockAnalysisDraftInput,
     actor: Actor,
   ): Promise<ProjectIntakeRecord> {
+    ensurePermission(actor, "generate_evaluation");
+
+    let record = await this.requireIntake(id);
+    // Idempotent no-op: a draft already exists (e.g. discovery's fire-and-forget
+    // auto-draft finished before a manual "Generate Mock AI Draft" click raced it,
+    // or a duplicate request replayed). Re-attempting the transition below would
+    // throw InvalidTransitionError since "generate_evaluation" only fires from
+    // "submitted" — return the completed record instead of erroring.
+    if (record.latestAnalysisDraft && record.status !== "evaluating") {
+      return record;
+    }
+
     if (this.orchestrator) {
       return this.generateEvaluation(id, { depth: "standard", provider: "mock" }, actor);
     }
 
-    ensurePermission(actor, "generate_evaluation");
-
-    let record = await this.requireIntake(id);
     const now = this.clock();
     // If the intake is already at "evaluating" (e.g. a prior attempt transitioned the status
     // but crashed before writing the draft), skip the transition and resume from where it left off.
@@ -1405,6 +1418,11 @@ export class IntakeWorkflowService {
     return record;
   }
 
+  // Q-CONC-1: this is the sole choke point every workflow status transition routes
+  // through, so a compare-and-swap write here closes the general "two concurrent
+  // callers both read the same starting status" race (e.g. the discovery hand-off's
+  // background auto-draft job racing a manual retry — see TASK-0057) without needing
+  // to touch every individual call site's business logic.
   private async applyTransitionToRecord(
     record: ProjectIntakeRecord,
     action: WorkflowAction,
@@ -1412,20 +1430,47 @@ export class IntakeWorkflowService {
     now: string,
     options: { reason?: string; metadata?: Record<string, unknown> } = {},
   ): Promise<ProjectIntakeRecord> {
-    const result = applyWorkflowTransition(record, action, actor, {
-      now,
-      reason: options.reason,
-      metadata: options.metadata,
-    });
+    const targetStatus = getNextStatus(record.status, action);
+    let current = record;
 
-    const updated = {
-      ...record,
-      ...result.request,
-    } satisfies ProjectIntakeRecord;
+    for (let attempt = 1; attempt <= MAX_TRANSITION_ATTEMPTS; attempt++) {
+      const result = applyWorkflowTransition(current, action, actor, {
+        now,
+        reason: options.reason,
+        metadata: options.metadata,
+      });
 
-    const saved = await this.store.saveIntake(updated);
-    await this.store.appendAuditEvent(result.auditEvent);
-    return saved;
+      const updated = {
+        ...current,
+        ...result.request,
+      } satisfies ProjectIntakeRecord;
+
+      // Older records may predate `updatedAt` being populated — fall back to a
+      // plain (non-CAS) write rather than refusing to save entirely.
+      const saved = current.updatedAt
+        ? await this.store.saveIntake(updated, { expectedUpdatedAt: current.updatedAt })
+        : await this.store.saveIntake(updated);
+
+      if (saved) {
+        await this.store.appendAuditEvent(result.auditEvent);
+        return saved;
+      }
+
+      // CAS conflict: another request wrote to this intake between our read and
+      // write. Re-read instead of silently overwriting whatever it just committed.
+      const fresh = await this.requireIntake(current.id);
+      if (targetStatus && fresh.status === targetStatus) {
+        // The other writer already landed on the exact status this transition was
+        // heading to — the desired end state is already reached, so this is a
+        // benign no-op rather than a real conflict.
+        return fresh;
+      }
+      current = fresh;
+    }
+
+    throw new ConflictError(
+      `Project intake ${record.id} was updated concurrently by another request; retry exhausted after ${MAX_TRANSITION_ATTEMPTS} attempts`,
+    );
   }
 
   // ─── Evaluation read methods ─────────────────────────────────────────────

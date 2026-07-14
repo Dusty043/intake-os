@@ -6,7 +6,7 @@ import { createAllMockEvaluationAgents } from "../../../../src/application/agent
 import { createAllEvaluationAgents } from "../../../../src/application/agents/openai/index.js";
 import { loadAnalysisProviderConfig } from "../../../../src/application/providers/analysis-provider-config.js";
 import { AnalysisProviderRouter } from "../../../../src/application/providers/analysis-provider-router.js";
-import { createLlmClient, resolveModel } from "../../../../src/application/providers/llm-client-factory.js";
+import { createLlmClient, resolveModel, resolveTasksModel } from "../../../../src/application/providers/llm-client-factory.js";
 import { ProvisioningRegistry } from "../../../../src/application/provisioning/provisioning-executor.js";
 import { createMockRegistry } from "../../../../src/application/provisioning/mock-executor.js";
 import type { MockExecutorMode } from "../../../../src/application/provisioning/mock-executor.js";
@@ -103,12 +103,13 @@ const logger = new Logger("RuntimeModule");
         const config = loadAnalysisProviderConfig();
         const isMock = config.provider === "mock";
         const model = resolveModel(config);
+        const tasksModel = resolveTasksModel(config);
 
         const agents = isMock
           ? createAllMockEvaluationAgents()
-          : createAllEvaluationAgents(createLlmClient(config), model);
+          : createAllEvaluationAgents(createLlmClient(config), model, tasksModel);
 
-        logger.log(`Evaluation orchestrator: ${isMock ? "mock agents" : `${config.provider} (${model})`}`);
+        logger.log(`Evaluation orchestrator: ${isMock ? "mock agents" : `${config.provider} (higher=${model}, lower=${tasksModel})`}`);
 
         return new EvaluationOrchestrator({
           agents,

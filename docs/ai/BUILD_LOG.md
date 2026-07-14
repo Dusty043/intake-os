@@ -2211,3 +2211,145 @@ correctly excludes "customers"; title word-boundary truncated; epics list fixed)
 **Task log**: `docs/ai/tasks/TASK-0055-discovery-to-intake-transfer-fixes.md`
 
 **Follow-up**: None new.
+
+## 2026-07-11 — Model update: gpt-5.6-sol (higher) / gpt-5.6-terra (lesser) (TASK-0056)
+
+User asked to switch models: gpt-5.6-sol for higher-tier tasks, gpt-5.6-terra for lesser.
+Read `ai-cost-governance.md` first — found the two-tier principle and a full
+"Recommended Model Tier by Agent" table already specified there, but never actually wired
+up: `resolveModel(config)` was the only resolver in the codebase, so every Evaluation agent
+and every real Discovery agent received the exact same model string regardless of the
+table. `OPENAI_TASKS_MODEL` existed but acted as a full override of `model` itself when
+set — a latent bug, since the single-call intake analysis pipeline reads `config.openai.model`
+directly and, per TASK-0036, deliberately needs the higher tier; setting `OPENAI_TASKS_MODEL`
+for "lighter tasks" would have silently downgraded it too.
+
+Fixed both: added a `tasksModel` field that resolves independently from its own env var
+(`OPENAI_TASKS_MODEL ?? "gpt-5.6-terra"`, no longer overriding `model`), added
+`resolveTasksModel()` alongside `resolveModel()` (now defaulting to `"gpt-5.6-sol"`), and
+wired real per-agent routing: Solutions Architect/Custom Build/Risk-Security/Cost-Effort/
+Work-Breakdown/Final-Synthesis/Critic-QA (Evaluation) + Solution-Generation/Proposal-
+Composition (Discovery) → higher tier; Intake-Analyst/Clarification/Project-Classifier/
+Low-Code-Path/Distribution-Planner (Evaluation) + Intent-Extraction/Problem-Framing/
+Clarification (Discovery) → lower tier. `createAllEvaluationAgents()` gained a second
+parameter; its one call site updated.
+
+Deliberately did not add `model-cost-registry.ts` entries for either new model — no real
+per-1M-token pricing is known for them, and fabricating numbers for a cost-tracking feature
+would be actively misleading. Falls back to null cost (existing behavior for any
+unregistered model) until real pricing is added. Logged as Q-COST-3 in OPEN_QUESTIONS.md.
+Also did not touch the live server's `.env.server` — that needs separate explicit
+authorization to read/edit, asked the user rather than doing it unprompted.
+
+**Tests**: `npx tsc --noEmit` (core + apps/api + apps/web) clean. `npm test` — 772/774, same
+2 pre-existing unrelated failures. Updated 3 tests in `analysis-provider-config.test.mjs`
+that asserted the old default and the old override-bleed behavior; all pass against the new
+behavior now.
+
+**Requirements trace**: G-002/G-003 (`ai-cost-governance.md`'s model tiering) moved from
+`specified` to `implemented` — this is the first time per-agent tiering actually existed in
+code. G-007 moved to `in_progress` (routing done; section-regeneration cost-awareness still
+isn't).
+
+**Task log**: `docs/ai/tasks/TASK-0056-model-tiering-gpt-5-6-sol-terra.md`
+
+**Follow-up**: Q-COST-3 (real pricing for the two new models) — open. Live server
+`.env.server` not yet updated — pending explicit go-ahead.
+
+## 2026-07-15 — Discovery → Intake handoff: draft-ready race fix (TASK-0057)
+
+User reported: "discovery passes onto the start of intake, when it already has the draft
+ready the flow is broken." Root-caused via `superpowers:systematic-debugging` +
+`/investigate` rather than guessing.
+
+`discovery.controller.ts`'s `send-to-evaluation` route creates the intake, then fires
+`generateMockAnalysisDraft` in the background, unawaited, while the frontend navigates to
+`/intakes/{id}` immediately. The intake page shows a "Generate Mock AI Draft" button
+whenever `!hasDraft` — true at the moment of landing, since the client's fetched state
+predates the background job finishing, and nothing polls to refresh it. Meanwhile,
+`generateMockAnalysisDraft`'s existing guard (`record.status !== "evaluating"`) only handled
+one resume case (crashed mid-generation) — it did not treat "draft already ready
+(`intake_review`)" as a no-op, so any second call once the draft was ready (a manual click
+racing the background job — the realistic, easily-hit case, not a rare edge case, since
+auto-draft generation is the normal path for every Discovery-originated intake) threw
+`InvalidTransitionError: intake_review -> generate_evaluation` unconditionally.
+
+Fixed with a single idempotency guard at the top of `generateMockAnalysisDraft` (before the
+orchestrator-path delegation, so both the mock-provider path and the real-orchestrator path
+route through it, and both callers — the background job and the manual-button endpoint — hit
+the same one guard): if a draft already exists and status isn't `evaluating`, return the
+record as-is instead of re-attempting the transition.
+
+**Tests**: Added a regression test in `intake-analysis-draft.test.mjs` (call
+`generateMockAnalysisDraft` twice, assert idempotent no-op on the second call). Verified
+red→green: stripped the guard from compiled output, confirmed the test fails with the exact
+real-world crash (`InvalidTransitionError: intake_review -> generate_evaluation`), rebuilt,
+confirmed it passes. `npm run typecheck` clean. `npm test` — 778/779 (1 new test added); the
+1 failure (`monday-config.test.mjs`) is pre-existing/unrelated (untracked, in-progress test
+for a feature not yet wired into `src/index.ts`).
+
+**Task log**: `docs/ai/tasks/TASK-0057-discovery-to-intake-draft-race-fix.md`
+
+**Follow-up**: Q-CONC-1 (no optimistic concurrency on `prisma-project-intake-store.ts`,
+unlike the discovery-session store which has CAS) and Q-CONC-2 (`sendToEvaluation()` isn't
+guarded against being called twice — would create an orphaned duplicate intake) added to
+OPEN_QUESTIONS.md as separate, not-yet-implemented follow-ups — both are bigger,
+separately-reviewable changes to idempotency/retry behavior per CLAUDE.md.
+
+## 2026-07-15 — Concurrency hardening: Q-CONC-1 + Q-CONC-2 (TASK-0058)
+
+User authorized both TASK-0057 follow-ups ("yes to both") with latitude to scope down if
+needed to keep the flow working, rather than an exhaustive implementation.
+
+**Q-CONC-1** (no CAS on the intake store): rather than retrofitting compare-and-swap onto
+every one of the ~20 `saveIntake` call sites in `intake-workflow-service.ts` (high-risk, wide
+refactor), added a CAS-capable overload to `ProjectIntakeStore.saveIntake` (both
+`PrismaProjectIntakeStore` — `updateMany` with `updatedAt` in the WHERE clause, mirroring
+`PrismaDiscoverySessionStore`'s existing pattern — and `InMemoryProjectIntakeStore`) and wired
+it into exactly one place: `applyTransitionToRecord`, the sole choke point every workflow
+status transition routes through. On conflict, re-reads the intake; if the fresh status
+already equals the transition's target, returns it as a benign no-op (someone else completed
+the identical transition); otherwise retries (bounded, `MAX_TRANSITION_ATTEMPTS = 3`), else
+throws `ConflictError`. Non-transition saves (draft content, plans) remain plain writes — a
+documented, narrower residual risk.
+
+**Q-CONC-2** (`sendToEvaluation()` not guarded against repeat calls): added
+`linkedIntakeId?: string` to `DiscoverySession` (no migration — sessions persist as an opaque
+JSON snapshot) and one idempotency check at the top of `sendToEvaluation()`: if already
+`sent_to_evaluation` with a `linkedIntakeId`, return that intake instead of building a new one.
+Self-heals (falls through to recreate) if the linked intake can't be found.
+
+**Tests**: new `tests/api/prisma-project-intake-store.test.mjs` (4 tests, fake-Prisma pattern
+mirroring `prisma-discovery-session-store.test.mjs`) covering create-when-absent/CAS
+success/CAS conflict/plain-call-unaffected. New test in `intake-workflow-service.test.mjs`
+simulating a CAS conflict via a monkey-patched store, proving the retry succeeds. New test in
+`discovery-phase-3.test.mjs` calling `sendToEvaluation` twice, asserting only one intake
+exists afterward. `npm run typecheck` (core) + `tsc -p apps/api/tsconfig.json --noEmit` both
+clean. `npm test` — 776/777 (same pre-existing unrelated `monday-config.test.mjs` failure).
+`npm run test:api` — 7/7 pass.
+
+**Task log**: `docs/ai/tasks/TASK-0058-concurrency-hardening-q-conc-1-2.md`
+
+**Follow-up**: Q-CONC-1/Q-CONC-2 in OPEN_QUESTIONS.md moved from `open` to `implemented`
+(scoped, not exhaustive — see task log's "Not Changed" section).
+
+## 2026-07-15 — Fix: wire up validateMondayConfig export (unblocked monday-config test suite)
+
+While running the full suite for TASK-0058, found `tests/monday-config.test.mjs` failing at
+import time: `SyntaxError: ... does not provide an export named 'validateMondayConfig'`.
+Root cause: `src/application/provisioning/monday-config.ts` (from the still-in-progress Monday
+adapter work, see TASK-0044/TASK-0045) implements `validateMondayConfig()`/`MondayConfig`
+correctly, but was never added to `src/index.ts`'s barrel exports, so the compiled
+`dist/src/index.js` never had the named export the test imports.
+
+Fix: added `export * from "./application/provisioning/monday-config.js";` to `src/index.ts`,
+alongside the other `./application/provisioning/*` exports already there. One line, no logic
+changes to `monday-config.ts` itself.
+
+**Tests**: `tests/monday-config.test.mjs` — 9/9 pass (previously failed at import). Full core
+suite — 785/785 (was 776/777; this was the last failure). `npm run typecheck` (core) +
+`tsc -p apps/api/tsconfig.json --noEmit` clean. `npm run test:api` — 7/7.
+
+**Follow-up**: None — TASK-0044/TASK-0045 (the broader Monday adapter build) remain
+untracked/in-progress; this fix only unblocks the config-parsing unit its own test already
+covered.

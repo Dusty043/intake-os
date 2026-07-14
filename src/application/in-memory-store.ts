@@ -27,7 +27,21 @@ export class InMemoryProjectIntakeStore implements ProjectIntakeStore {
     return record ? structuredClone(record) : null;
   }
 
-  async saveIntake(record: ProjectIntakeRecord): Promise<ProjectIntakeRecord> {
+  async saveIntake(record: ProjectIntakeRecord): Promise<ProjectIntakeRecord>;
+  async saveIntake(
+    record: ProjectIntakeRecord,
+    options: { expectedUpdatedAt: string },
+  ): Promise<ProjectIntakeRecord | null>;
+  async saveIntake(
+    record: ProjectIntakeRecord,
+    options?: { expectedUpdatedAt: string },
+  ): Promise<ProjectIntakeRecord | null> {
+    if (options) {
+      const current = this.intakes.get(record.id);
+      if (current && current.updatedAt !== options.expectedUpdatedAt) {
+        return null;
+      }
+    }
     const copy = structuredClone(record);
     this.intakes.set(record.id, copy);
     return structuredClone(copy);

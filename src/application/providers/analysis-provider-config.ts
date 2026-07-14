@@ -9,7 +9,10 @@ export interface AnalysisProviderConfig {
 
   openai?: {
     apiKey: string;
+    /** Higher-capability tier — architecture, planning, risk, final synthesis. Also used directly by the single-call intake analysis pipeline. */
     model: string;
+    /** Lower-cost tier — classification, extraction, clarification, formatting. See ai-cost-governance.md's model tiering table. */
+    tasksModel: string;
     inputCostPer1MTokens: number | null;
     outputCostPer1MTokens: number | null;
   };
@@ -55,7 +58,12 @@ export function loadAnalysisProviderConfig(env: NodeJS.ProcessEnv = process.env)
     if (!apiKey) throw new ConfigurationError("AI_PROVIDER=openai requires OPENAI_API_KEY.");
     config.openai = {
       apiKey,
-      model: nonEmpty(env["OPENAI_TASKS_MODEL"]) ?? nonEmpty(env["OPENAI_MODEL"]) ?? "gpt-5.5",
+      // OPENAI_TASKS_MODEL previously overrode OPENAI_MODEL entirely when set,
+      // silently downgrading the single-call intake analysis pipeline too
+      // (which deliberately needs the higher tier — see TASK-0036). Now each
+      // tier resolves independently.
+      model: nonEmpty(env["OPENAI_MODEL"]) ?? "gpt-5.6-sol",
+      tasksModel: nonEmpty(env["OPENAI_TASKS_MODEL"]) ?? "gpt-5.6-terra",
       inputCostPer1MTokens: parseOptionalFloat(env["OPENAI_INPUT_COST_PER_1M_TOKENS"]),
       outputCostPer1MTokens: parseOptionalFloat(env["OPENAI_OUTPUT_COST_PER_1M_TOKENS"]),
     };

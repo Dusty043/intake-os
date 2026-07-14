@@ -158,3 +158,43 @@ test("invalid repository plan stays dry-run and cannot be marked ready", async (
     ValidationError,
   );
 });
+
+test("applyTransitionToRecord retries and recovers from a simulated compare-and-swap conflict (Q-CONC-1)", async () => {
+  // Proves the retry path in applyTransitionToRecord: if another writer's save
+  // races in between this caller's read and write, the CAS-guarded saveIntake
+  // call returns null (simulated here rather than via real concurrency), and
+  // the transition must re-read and retry instead of throwing or silently
+  // clobbering the other writer's change.
+  const store = new InMemoryProjectIntakeStore();
+  const originalSaveIntake = store.saveIntake.bind(store);
+  let casGuardedCalls = 0;
+  store.saveIntake = async (record, options) => {
+    if (options && casGuardedCalls++ === 0) {
+      return null;
+    }
+    return originalSaveIntake(record, options);
+  };
+
+  let counter = 0;
+  const service = new IntakeWorkflowService({
+    store,
+    clock: () => "2026-05-27T00:00:00.000Z",
+    idFactory: (prefix) => `${prefix}-${++counter}`,
+  });
+
+  const intake = await service.createIntake(
+    {
+      title: "Concurrent Write Regression",
+      description: "Exercises the compare-and-swap retry path in applyTransitionToRecord.",
+      requester: "Digital Solutions",
+      department: "Internal Tools",
+      projectType: "internal_tool",
+    },
+    creator,
+  );
+
+  const submitted = await service.submitIntake(intake.id, creator);
+
+  assert.equal(submitted.status, "submitted");
+  assert.equal(casGuardedCalls, 2, "first CAS attempt must have conflicted, second must have succeeded");
+});

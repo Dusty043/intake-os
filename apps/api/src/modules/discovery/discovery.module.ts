@@ -18,7 +18,7 @@ import {
   OpenAIProposalComposerAgent,
 } from "../../../../../src/application/discovery/index.js";
 import { loadAnalysisProviderConfig } from "../../../../../src/application/providers/analysis-provider-config.js";
-import { createLlmClient, resolveModel } from "../../../../../src/application/providers/llm-client-factory.js";
+import { createLlmClient, resolveModel, resolveTasksModel } from "../../../../../src/application/providers/llm-client-factory.js";
 import { DISCOVERY_SESSION_STORE, PROJECT_INTAKE_STORE } from "../../persistence/store.token.js";
 import { DiscoveryHttpController } from "./discovery.controller.js";
 import { GlobalSettingsService } from "../admin/global-settings.service.js";
@@ -38,15 +38,20 @@ function buildOrchestrator(
 
   const config = loadAnalysisProviderConfig();
   const isMock = config.provider === "mock";
+  // Higher tier: solution generation and proposal composition — architecture,
+  // trade-offs, and system design reasoning. Lower tier: intent extraction,
+  // problem framing, and clarification — extraction/classification-shaped
+  // tasks. See ai-cost-governance.md's model tiering table.
   const model = resolveModel(config);
+  const tasksModel = resolveTasksModel(config);
   const llmClient = isMock ? null : createLlmClient(config);
 
   const intentAgent = llmClient
-    ? new OpenAIIntentExtractionAgent(llmClient, model)
+    ? new OpenAIIntentExtractionAgent(llmClient, tasksModel)
     : new MockIntentExtractionAgent();
 
   const framingAgent = llmClient
-    ? new OpenAIProblemFramingAgent(llmClient, model)
+    ? new OpenAIProblemFramingAgent(llmClient, tasksModel)
     : new MockProblemFramingAgent();
 
   const solutionAgent = llmClient
@@ -54,7 +59,7 @@ function buildOrchestrator(
     : new MockSolutionGenerationAgent();
 
   const clarificationAgent = llmClient
-    ? new OpenAIClarificationAgent(llmClient, model)
+    ? new OpenAIClarificationAgent(llmClient, tasksModel)
     : new MockClarificationAgent();
 
   const proposalAgent = llmClient

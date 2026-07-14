@@ -33,5 +33,6 @@ export * from "./application/notifications/google-chat-config.js";
 export * from "./auth-config-validator.js";
 export * from "./domain/error-categories.js";
 export * from "./application/provisioning/backoff.js";
+export * from "./application/provisioning/monday-config.js";
 export * from "./domain/discovery.js";
 export * from "./application/discovery/index.js";

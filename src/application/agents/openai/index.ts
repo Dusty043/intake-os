@@ -27,18 +27,25 @@ export {
   OpenAICriticQAAgent,
 };
 
-export function createAllEvaluationAgents(client: LlmClient, model: string) {
+/**
+ * model = higher-capability tier, tasksModel = lower-cost tier. Routing
+ * follows ai-cost-governance.md's "Recommended Model Tier by Agent" table:
+ * lower-cost for classification/extraction/clarification-shaped work,
+ * higher-capability for architecture, risk, cost, work breakdown, and final
+ * synthesis.
+ */
+export function createAllEvaluationAgents(client: LlmClient, model: string, tasksModel: string) {
   return [
-    new OpenAIIntakeAnalystAgent(client, model),
-    new OpenAIClarificationQuestionsAgent(client, model),
-    new OpenAIProjectClassifierAgent(client, model),
+    new OpenAIIntakeAnalystAgent(client, tasksModel),
+    new OpenAIClarificationQuestionsAgent(client, tasksModel),
+    new OpenAIProjectClassifierAgent(client, tasksModel),
     new OpenAISolutionsArchitectAgent(client, model),
-    new OpenAILowCodePathAgent(client, model),
+    new OpenAILowCodePathAgent(client, tasksModel),
     new OpenAICustomBuildAgent(client, model),
     new OpenAIRiskSecurityAgent(client, model),
     new OpenAICostEffortAgent(client, model),
     new OpenAIWorkBreakdownAgent(client, model),
-    new OpenAIDistributionPlannerAgent(client, model),
+    new OpenAIDistributionPlannerAgent(client, tasksModel),
     new OpenAIFinalSynthesisAgent(client, model),
     new OpenAICriticQAAgent(client, model),
   ];

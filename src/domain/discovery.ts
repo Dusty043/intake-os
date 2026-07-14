@@ -492,6 +492,10 @@ export interface DiscoverySession {
   proposal: ProjectProposal | null;
   manifest: ProvisioningManifest | null;
 
+  /** Set once `sendToEvaluation()` creates the downstream intake (Q-CONC-2) — lets a
+   *  repeat call return the existing intake instead of creating an orphaned duplicate. */
+  linkedIntakeId?: string;
+
   confidence: DiscoveryConfidence;
 
   /** AI usage emitted by real (non-mock) discovery agents, for cost reporting. */

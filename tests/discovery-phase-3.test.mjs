@@ -7,6 +7,7 @@ import { describe, test, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import {
   InMemoryDiscoverySessionStore,
+  InMemoryProjectIntakeStore,
   DiscoveryOrchestrator,
   DiscoveryController,
   MockIntentExtractionAgent,
@@ -477,6 +478,33 @@ describe("DiscoveryOrchestrator.sendToEvaluation", () => {
       () => orchestrator.sendToEvaluation("nope"),
       /not found/i,
     );
+  });
+
+  test("calling sendToEvaluation again returns the same intake instead of creating an orphaned duplicate (Q-CONC-2)", async () => {
+    const intakeStore = new InMemoryProjectIntakeStore();
+    const store = new InMemoryDiscoverySessionStore();
+    const orchestrator = new DiscoveryOrchestrator(
+      store,
+      new MockIntentExtractionAgent(),
+      new MockProblemFramingAgent(),
+      new MockSolutionGenerationAgent(),
+      new MockClarificationAgent(),
+      new MockProposalComposerAgent(),
+      new MockManifestGeneratorAgent(),
+      { idFactory, now: fixedNow, intakeStore },
+    );
+    const directed = await startAndSelectDirection(
+      orchestrator,
+      "Our onboarding checklist is tracked in a spreadsheet.",
+    );
+
+    const first = await orchestrator.sendToEvaluation(directed.id);
+    const second = await orchestrator.sendToEvaluation(directed.id);
+
+    assert.equal(second.intakeRecord.id, first.intakeRecord.id);
+    assert.equal(second.session.status, "sent_to_evaluation");
+    const allIntakes = await intakeStore.listIntakes();
+    assert.equal(allIntakes.length, 1, "repeat call must not create a second intake");
   });
 });
 
