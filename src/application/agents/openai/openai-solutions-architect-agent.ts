@@ -4,11 +4,11 @@ import type { LlmClient } from "../../llm-client.js";
 
 const schema = {
   type: "object",
-  required: ["recommendation","recommendedTechStack","integrationPoints","dataStores","deploymentNotes","assumptions"],
+  required: ["recommendation","architectureStyle","recommendedTechStack","integrationPoints","dataStores","deploymentNotes","assumptions"],
   additionalProperties: false,
   properties: {
     recommendation: { type: "string" },
-    architectureStyle: { type: "string" },
+    architectureStyle: { type: ["string", "null"] },
     recommendedTechStack: { type: "array", items: { type: "string" } },
     integrationPoints: { type: "array", items: { type: "string" } },
     dataStores: { type: "array", items: { type: "string" } },

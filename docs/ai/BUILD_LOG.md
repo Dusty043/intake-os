@@ -2353,3 +2353,39 @@ suite — 785/785 (was 776/777; this was the last failure). `npm run typecheck` 
 **Follow-up**: None — TASK-0044/TASK-0045 (the broader Monday adapter build) remain
 untracked/in-progress; this fix only unblocks the config-parsing unit its own test already
 covered.
+
+## 2026-07-15 — Fix: OpenAI strict-schema violation stuck every real evaluation (TASK-0059)
+
+User asked to check why the last production run "still didnt run to the ai draft / eval
+stage." Queried the production DB directly: the latest intake was stuck at `evaluating`
+with only one audit event and no follow-up. Grepped production API logs (error-level only,
+secrets redacted) and found: `400 Invalid schema for response_format
+'clarification_questions': ... Missing 'suggestedAnswerFormat'` — OpenAI's Structured
+Outputs `strict: true` mode requires every `properties` key to also appear in `required`
+(optional fields must be nullable-typed, not omitted from `required`), and
+`OpenAIClarificationQuestionsAgent`'s schema violated this.
+
+Audited all 13 OpenAI agent schemas for the same pattern and found it was systemic: 6 of
+13 agents (`clarification-questions`, `cost-effort`, `distribution-planner`,
+`project-classifier`, `solutions-architect`, `work-breakdown`) had at least one optional
+TS field missing from its schema's `required` array. Every affected field is genuinely
+optional in `intake-evaluation.ts`'s domain types — fixed each by adding the missing
+key(s) to `required` and widening the type to `["<type>", "null"]`, matching OpenAI's
+documented pattern. Verified every downstream consumer already null-safely checks these
+fields (`!!x`, `x != null`, `?? default`) before making this change.
+
+This means the ENTIRE real-OpenAI evaluation pipeline (production's actual configuration —
+local dev uses `AI_PROVIDER=mock`, which never exercised this code path) was silently
+broken for any evaluation that reached these 6 agents, with no user-visible error since the
+discovery controller's fire-and-forget auto-evaluation call only logs a warning on failure.
+
+**Tests**: `npm run typecheck` (core) clean. `npm test` — 785/785, no regressions. No
+existing unit tests exercised these schemas against a live OpenAI call (that's why this
+shipped silently) — not yet re-verified against the real OpenAI endpoint post-deploy.
+
+**Task log**: `docs/ai/tasks/TASK-0059-openai-strict-schema-required-fields.md`
+
+**Follow-up**: Q-EVAL-1 added — intakes that fail real evaluation have no retry path
+(stuck forever, only a server log warning); several pre-existing production intakes are
+still stuck from before this fix and need manual recovery. Also flagged: no automated
+schema-consistency test exists to catch this class of bug for future agents.
