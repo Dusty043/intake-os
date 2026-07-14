@@ -9,23 +9,23 @@ const schema = {
   properties: {
     monday: {
       type: "object",
-      required: ["required","notes"],
+      required: ["required","suggestedBoard","suggestedGroup","itemName","notes"],
       additionalProperties: false,
       properties: {
         required: { type: "boolean" },
-        suggestedBoard: { type: "string" },
-        suggestedGroup: { type: "string" },
-        itemName: { type: "string" },
+        suggestedBoard: { type: ["string", "null"] },
+        suggestedGroup: { type: ["string", "null"] },
+        itemName: { type: ["string", "null"] },
         notes: { type: "array", items: { type: "string" } },
       },
     },
     github: {
       type: "object",
-      required: ["required","issueLabels","issueBreakdownSuggested"],
+      required: ["required","repositoryName","issueLabels","issueBreakdownSuggested"],
       additionalProperties: false,
       properties: {
         required: { type: "boolean" },
-        repositoryName: { type: "string" },
+        repositoryName: { type: ["string", "null"] },
         issueLabels: { type: "array", items: { type: "string" } },
         issueBreakdownSuggested: { type: "boolean" },
       },

@@ -11,14 +11,14 @@ const schema = {
       type: "array",
       items: {
         type: "object",
-        required: ["title","description","acceptanceCriteria"],
+        required: ["title","description","acceptanceCriteria","estimatedHours","suggestedOwnerRole"],
         additionalProperties: false,
         properties: {
           title: { type: "string" },
           description: { type: "string" },
           acceptanceCriteria: { type: "array", items: { type: "string" } },
-          estimatedHours: { type: "number" },
-          suggestedOwnerRole: { type: "string" },
+          estimatedHours: { type: ["number", "null"] },
+          suggestedOwnerRole: { type: ["string", "null"] },
         },
       },
     },

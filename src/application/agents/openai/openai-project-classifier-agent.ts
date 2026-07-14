@@ -7,11 +7,11 @@ const DEPTHS = ["light","standard","full"] as const;
 
 const schema = {
   type: "object",
-  required: ["projectType","confidence","reasoning","recommendedDepth","signals"],
+  required: ["projectType","projectSubtype","confidence","reasoning","recommendedDepth","signals"],
   additionalProperties: false,
   properties: {
     projectType: { type: "string", enum: [...PROJECT_TYPES] },
-    projectSubtype: { type: "string" },
+    projectSubtype: { type: ["string", "null"] },
     confidence: { type: "number" },
     reasoning: { type: "string" },
     recommendedDepth: { type: "string", enum: [...DEPTHS] },

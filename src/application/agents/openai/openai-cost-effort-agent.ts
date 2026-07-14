@@ -4,11 +4,11 @@ import type { LlmClient } from "../../llm-client.js";
 
 const schema = {
   type: "object",
-  required: ["estimatedStoryPoints","complexity","costDrivers","costAssumptions","infraCostSignal"],
+  required: ["estimatedStoryPoints","estimatedEngineeringDays","complexity","costDrivers","costAssumptions","infraCostSignal"],
   additionalProperties: false,
   properties: {
     estimatedStoryPoints: { type: "number" },
-    estimatedEngineeringDays: { type: "number" },
+    estimatedEngineeringDays: { type: ["number", "null"] },
     complexity: { type: "string", enum: ["low","medium","high"] },
     costDrivers: { type: "array", items: { type: "string" } },
     costAssumptions: { type: "array", items: { type: "string" } },

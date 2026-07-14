@@ -12,14 +12,14 @@ const schema = {
       type: "array",
       items: {
         type: "object",
-        required: ["id","question","reason","required"],
+        required: ["id","question","reason","required","suggestedAnswerFormat"],
         additionalProperties: false,
         properties: {
           id: { type: "string" },
           question: { type: "string" },
           reason: { type: "string" },
           required: { type: "boolean" },
-          suggestedAnswerFormat: { type: "string" },
+          suggestedAnswerFormat: { type: ["string", "null"] },
         },
       },
     },
