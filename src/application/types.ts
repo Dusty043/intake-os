@@ -306,6 +306,12 @@ export interface ProjectIntakeStore {
   listIntakes(pagination?: { take?: number; skip?: number }): Promise<readonly ProjectIntakeRecord[]>;
   getIntake(id: string): Promise<ProjectIntakeRecord | null>;
   saveIntake(record: ProjectIntakeRecord): Promise<ProjectIntakeRecord>;
+  // Compare-and-swap variant (Q-CONC-1): only writes if the stored row's `updatedAt`
+  // still matches `expectedUpdatedAt` (i.e. nothing else wrote to this intake between
+  // the caller's read and this write). Returns null on conflict instead of throwing,
+  // so the caller can re-read and retry. A brand-new record (no existing row) always
+  // succeeds since there's nothing to conflict with.
+  saveIntake(record: ProjectIntakeRecord, options: { expectedUpdatedAt: string }): Promise<ProjectIntakeRecord | null>;
   listAuditEvents(intakeId: string): Promise<readonly AuditEvent[]>;
   appendAuditEvent(event: AuditEvent): Promise<AuditEvent>;
 

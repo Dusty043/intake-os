@@ -379,6 +379,20 @@ export class DiscoveryOrchestrator {
 
     let session = await this.store.getById(sessionId);
     if (!session) throw new NotFoundError("DiscoverySession", sessionId);
+
+    // Idempotent no-op (Q-CONC-2): without this, a repeat call — a double-click
+    // before the frontend's button disables, or a retried request — would build
+    // a brand-new intakeRecord every time via proposalToIntakeRecord(), orphaning
+    // a duplicate. Return the already-linked intake instead, if it's still there.
+    if (session.status === "sent_to_evaluation" && session.linkedIntakeId && this.intakeStore) {
+      const existingIntake = await this.intakeStore.getIntake(session.linkedIntakeId);
+      if (existingIntake) {
+        return { session, intakeRecord: existingIntake };
+      }
+      // Linked intake vanished somehow — fall through and recreate rather than
+      // leaving the session stuck pointing at nothing.
+    }
+
     if (!session.selectedSolutionId) {
       throw new ValidationError(`No solution selected for session: ${sessionId} — call selectDirection first`);
     }
@@ -409,6 +423,7 @@ export class DiscoveryOrchestrator {
 
     const updatedSession = await this.store.update(session.id, {
       status: nextStatus,
+      linkedIntakeId: savedIntake.id,
       timeline: [...session.timeline, ...newEvents],
       updatedAt: now,
     });

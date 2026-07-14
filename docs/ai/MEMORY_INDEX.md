@@ -75,6 +75,8 @@ Generated at: 2026-06-09T14:53:20.716Z
 - `docs/ai/tasks/TASK-0054-discovery-auto-artifacts-and-clarification-drawer.md` — UI: automatic proposal/manifest generation moved to center chat panel, clarification questions collapsed by default
 - `docs/ai/tasks/TASK-0055-discovery-to-intake-transfer-fixes.md` — fix: mock proposal title truncation, fake epics-from-dependencies, false-positive stakeholder extraction; added always-visible "From Discovery" context on the intake Overview tab
 - `docs/ai/tasks/TASK-0056-model-tiering-gpt-5-6-sol-terra.md` — models updated to gpt-5.6-sol (higher)/gpt-5.6-terra (lesser), wired real per-agent tiering (previously specified in ai-cost-governance.md but never implemented — every agent shared one model)
+- `docs/ai/tasks/TASK-0057-discovery-to-intake-draft-race-fix.md` — fix: `generateMockAnalysisDraft` threw `InvalidTransitionError` when called after the draft was already ready (background auto-draft job racing a manual "Generate Mock AI Draft" click); added an idempotency guard so a second call is a no-op instead of a crash
+- `docs/ai/tasks/TASK-0058-concurrency-hardening-q-conc-1-2.md` — added compare-and-swap to `ProjectIntakeStore.saveIntake`, wired into `applyTransitionToRecord` (the sole choke point for every workflow transition); added `linkedIntakeId` to `DiscoverySession` so `sendToEvaluation()` no longer creates a duplicate intake on a repeat call
 - `docs/ai/tasks/HANDOFF-0023D-monday-credentials.md`
 
 ## Deployment Docs

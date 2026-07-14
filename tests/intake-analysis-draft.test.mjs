@@ -76,6 +76,25 @@ test("mock AI analysis draft is generated as review-only state", async () => {
   assert.equal(audit[3].metadata.draftOnly, true);
 });
 
+test("calling generateMockAnalysisDraft again after the draft is ready is an idempotent no-op", async () => {
+  // Regression for the discovery-to-intake handoff: send-to-evaluation fires
+  // generateMockAnalysisDraft in the background, unawaited. If a second call
+  // (a manual "Generate Mock AI Draft" click racing it, or a retried request)
+  // lands after the draft is already ready, it used to throw
+  // InvalidTransitionError because "generate_evaluation" only transitions
+  // from "submitted" — not from "intake_review".
+  const service = createService();
+  const submitted = await createSubmittedIntake(service);
+  const ready = await service.generateMockAnalysisDraft(submitted.id, {}, intakeOwner);
+  assert.equal(ready.status, "intake_review");
+
+  const repeated = await service.generateMockAnalysisDraft(ready.id, {}, intakeOwner);
+
+  assert.equal(repeated.status, "intake_review");
+  assert.equal(repeated.analysisDrafts.length, 1);
+  assert.equal(repeated.latestAnalysisDraft.id, ready.latestAnalysisDraft.id);
+});
+
 test("mock analysis cannot bypass approval or provisioning gates", async () => {
   const service = createService();
   const submitted = await createSubmittedIntake(service);

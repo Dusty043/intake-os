@@ -43,57 +43,91 @@ export class PrismaProjectIntakeStore implements ProjectIntakeStore {
     return row ? fromJson<ProjectIntakeRecord>(row.recordSnapshot) : null;
   }
 
-  async saveIntake(record: ProjectIntakeRecord): Promise<ProjectIntakeRecord> {
+  async saveIntake(record: ProjectIntakeRecord): Promise<ProjectIntakeRecord>;
+  async saveIntake(
+    record: ProjectIntakeRecord,
+    options: { expectedUpdatedAt: string },
+  ): Promise<ProjectIntakeRecord | null>;
+  async saveIntake(
+    record: ProjectIntakeRecord,
+    options?: { expectedUpdatedAt: string },
+  ): Promise<ProjectIntakeRecord | null> {
     const snapshot = toJson(record);
     const distributionPackage = record.distributionPackage ? toJson(record.distributionPackage) : undefined;
     const analysisDrafts = record.analysisDrafts ? toJson(record.analysisDrafts) : undefined;
     const latestAnalysisDraft = record.latestAnalysisDraft ? toJson(record.latestAnalysisDraft) : undefined;
     const sourceRawPayload = record.source.rawPayload ? toJson(record.source.rawPayload) : undefined;
 
+    const createData = {
+      id: record.id,
+      title: record.title,
+      description: record.description,
+      requester: record.requester,
+      department: record.department,
+      projectType: record.projectType,
+      status: record.status,
+      sourceSystem: record.source.system,
+      sourceExternalId: record.source.externalId,
+      sourceExternalUrl: record.source.externalUrl,
+      sourceRawPayload,
+      distributionPackage,
+      analysisDrafts,
+      latestAnalysisDraft,
+      recordSnapshot: snapshot,
+      createdAt: new Date(record.createdAt),
+      updatedAt: new Date(record.updatedAt ?? record.createdAt),
+      createdById: record.createdBy.id,
+      createdByRole: record.createdBy.role,
+      createdByName: record.createdBy.displayName,
+    };
+    const updateData = {
+      title: record.title,
+      description: record.description,
+      requester: record.requester,
+      department: record.department,
+      projectType: record.projectType,
+      status: record.status,
+      sourceSystem: record.source.system,
+      sourceExternalId: record.source.externalId,
+      sourceExternalUrl: record.source.externalUrl,
+      sourceRawPayload,
+      distributionPackage,
+      analysisDrafts,
+      latestAnalysisDraft,
+      recordSnapshot: snapshot,
+      updatedAt: new Date(record.updatedAt ?? new Date().toISOString()),
+    };
+
     const saved = await this.prisma.$transaction(async (tx) => {
-      const row = await tx.projectIntake.upsert({
-        where: { id: record.id },
-        create: {
-          id: record.id,
-          title: record.title,
-          description: record.description,
-          requester: record.requester,
-          department: record.department,
-          projectType: record.projectType,
-          status: record.status,
-          sourceSystem: record.source.system,
-          sourceExternalId: record.source.externalId,
-          sourceExternalUrl: record.source.externalUrl,
-          sourceRawPayload,
-          distributionPackage,
-          analysisDrafts,
-          latestAnalysisDraft,
-          recordSnapshot: snapshot,
-          createdAt: new Date(record.createdAt),
-          updatedAt: new Date(record.updatedAt ?? record.createdAt),
-          createdById: record.createdBy.id,
-          createdByRole: record.createdBy.role,
-          createdByName: record.createdBy.displayName,
-        },
-        update: {
-          title: record.title,
-          description: record.description,
-          requester: record.requester,
-          department: record.department,
-          projectType: record.projectType,
-          status: record.status,
-          sourceSystem: record.source.system,
-          sourceExternalId: record.source.externalId,
-          sourceExternalUrl: record.source.externalUrl,
-          sourceRawPayload,
-          distributionPackage,
-          analysisDrafts,
-          latestAnalysisDraft,
-          recordSnapshot: snapshot,
-          updatedAt: new Date(record.updatedAt ?? new Date().toISOString()),
-        },
-        select: { recordSnapshot: true },
-      });
+      let row: { recordSnapshot: Prisma.JsonValue } | null;
+
+      if (options) {
+        // Compare-and-swap (Q-CONC-1): only overwrite if the row hasn't moved since
+        // the caller read it. `updateMany`'s WHERE clause makes the check-and-write a
+        // single atomic statement — no separate SELECT ... FOR UPDATE needed. A row
+        // that doesn't exist yet (first save) has nothing to conflict with, so it
+        // always proceeds as a plain create.
+        const existing = await tx.projectIntake.findUnique({ where: { id: record.id }, select: { id: true } });
+        if (!existing) {
+          row = await tx.projectIntake.create({ data: createData, select: { recordSnapshot: true } });
+        } else {
+          const result = await tx.projectIntake.updateMany({
+            where: { id: record.id, updatedAt: new Date(options.expectedUpdatedAt) },
+            data: updateData,
+          });
+          if (result.count === 0) return null;
+          row = await tx.projectIntake.findUnique({ where: { id: record.id }, select: { recordSnapshot: true } });
+        }
+      } else {
+        row = await tx.projectIntake.upsert({
+          where: { id: record.id },
+          create: createData,
+          update: updateData,
+          select: { recordSnapshot: true },
+        });
+      }
+
+      if (!row) return null;
 
       // The provisioning plan is authored as a JSON field on the intake record (like
       // everything else here), but ProvisioningRun.planId is a real foreign key into
@@ -165,7 +199,7 @@ export class PrismaProjectIntakeStore implements ProjectIntakeStore {
       return row;
     });
 
-    return fromJson<ProjectIntakeRecord>(saved.recordSnapshot);
+    return saved ? fromJson<ProjectIntakeRecord>(saved.recordSnapshot) : null;
   }
 
   async listAuditEvents(intakeId: string): Promise<readonly AuditEvent[]> {
