@@ -313,6 +313,18 @@ describe("evaluationToLegacyDraft", () => {
     assert.equal(draft.projectType, "internal_tool");
   });
 
+  it("falls back to internal_tool when classification returns an unrecognized projectType", () => {
+    const evaluation = makeFullEvaluation();
+    evaluation.sections = evaluation.sections.map((s) => {
+      if (s.kind === "classification") {
+        return { ...s, content: { ...s.content, projectType: "ai_assistant" } };
+      }
+      return s;
+    });
+    const draft = evaluationToLegacyDraft(evaluation, { idFactory: testIdFactory, now: NOW });
+    assert.equal(draft.projectType, "internal_tool");
+  });
+
   it("produces a draft with sourceSummary truncated to 240 chars", () => {
     const longSummary = "A".repeat(300);
     const evaluation = makeFullEvaluation();

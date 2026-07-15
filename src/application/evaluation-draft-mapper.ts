@@ -1,6 +1,7 @@
 import { intakeAnalysisDraftSchemaVersion } from "./intake-analysis.js";
 import type { IntakeAnalysisDraft, InfrastructureRequirementDraft, IntakeAnalysisSubtaskDraft } from "./intake-analysis.js";
 import type { Actor } from "../domain/types.js";
+import { projectTypes } from "../domain/types.js";
 import {
   getSection,
   qualityBandFromScore,
@@ -173,8 +174,16 @@ export function evaluationToLegacyDraft(
     warnings.push("Clarification is required before this evaluation can be approved.");
   }
 
-  // Project type — use classification result or fall back to intake record
-  const projectType = (classification?.content.projectType ?? "internal_tool") as IntakeAnalysisDraft["projectType"];
+  // Project type — use classification result if it's a recognized ProjectType,
+  // else fall back to internal_tool. The classification agent's projectType is
+  // an untyped string from an AI response; trusting it blindly (a bare `as`
+  // cast) let an out-of-enum value reach getProjectTypeDefinition() later and
+  // throw deep inside provisioning-plan generation instead of failing safely here.
+  const classifiedType = classification?.content.projectType;
+  const projectType: IntakeAnalysisDraft["projectType"] =
+    classifiedType && (projectTypes as readonly string[]).includes(classifiedType)
+      ? (classifiedType as IntakeAnalysisDraft["projectType"])
+      : "internal_tool";
 
   // Required evaluation sections from depth routing
   const requiredEvaluationSections = EVALUATION_DEPTH_ROUTING_TABLE[evaluation.depth];

@@ -2573,3 +2573,32 @@ on live retry verification. `npm run build:core` clean. `npm test` —
 794/794 pass, no regressions.
 
 **Task log**: `docs/ai/tasks/TASK-0064-custom-build-verbosity-bound.md`
+
+## 2026-07-16 — Fix: classifier projectType taxonomy mismatch breaking provisioning (TASK-0065)
+
+User progressed the same intake to Gate 2 and clicked "Generate Distribution
+Preview" — same generic error. TASK-0062's logging paid off immediately, no
+reproduction needed: `Error: Unknown project type: ai_assistant` at
+`getProjectTypeDefinition`.
+
+Root cause: `openai-project-classifier-agent.ts`'s schema used a completely
+different, made-up `projectType` enum (`web_app, mobile_app, automation,
+dashboard, ai_assistant, ...`) with almost no overlap with the canonical
+`ProjectType` enum in `src/domain/types.ts` that `project-type-registry.ts`
+actually indexes. This meant every real (non-mock) evaluation's
+classification was unusable for provisioning — a systemic, 100%-reproducible
+bug. Compounding it, `evaluation-draft-mapper.ts` blindly cast the raw
+classifier string with `as`, no validation, so the bad value sailed through
+undetected until it crashed deep in provisioning-plan generation.
+
+**Fix**: classifier now imports `projectTypes` from `domain/types.ts`
+directly as its schema enum (single source of truth, can't drift again).
+`evaluation-draft-mapper.ts` now validates the classifier's value against
+`projectTypes` and falls back to `internal_tool` instead of propagating an
+invalid one.
+
+**Tests**: 1 new case in `evaluation-draft-mapper.test.mjs` — unrecognized
+projectType falls back to `internal_tool`. `npm run build:core` clean.
+`npm test` — 795/795 pass, no regressions.
+
+**Task log**: `docs/ai/tasks/TASK-0065-classifier-projecttype-taxonomy-mismatch.md`
