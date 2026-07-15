@@ -8,6 +8,7 @@ import {
   ForbiddenException,
   HttpException,
   InternalServerErrorException,
+  Logger,
   NotFoundException,
 } from "@nestjs/common";
 import type { Response } from "express";
@@ -24,12 +25,22 @@ import { InvalidTransitionError, WorkflowGuardError } from "../../../../src/doma
 
 @Catch(Error)
 export class ApplicationExceptionFilter implements ExceptionFilter {
+  private readonly logger = new Logger(ApplicationExceptionFilter.name);
+
   catch(error: Error, host: ArgumentsHost): void {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();
     const httpError = toHttpError(error);
     const status = httpError.getStatus();
     const body = httpError.getResponse();
+
+    // Unrecognized errors fall through to a generic 500 with no caller-visible
+    // detail (toHttpError's default branch) — log the real error server-side,
+    // otherwise it's unrecoverable: the client only ever sees "Unexpected
+    // application error."
+    if (status >= 500) {
+      this.logger.error(error.message, error.stack);
+    }
 
     response.status(status).json(
       typeof body === "string"
