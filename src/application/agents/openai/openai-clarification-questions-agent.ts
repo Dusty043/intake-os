@@ -31,7 +31,8 @@ const SYSTEM = `You are a requirements analyst. Identify missing information tha
 - isBlocking: true if there is at least one required question without which the project cannot be scoped
 - questions: up to 5 clarifying questions. Set required:true for questions that are truly blocking.
 - missingFields: short labels for key missing items (e.g. "tech stack preference", "expected user count")
-- Use short IDs like "q1", "q2" etc.`;
+- Use short IDs like "q1", "q2" etc.
+- If a "Already answered during discovery" section is present, do not flag those items as missing.`;
 
 export class OpenAIClarificationQuestionsAgent implements EvaluationAgent<ClarificationQuestionsSectionContent> {
   readonly role = "clarification_questions" as const;
@@ -39,11 +40,22 @@ export class OpenAIClarificationQuestionsAgent implements EvaluationAgent<Clarif
 
   async run(ctx: AgentRunContext, opts: AgentRunOptions): Promise<AgentOutput<ClarificationQuestionsSectionContent>> {
     const { intake } = ctx;
-    const userPrompt = `Title: ${intake.title}\nDescription:\n${intake.description}`;
+    const priorQA = (ctx.priorClarifications ?? [])
+      .map((q, i) => `Q${i + 1}: ${q.question}\nA${i + 1}: ${q.answer}`)
+      .join("\n\n");
+    const userPrompt = priorQA
+      ? `Title: ${intake.title}\nDescription:\n${intake.description}\n\nAlready answered during discovery:\n${priorQA}`
+      : `Title: ${intake.title}\nDescription:\n${intake.description}`;
     const { content: out } = await this.client.completeStructured<ClarificationQuestionsSectionContent>({
       model: this.model, systemPrompt: SYSTEM, userPrompt: userPrompt, schemaName: "clarification_questions", schema: schema as unknown as Record<string,unknown>,
     });
-    const warnings = out.isBlocking ? ["Clarification is blocking — evaluation may be incomplete."] : [];
-    return { sectionKind: "clarification_questions", content: out, confidence: 0.80, warnings };
+    // Prior clarification answers resolve blocking questions — treat as non-blocking.
+    // Matches MockClarificationQuestionsAgent; without this, Discovery-originated
+    // intakes get re-blocked at evaluation even though discovery already resolved it.
+    const hasPriorAnswers = (ctx.priorClarifications?.length ?? 0) > 0;
+    const isBlocking = out.isBlocking && !hasPriorAnswers;
+    const content: ClarificationQuestionsSectionContent = { ...out, isBlocking };
+    const warnings = isBlocking ? ["Clarification is blocking — evaluation may be incomplete."] : [];
+    return { sectionKind: "clarification_questions", content, confidence: 0.80, warnings, isClarificationBlocking: isBlocking };
   }
 }

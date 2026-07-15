@@ -2432,3 +2432,46 @@ codebase outside n8n/Monday" test in place of the current broad keyword heuristi
 (`code|app|build|develop|engineer` in `determineGithubRequired`, which over-triggers —
 e.g. "build a dashboard" → GitHub yes despite Internal Dashboard being `optional`) —
 not yet confirmed or implemented.
+
+## 2026-07-16 — Fix: Discovery-originated intakes re-blocked at evaluation, no draft created (TASK-0061)
+
+User reported after the TASK-0059/TASK-0060 deploy: "discovery is broken--- and it
+creates the intake properly but not at the proper stage and the pushback existed in
+the intake not the discovery. it doesnt create ai draft properly." Investigated via
+`superpowers:systematic-debugging` rather than guessing at a fix.
+
+Root cause: `src/application/agents/openai/openai-clarification-questions-agent.ts`
+never read `ctx.priorClarifications` or `ctx.discoveryNotes` — its prompt was built
+from only `intake.title`/`intake.description`, and the model's raw `isBlocking`
+verdict was returned unmodified. Grepped all 13 OpenAI evaluation agents: zero
+reference either field (a systemic gap, same shape as TASK-0059's "N of 13 agents
+missing a rule" pattern). `mock-clarification-questions-agent.ts` already had the
+correct rule ("Prior clarification answers resolve blocking questions — treat as
+non-blocking") — the OpenAI agent was simply never updated to match, and production
+runs real OpenAI agents (`AI_PROVIDER=openai`).
+
+Traced the failure chain in `evaluation-orchestrator.ts`: when the clarification
+agent says blocking, the orchestrator returns `clarification_required` and never
+reaches draft/synthesis — the intake transitions to `clarification_needed` instead
+of `intake_review`. This single mechanism explains all three symptoms in one root
+cause: wrong stage, duplicate pushback (Discovery already resolved it, evaluation
+re-asks from a thin title+description with no memory of what was already answered),
+and no draft (blocking short-circuits before synthesis ever runs).
+
+**Fix**: prompt now includes an "Already answered during discovery" section from
+`ctx.priorClarifications`; added the same deterministic override the mock agent has
+— `isBlocking` forced `false` when prior clarifications exist, regardless of what
+the model returns, rather than hoping the LLM infers it reliably from prose. Also
+now sets `isClarificationBlocking` on the `AgentOutput` (previously omitted).
+
+**Tests**: new `tests/openai-clarification-questions-agent.test.mjs` (3 cases,
+stub `LlmClient` matching `openai-discovery-agents-usage.test.mjs`'s pattern).
+Verified red→green against the pre-fix code first. `npm run build:core` clean.
+`npm test` — 791/791 pass, no regressions.
+
+**Task log**: `docs/ai/tasks/TASK-0061-discovery-clarification-reblocking-fix.md`
+
+**Follow-up**: Q-DISC-1 added — the other 12 OpenAI evaluation agents still don't
+read `ctx.discoveryNotes`/`ctx.priorClarifications`; draft quality for
+Discovery-originated intakes may be more generic than it could be. Not a
+correctness bug, scoped out as a separate quality improvement.
