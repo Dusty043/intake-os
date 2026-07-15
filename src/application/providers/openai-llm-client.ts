@@ -1,5 +1,6 @@
 import OpenAI from "openai";
 import type { LlmClient, StructuredCompletionParams, StructuredCompletionResult } from "../llm-client.js";
+import { ProviderResponseValidationError } from "../errors.js";
 
 export class OpenAiLlmClient implements LlmClient {
   readonly provider = "openai" as const;
@@ -49,13 +50,19 @@ export class OpenAiLlmClient implements LlmClient {
       }
     }
 
-    if (!raw) throw new Error(`OpenAI returned empty content for ${schemaName}`);
+    if (!raw) throw new ProviderResponseValidationError("openai", `Empty content for ${schemaName}.`);
 
     let parsed: unknown;
     try {
       parsed = JSON.parse(raw);
     } catch {
-      throw new Error(`OpenAI returned non-JSON for ${schemaName}: ${raw.slice(0, 200)}`);
+      // finish_reason "length" means the model hit max_completion_tokens before
+      // closing the JSON — a distinguishable, actionable cause (raise maxTokens
+      // for this schema) rather than genuinely malformed output.
+      const cause = finishReason === "length"
+        ? `response truncated at max_completion_tokens=${maxTokens} before valid JSON`
+        : "response is not valid JSON";
+      throw new ProviderResponseValidationError("openai", `${cause} for ${schemaName}: ${raw.slice(0, 200)}`);
     }
 
     return {

@@ -2475,3 +2475,45 @@ Verified red→green against the pre-fix code first. `npm run build:core` clean.
 read `ctx.discoveryNotes`/`ctx.priorClarifications`; draft quality for
 Discovery-originated intakes may be more generic than it could be. Not a
 correctness bug, scoped out as a separate quality improvement.
+
+## 2026-07-16 — Fix: "Unexpected application error" on select-direction/manifest (TASK-0062)
+
+User reported "unexpected application error on selecting direction" with a
+screenshot: red banner + DevTools showing `POST /api/discovery/{id}/manifest`
+returning 500. Server logs showed nothing at all — `ApplicationExceptionFilter`
+had zero logging before its generic 500 fallback. Added
+`this.logger.error(error.message, error.stack)` for 500-classified errors
+(safe, non-behavioral), deployed, then reproduced the exact failure directly
+via curl against the user's real session (`discovery-mrmfk0kz-1`, actor headers
+read from the proxy's own access logs) instead of needing another browser
+round-trip.
+
+Real error: `OpenAiLlmClient.completeStructured` threw "OpenAI returned
+non-JSON for proposal_composition" — the model's response for
+`OpenAIProposalComposerAgent`'s 18-required-field schema (several long
+free-text fields + arrays) exceeded `maxTokens: 3000` and got cut off mid-JSON.
+`openai-llm-client.ts` then threw a plain `Error` instead of the
+`ProviderResponseValidationError` this codebase already uses for this exact
+failure shape in `openai-intake-analysis-provider.ts` /
+`bedrock-intake-analysis-provider.ts` / `anthropic-intake-analysis-provider.ts`
+— so `ApplicationExceptionFilter`'s `toHttpError()` couldn't classify it and
+fell through to the opaque "Unexpected application error." 500.
+
+**Fix**: `openai-llm-client.ts` now throws `ProviderResponseValidationError`
+for both empty-content and non-JSON cases (routes to a real 502 with the
+actual cause visible), and explicitly names truncation when
+`finish_reason === "length"` rather than implying malformed output — this
+benefits every OpenAI discovery/evaluation agent sharing this client, not
+just the proposal composer. `openai-proposal-composer-agent.ts`'s `maxTokens`
+raised 3000 → 6000 so this schema stops truncating for realistic proposals.
+
+**Tests**: no new unit test — `OpenAiLlmClient` has no DI seam for the OpenAI
+SDK client (unlike `OpenAIIntakeAnalysisProvider`, which does), so verified
+via live reproduction instead (same curl call, before/after the fix — failed,
+then succeeded post-deploy). `npm run build:core` clean. `npm test` —
+791/791 pass, no regressions.
+
+**Task log**: `docs/ai/tasks/TASK-0062-manifest-generation-truncated-json-500.md`
+
+**Follow-up**: no numbered open question — noted as a testability nice-to-have
+(add a `client?: OpenAI` injection seam to `OpenAiLlmClient`) in the task log.

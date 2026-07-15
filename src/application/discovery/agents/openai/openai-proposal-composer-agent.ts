@@ -92,7 +92,7 @@ export class OpenAIProposalComposerAgent implements IProposalComposerAgent {
 
     const system = BASE_SYSTEM + orgContextBlock(opts.orgContext);
     const out = await completeWithUsage<Output>(this.client, opts, "proposal_composition", this.model, {
-      systemPrompt: system, userPrompt: userPrompt, schemaName: "proposal_composition", schema: schema as unknown as Record<string, unknown>, maxTokens: 3000,
+      systemPrompt: system, userPrompt: userPrompt, schemaName: "proposal_composition", schema: schema as unknown as Record<string, unknown>, maxTokens: 6000,
     });
 
     const now = opts.now;
