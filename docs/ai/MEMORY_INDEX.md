@@ -78,6 +78,7 @@ Generated at: 2026-06-09T14:53:20.716Z
 - `docs/ai/tasks/TASK-0057-discovery-to-intake-draft-race-fix.md` — fix: `generateMockAnalysisDraft` threw `InvalidTransitionError` when called after the draft was already ready (background auto-draft job racing a manual "Generate Mock AI Draft" click); added an idempotency guard so a second call is a no-op instead of a crash
 - `docs/ai/tasks/TASK-0058-concurrency-hardening-q-conc-1-2.md` — added compare-and-swap to `ProjectIntakeStore.saveIntake`, wired into `applyTransitionToRecord` (the sole choke point for every workflow transition); added `linkedIntakeId` to `DiscoverySession` so `sendToEvaluation()` no longer creates a duplicate intake on a repeat call
 - `docs/ai/tasks/TASK-0059-openai-strict-schema-required-fields.md` — fix: 6 of 13 OpenAI agent schemas violated Structured Outputs' strict-mode rule (every `properties` key must be in `required`, optional fields nullable), silently breaking the entire real evaluation pipeline in production; intakes stuck at `evaluating` forever with no visible error
+- `docs/ai/tasks/TASK-0060-distribution-planner-board-group-fix.md` — fix: `MockDistributionPlannerAgent`'s Monday board/group names predated the Q-0005 schema correction (invented board names, made-up groups); now always suggests "Projects Portfolio" and maps to real `MondayProjectType` groups. Surfaced Q-DIST-1 (unresolved): GitHub-optional default narrowing + real-world category taxonomy mismatch
 - `docs/ai/tasks/HANDOFF-0023D-monday-credentials.md`
 
 ## Deployment Docs

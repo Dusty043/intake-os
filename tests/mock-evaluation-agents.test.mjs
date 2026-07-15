@@ -405,6 +405,27 @@ describe("MockDistributionPlannerAgent", () => {
     });
     assert.equal(output.content.github.required, true);
   });
+
+  it("monday.suggestedBoard is always Projects Portfolio", async () => {
+    const output = await runAgent(new MockDistributionPlannerAgent(), {
+      projectType: "saas_platform",
+    });
+    assert.equal(output.content.monday.suggestedBoard, "Projects Portfolio");
+  });
+
+  it("monday.suggestedGroup maps n8n_automation to n8n Workflow", async () => {
+    const output = await runAgent(new MockDistributionPlannerAgent(), {
+      projectType: "n8n_automation",
+    });
+    assert.equal(output.content.monday.suggestedGroup, "n8n Workflow");
+  });
+
+  it("monday.suggestedGroup falls back to Other for unmapped project types", async () => {
+    const output = await runAgent(new MockDistributionPlannerAgent(), {
+      projectType: "api_service",
+    });
+    assert.equal(output.content.monday.suggestedGroup, "Other");
+  });
 });
 
 // ─── Agent 11: MockFinalSynthesisAgent ───────────────────────────────────────

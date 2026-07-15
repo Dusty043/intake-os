@@ -2389,3 +2389,46 @@ shipped silently) — not yet re-verified against the real OpenAI endpoint post-
 (stuck forever, only a server log warning); several pre-existing production intakes are
 still stuck from before this fix and need manual recovery. Also flagged: no automated
 schema-consistency test exists to catch this class of bug for future agents.
+
+## 2026-07-16 — Fix: stale Monday board/group names in MockDistributionPlannerAgent (TASK-0060)
+
+User asked to confirm the criteria Intake OS uses to route a request to
+GitHub+Monday provisioning vs. Monday-only. Existing docs (`project-type-registry.md`,
+`distribution-rules.md`) already fully answer this per-project-type — not a binary
+GitHub/web-app-vs-Monday-only split as the user's framing assumed. Two corrections
+surfaced during confirmation:
+
+1. There is no separate "new Monday workspace" — every `create_project` request writes
+   to Board 2 (Projects Portfolio) in the single existing Dev Operations Workspace
+   (Q-0005), whether or not GitHub is required. GitHub repo creation is additive, not a
+   fork to a different Monday destination.
+2. `mock-distribution-planner-agent.ts` (the `distribution_plan` mock agent, used by the
+   intake-evaluation pipeline) predated the Q-0005 schema correction: `inferMondayBoard`
+   invented board names ("Software Development Board", "AI/Automation Projects Board",
+   etc.) that don't exist in the real 6-board schema, and `inferMondayGroup` used
+   made-up group names instead of the real `MondayProjectType` enum. The live
+   `OpenAIDistributionPlannerAgent` already correctly said "Projects Portfolio" via its
+   system prompt — only the mock was stale.
+
+User confirmed (recommended option) to fix this now. Removed `inferMondayBoard`;
+`suggestedBoard` is now the constant `"Projects Portfolio"`. Rewrote `inferMondayGroup`'s
+lookup table to map each `ProjectType` to a real `MondayProjectType` group, with
+`"Other"` as an explicit fallback where no clean mapping exists (`api_service`,
+`ai_workflow_tool`, `data_sync_integration`, `discovery_research`) rather than guessing.
+
+**Tests**: added 3 cases to `tests/mock-evaluation-agents.test.mjs`
+(`MockDistributionPlannerAgent` describe block) covering the constant board and the
+group lookup/fallback. `npm run build:core` clean. `node --test
+tests/mock-evaluation-agents.test.mjs` — 83/83 pass, no regressions.
+
+**Task log**: `docs/ai/tasks/TASK-0060-distribution-planner-board-group-fix.md`
+
+**Follow-up**: Q-DIST-1 added — user's real-world intake categories (webapp, chrome
+extension, custom n8n node, automation [broad, mostly n8n], system) don't map cleanly
+onto either the 10-value `ProjectType` enum or the 8-value `MondayProjectType` enum.
+User couldn't confirm how to narrow the GitHub-required default for the 3 `optional`
+types ("idk how to narrow properly"). Recommended a "does delivery require a maintained
+codebase outside n8n/Monday" test in place of the current broad keyword heuristic
+(`code|app|build|develop|engineer` in `determineGithubRequired`, which over-triggers —
+e.g. "build a dashboard" → GitHub yes despite Internal Dashboard being `optional`) —
+not yet confirmed or implemented.
