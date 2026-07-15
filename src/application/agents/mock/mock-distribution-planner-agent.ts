@@ -28,7 +28,7 @@ export class MockDistributionPlannerAgent implements EvaluationAgent<Distributio
     const issueBreakdownSuggested = githubRequired && containsAny(text, ["task", "breakdown", "subtask", "sprint"]);
 
     const mondayItemName = intake.title.slice(0, 80);
-    const suggestedBoard = inferMondayBoard(text, projectType);
+    const suggestedBoard = "Projects Portfolio";
     const suggestedGroup = inferMondayGroup(projectType);
 
     const distributionNotes: string[] = [
@@ -85,25 +85,20 @@ function buildIssueLabels(text: string, projectType: string): string[] {
   return labels;
 }
 
-function inferMondayBoard(text: string, projectType: string): string {
-  if (containsAny(text, ["design", "ux"])) return "Design & Product Board";
-  if (projectType === "ai_workflow_tool") return "AI/Automation Projects Board";
-  if (containsAny(text, ["infra", "deploy"])) return "Infrastructure Board";
-  return "Software Development Board";
-}
-
+// Groups match the Board 2 (Projects Portfolio) "Project Type" column defined in
+// docs/product/distribution-rules.md — the MondayProjectType enum in src/domain/discovery.ts.
 function inferMondayGroup(projectType: string): string {
   const groupByType: Record<string, string> = {
-    internal_tool: "Internal Tools",
-    api_service: "Backend Services",
-    internal_dashboard: "Dashboards & Reporting",
-    reporting_automation: "Automation & Reports",
-    n8n_automation: "Workflow Automation",
-    saas_platform: "Product / SaaS",
-    client_portal: "Client-Facing",
-    ai_workflow_tool: "AI/ML Projects",
-    data_sync_integration: "Data & Integrations",
-    discovery_research: "Research & Discovery",
+    internal_tool: "Web App",
+    api_service: "Other",
+    internal_dashboard: "Dashboard",
+    reporting_automation: "Dashboard",
+    n8n_automation: "n8n Workflow",
+    saas_platform: "SaaS",
+    client_portal: "Web App",
+    ai_workflow_tool: "Other",
+    data_sync_integration: "Other",
+    discovery_research: "Other",
   };
-  return groupByType[projectType] ?? "General";
+  return groupByType[projectType] ?? "Other";
 }
