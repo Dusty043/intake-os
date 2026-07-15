@@ -22,7 +22,8 @@ const SYSTEM = `You are a senior full-stack engineer. Assess whether this projec
 - backendNeeds: API endpoints, business logic, data processing needed
 - frontendNeeds: UI components, pages, interactions needed
 - integrationNeeds: third-party APIs, webhooks, external systems
-- infrastructureNeeds: hosting, databases, queues, storage, CI/CD`;
+- infrastructureNeeds: hosting, databases, queues, storage, CI/CD
+- Keep each list item to one concise phrase (max ~15 words). List at most 6 items per array — pick the most important, do not enumerate exhaustively.`;
 
 export class OpenAICustomBuildAgent implements EvaluationAgent<CustomBuildSectionContent> {
   readonly role = "custom_build" as const;
@@ -32,7 +33,7 @@ export class OpenAICustomBuildAgent implements EvaluationAgent<CustomBuildSectio
     const { intake } = ctx;
     const userPrompt = `Title: ${intake.title}\nDescription:\n${intake.description}`;
     const { content: out } = await this.client.completeStructured<CustomBuildSectionContent>({
-      model: this.model, systemPrompt: SYSTEM, userPrompt: userPrompt, schemaName: "custom_build", schema: schema as unknown as Record<string,unknown>,
+      model: this.model, systemPrompt: SYSTEM, userPrompt: userPrompt, schemaName: "custom_build", schema: schema as unknown as Record<string,unknown>, maxTokens: 6000,
     });
     return { sectionKind: "custom_build", content: out, confidence: 0.80, warnings: [] };
   }

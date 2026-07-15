@@ -2555,3 +2555,21 @@ no regressions.
 (`intake-mrl41883-15` and others, plus `intake-mrmgsweh-3` from this task)
 predate the revert logic and are not auto-healed — still need manual
 recovery or recreation.
+
+## 2026-07-16 — Fix: custom_build agent still truncating at raised maxTokens (TASK-0064)
+
+User reported "still broken" on a fresh intake (`intake-mrmhkuou-18`) right
+after TASK-0063 deployed. Confirmed the revert-to-submitted fix worked (no
+longer stuck forever), but `custom_build` truncated again — this time at the
+just-raised `max_completion_tokens=4000` default, for another maximalist
+infra-platform request. Raising the ceiling alone doesn't fix unbounded
+verbosity. Added an explicit brevity constraint to
+`openai-custom-build-agent.ts`'s system prompt (max ~15 words per item, max 6
+items per array) plus `maxTokens: 6000` headroom, bounding output size at the
+source instead of chasing it with an ever-higher cap.
+
+**Tests**: no new test (prompt-content tuning, no new logic branch); relying
+on live retry verification. `npm run build:core` clean. `npm test` —
+794/794 pass, no regressions.
+
+**Task log**: `docs/ai/tasks/TASK-0064-custom-build-verbosity-bound.md`

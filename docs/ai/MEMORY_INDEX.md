@@ -135,3 +135,4 @@ Generated at: 2026-06-09T14:53:20.716Z
 - `docs/ai/tasks/TASK-DISCOVERY-PHASE4.md` — Phase 4: manifest generator, intent→action routing, Monday/GitHub manifest blocks
 - `docs/ai/tasks/TASK-DISCOVERY-PHASE5.md` — Phase 5: NestJS DiscoveryModule, DiscoveryHttpController, 10 API routes
 - `docs/ai/tasks/TASK-DISCOVERY-PHASE6.md` — Phase 6: Next.js frontend — session list, three-panel session view, all action handlers
+- `docs/ai/tasks/TASK-0064-custom-build-verbosity-bound.md` — fix: `custom_build` agent kept truncating even at the raised maxTokens default; added an explicit brevity constraint to its system prompt (bounds output size at the source) plus more headroom
