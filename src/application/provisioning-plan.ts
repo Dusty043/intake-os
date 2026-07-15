@@ -7,7 +7,8 @@ import {
   generateDefaultLabels,
   generateRepositoryName,
 } from "../domain/repository-naming.js";
-import type { Actor } from "../domain/types.js";
+import type { Actor, ProjectType } from "../domain/types.js";
+import { projectTypes } from "../domain/types.js";
 import { ValidationError } from "./errors.js";
 import type {
   DistributionSourceType,
@@ -57,7 +58,14 @@ export function buildDryRunProvisioningPlan(
   const source = resolveDistributionSource(intake);
   const pkg = source.type === "reviewed_project_package" ? intake.reviewedProjectPackage! : undefined;
 
-  const effectiveProjectType = pkg?.projectType ?? intake.projectType;
+  // Defense-in-depth: pkg.projectType is a snapshot taken at Gate 1 acceptance
+  // time (locked, never re-derived) — an invalid value from before TASK-0065's
+  // classifier fix can still be baked into an already-approved package. Fall
+  // back rather than throwing deep here for a record that can't be re-approved.
+  const rawProjectType = pkg?.projectType ?? intake.projectType;
+  const effectiveProjectType: ProjectType = (projectTypes as readonly string[]).includes(rawProjectType)
+    ? (rawProjectType as ProjectType)
+    : "internal_tool";
   const definition = getProjectTypeDefinition(effectiveProjectType);
 
   const githubRequirement = resolveGithubRequirement(

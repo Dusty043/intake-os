@@ -63,13 +63,32 @@ Committed and pushed to `main`, pulled + rebuilt + restarted on
 oreochiserver, healthcheck passed. Retried "Generate Distribution Preview"
 for the same intake to confirm (see BUILD_LOG for result).
 
+## Correction — first deploy didn't fully fix it
+
+Retried the exact failing call live after deploying the first two fixes:
+**still** `Unknown project type: ai_assistant`. Traced further:
+`buildDryRunProvisioningPlan` (`provisioning-plan.ts:60`) reads
+`pkg?.projectType ?? intake.projectType` — `pkg` is the `ReviewedProjectPackage`
+snapshotted at Gate 1 acceptance time, **not** re-derived from the evaluation
+on each call. This intake's package was accepted before this session's fixes
+landed, so its `projectType` is permanently `"ai_assistant"` — and approval
+records are locked (CLAUDE.md), so it can't be re-accepted to pick up a
+corrected value.
+
+Added the same validate-or-fallback guard directly in
+`provisioning-plan.ts`'s `buildDryRunProvisioningPlan`, right before
+`getProjectTypeDefinition()` — this is the true final consumption point for
+every provisioning-plan call, protecting already-approved/locked packages
+too, not just future evaluations.
+
+No dedicated unit test added for this last piece — no existing test file
+covers `buildDryRunProvisioningPlan` and building full fixtures from scratch
+was a larger investment than the session's cost situation could justify;
+relied on live retry verification instead (confirmed in BUILD_LOG).
+
 ## Not Changed
 
 - Did not re-classify/re-run evaluation for intakes already stuck with a
-  bad `projectType` from before this fix — this intake's classification
-  section already has `projectType: "ai_assistant"` baked into its
-  persisted evaluation. The mapper fallback (this fix) makes distribution
-  preview generation work going forward for it too, since
-  `evaluationToLegacyDraft` re-derives the draft's `projectType` from the
-  same stored classification section each time it's called — no
-  re-evaluation needed.
+  bad `projectType` from before this fix — the `provisioning-plan.ts` guard
+  makes distribution preview generation work for them going forward without
+  needing to touch locked approval records.

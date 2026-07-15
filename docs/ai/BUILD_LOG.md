@@ -2601,4 +2601,14 @@ invalid one.
 projectType falls back to `internal_tool`. `npm run build:core` clean.
 `npm test` — 795/795 pass, no regressions.
 
+**Correction after live retry still failed**: `buildDryRunProvisioningPlan`
+reads `pkg?.projectType` from the `ReviewedProjectPackage` snapshotted at
+Gate 1 acceptance — not re-derived per call. This intake's package predates
+the fix, is permanently `"ai_assistant"`, and approval records are locked
+(can't re-accept to fix it). Added the same validate-or-fallback guard
+directly in `provisioning-plan.ts` before `getProjectTypeDefinition()` —
+the true final consumption point, fixing already-approved/locked packages
+too. `npm run build:core` clean, `npm test` 795/795 (no new test — no
+existing fixture harness for this function; relied on live retry).
+
 **Task log**: `docs/ai/tasks/TASK-0065-classifier-projecttype-taxonomy-mismatch.md`
