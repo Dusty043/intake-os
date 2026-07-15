@@ -11,7 +11,11 @@ export class OpenAiLlmClient implements LlmClient {
   }
 
   async completeStructured<T>(params: StructuredCompletionParams): Promise<StructuredCompletionResult<T>> {
-    const { model, systemPrompt, userPrompt, schemaName, schema, maxTokens = 2500, onToken } = params;
+    // 10 of 13 evaluation agents and most discovery agents rely on this default
+    // rather than passing their own maxTokens. 2500 was too tight for verbose,
+    // multi-array schemas (e.g. custom_build) on complex real-world requests —
+    // truncated mid-JSON, thrown as ProviderResponseValidationError.
+    const { model, systemPrompt, userPrompt, schemaName, schema, maxTokens = 4000, onToken } = params;
 
     // Always streams internally — same final result (accumulated content is
     // parsed identically to a non-streaming call), but lets Discovery forward

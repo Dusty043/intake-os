@@ -2517,3 +2517,41 @@ then succeeded post-deploy). `npm run build:core` clean. `npm test` —
 
 **Follow-up**: no numbered open question — noted as a testability nice-to-have
 (add a `client?: OpenAI` injection seam to `OpenAiLlmClient`) in the task log.
+
+## 2026-07-16 — Fix: intakes stuck at "evaluating" forever + shared maxTokens default (TASK-0063, closes Q-EVAL-1)
+
+User confirmed the TASK-0062 fix worked, then reported: "okay discovery was
+fixed but it still failed intake." With TASK-0062's new logging already live,
+checked `docker logs intake-os-api-1` directly — no reproduction needed this
+time: `Auto-evaluation failed for intake intake-mrmgsweh-3:
+ProviderResponseValidationError: ... truncated at max_completion_tokens=2500
+... for custom_build`. Same truncation class TASK-0062 just fixed, a
+different agent.
+
+Two root causes: (1) `custom_build`'s schema (6 fields, 4 free-text arrays)
+exceeded the shared `OpenAiLlmClient` default of `maxTokens: 2500` — checked
+all 13 evaluation agents, only 2 override it explicitly, the other 10 rely
+on the default; (2) Q-EVAL-1 (logged in TASK-0059, never fixed) — the
+`evaluation_failed: evaluating -> submitted` transition existed in
+`workflow.ts` but nothing ever triggered it, so a failed evaluation left the
+intake permanently stuck with no retry path.
+
+**Fix**: raised the shared default `maxTokens` 2500→4000 (benefits all 10
+agents relying on it). `generateEvaluation` now wraps the orchestrator call
+in try/catch — on failure, fires `evaluation_failed` to revert to
+`submitted`, records an `EVALUATION_FAILED` audit event with the error
+message, then rethrows.
+
+**Tests**: 3 new cases in `tests/generate-evaluation-service.test.mjs`
+(`describe("generateEvaluation — orchestrator failure")`) using the existing
+`makeOrchestrator(agentOverrides)` harness with a fake throwing agent:
+reverts to submitted, records the audit event, and a subsequent retry
+succeeds end-to-end. `npm run build:core` clean. `npm test` — 794/794 pass,
+no regressions.
+
+**Task log**: `docs/ai/tasks/TASK-0063-eval-failed-retry-and-maxtokens-default.md`
+
+**Follow-up**: Q-EVAL-1 closed (resolved). Pre-existing stuck intakes
+(`intake-mrl41883-15` and others, plus `intake-mrmgsweh-3` from this task)
+predate the revert logic and are not auto-healed — still need manual
+recovery or recreation.

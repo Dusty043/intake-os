@@ -292,3 +292,78 @@ describe("regenerateAnalysisDraft — orchestrator routing", () => {
     assert.ok(regenEvent.metadata?.newDraftId, "must include newDraftId");
   });
 });
+
+// ─── generateEvaluation: failure path (Q-EVAL-1) ────────────────────────────
+
+describe("generateEvaluation — orchestrator failure", () => {
+  it("reverts the intake to submitted instead of leaving it stuck at evaluating", async () => {
+    _seq = 0;
+    const failingAgent = {
+      role: "intake_brief",
+      async run() {
+        throw new Error("simulated provider failure");
+      },
+    };
+    const orchestrator = makeOrchestrator({ intake_brief: failingAgent });
+    const service = makeServiceWithOrchestrator(orchestrator);
+    const submitted = await createAndSubmitIntake(service);
+
+    await assert.rejects(
+      () => service.generateEvaluation(submitted.id, { depth: "standard", provider: "mock" }, intakeOwner),
+      /simulated provider failure/,
+    );
+
+    const reverted = await service.getIntake(submitted.id, intakeOwner);
+    assert.equal(reverted.status, "submitted");
+  });
+
+  it("records an EVALUATION_FAILED audit event with the error message", async () => {
+    _seq = 0;
+    const failingAgent = {
+      role: "intake_brief",
+      async run() {
+        throw new Error("simulated provider failure");
+      },
+    };
+    const orchestrator = makeOrchestrator({ intake_brief: failingAgent });
+    const service = makeServiceWithOrchestrator(orchestrator);
+    const submitted = await createAndSubmitIntake(service);
+
+    await assert.rejects(() =>
+      service.generateEvaluation(submitted.id, { depth: "standard", provider: "mock" }, intakeOwner),
+    );
+
+    const audit = await service.getAuditTrail(submitted.id, intakeOwner);
+    const failedEvent = audit.find((e) => e.action === "EVALUATION_FAILED");
+    assert.ok(failedEvent, "EVALUATION_FAILED audit event must exist");
+    assert.match(failedEvent.metadata?.error ?? "", /simulated provider failure/);
+  });
+
+  it("allows retrying generateEvaluation after a reverted failure", async () => {
+    _seq = 0;
+    let shouldFail = true;
+    const flakyAgent = {
+      role: "intake_brief",
+      async run(ctx, opts) {
+        if (shouldFail) {
+          shouldFail = false;
+          throw new Error("simulated provider failure");
+        }
+        return createAllMockEvaluationAgents()
+          .find((a) => a.role === "intake_brief")
+          .run(ctx, opts);
+      },
+    };
+    const orchestrator = makeOrchestrator({ intake_brief: flakyAgent });
+    const service = makeServiceWithOrchestrator(orchestrator);
+    const submitted = await createAndSubmitIntake(service);
+
+    await assert.rejects(() =>
+      service.generateEvaluation(submitted.id, { depth: "standard", provider: "mock" }, intakeOwner),
+    );
+
+    const result = await service.generateEvaluation(submitted.id, { depth: "standard", provider: "mock" }, intakeOwner);
+    assert.equal(result.status, "intake_review");
+    assert.ok(result.latestAnalysisDraft, "retry must produce a draft");
+  });
+});

@@ -473,7 +473,29 @@ export class IntakeWorkflowService {
       allowDepthUpgrade: input.allowDepthUpgrade ?? true,
     };
 
-    const result = await this.orchestrator.orchestrate(record, orchestrationOptions);
+    let result: Awaited<ReturnType<typeof this.orchestrator.orchestrate>>;
+    try {
+      result = await this.orchestrator.orchestrate(record, orchestrationOptions);
+    } catch (err) {
+      // Q-EVAL-1: without this, a failed evaluation (e.g. a provider error)
+      // left the intake stuck at "evaluating" forever — generate_evaluation
+      // only fires from "submitted", so there was no retry path, only a
+      // fire-and-forget warning log at the discovery call site.
+      const failedNow = this.clock();
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      const reverted = await this.applyTransitionToRecord(record, "evaluation_failed", actor, failedNow, {
+        reason: "AI evaluation failed — returned to submitted for retry.",
+        metadata: { error: errorMessage, depth },
+      });
+      await this.audit({
+        record: reverted,
+        actor,
+        action: "EVALUATION_FAILED",
+        timestamp: failedNow,
+        metadata: { error: errorMessage, depth },
+      });
+      throw err;
+    }
 
     if (result.kind === "clarification_required") {
       const withPending: ProjectIntakeRecord = {
