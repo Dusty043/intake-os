@@ -401,12 +401,14 @@ export function DiscoveryChat({
       {/* Header */}
       <div className="px-4 py-4 border-b border-gray-100 flex items-center justify-between">
         <p className="section-label mb-0">Conversation</p>
-        {busy && (
-          <span className="text-xs text-indigo-600 font-medium flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-indigo-600 animate-pulse" />
-            {progressText(activeStages)}
-          </span>
-        )}
+        <span aria-live="polite" className="text-xs text-indigo-600 font-medium flex items-center gap-1.5 min-h-[1rem]">
+          {busy && (
+            <>
+              <span className="w-2 h-2 rounded-full bg-indigo-600 animate-pulse" />
+              {progressText(activeStages)}
+            </>
+          )}
+        </span>
       </div>
 
       {/* Messages */}

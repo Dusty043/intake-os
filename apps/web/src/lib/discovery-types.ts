@@ -176,4 +176,5 @@ export type DiscoverySession = {
   proposal: DiscoveryProposal | null;
   manifest: DiscoveryManifest | null;
   confidence: DiscoveryConfidence;
+  linkedIntakeId?: string | null;
 };

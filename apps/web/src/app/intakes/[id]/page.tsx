@@ -1026,14 +1026,16 @@ function ProvisioningRunPanel({
   );
 }
 
-function DistributionTab({
+export function DistributionTab({
   intake,
   actor,
   onIntakeUpdate,
+  onSuccess,
 }: {
   intake: ProjectIntakeRecord;
   actor: UiActor;
   onIntakeUpdate: (updated: ProjectIntakeRecord) => void;
+  onSuccess: (message: string) => void;
 }) {
   const plan = intake.provisioningPlan;
   const [busy, setBusy] = useState<string | null>(null);
@@ -1076,6 +1078,7 @@ function DistributionTab({
       setRuns((prev) => [run, ...(prev ?? [])]);
       const updated = await import("@/lib/api-client").then(m => m.getIntake(intake.id, actor));
       onIntakeUpdate(updated);
+      onSuccess("Distribution executing. Track progress below.");
     } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
     finally { setBusy(null); }
   }
@@ -1614,6 +1617,7 @@ function IntakeDetailContent() {
             setIntake(updated);
             void getAuditTrail(intake.id, actor).then(setAudit);
           }}
+          onSuccess={(msg) => setSuccessMsg(msg)}
         />
       )}
       {activeTab === "Audit Trail" && (

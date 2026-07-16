@@ -42,7 +42,6 @@ export default function DiscoverySessionPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [linkedIntakeId, setLinkedIntakeId] = useState<string | null>(null);
   const [activeStages, setActiveStages] = useState<Set<string>>(new Set());
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -59,11 +58,6 @@ export default function DiscoverySessionPage() {
     try {
       const data = await getDiscoverySession(id, actor);
       setSession(data);
-      if (data.status === "sent_to_evaluation") {
-        try {
-          setLinkedIntakeId(localStorage.getItem(`pit:discovery:intake:${id}`));
-        } catch {}
-      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to load discovery session.");
     } finally {
@@ -188,9 +182,6 @@ export default function DiscoverySessionPage() {
       if (result.intakeRecord && typeof result.intakeRecord === "object") {
         const record = result.intakeRecord as { id?: string };
         if (record.id) {
-          try {
-            localStorage.setItem(`pit:discovery:intake:${id}`, record.id);
-          } catch {}
           router.push(`/intakes/${record.id}`);
           return;
         }
@@ -267,9 +258,9 @@ export default function DiscoverySessionPage() {
             ✓ Sent to evaluation
           </span>
           <span className="text-emerald-700/60">—</span>
-          {linkedIntakeId ? (
+          {session.linkedIntakeId ? (
             <Link
-              href={`/intakes/${linkedIntakeId}`}
+              href={`/intakes/${session.linkedIntakeId}`}
               className="text-emerald-700 font-medium hover:text-emerald-900 hover:underline"
             >
               View intake →
