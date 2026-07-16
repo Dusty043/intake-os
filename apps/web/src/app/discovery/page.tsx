@@ -38,14 +38,6 @@ function getSessionTitle(session: DiscoverySession): string | null {
   return null;
 }
 
-function getLinkedIntakeId(sessionId: string): string | null {
-  try {
-    return localStorage.getItem(`pit:discovery:intake:${sessionId}`);
-  } catch {
-    return null;
-  }
-}
-
 export default function DiscoveryListPage() {
   const { actor } = useActor();
   const { user } = useAuth();
@@ -148,7 +140,7 @@ export default function DiscoveryListPage() {
                     lastEvent?.occurredAt ?? lastMessage?.createdAt ?? session.id;
                   const title = getSessionTitle(session);
                   const linkedIntakeId = session.status === "sent_to_evaluation"
-                    ? getLinkedIntakeId(session.id)
+                    ? session.linkedIntakeId
                     : null;
 
                   return (
