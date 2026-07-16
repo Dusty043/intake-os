@@ -2694,3 +2694,21 @@ This closes out all 4 items of TASK-0066's plan (Q-UX-1 verification, form valid
 dead-field cleanup, Discovery a11y/toast audit, unsaved-changes guard).
 
 **Task log**: `docs/ai/tasks/TASK-0071-intake-form-unsaved-changes-guard.md`
+
+## 2026-07-16 — Fix: production build break from DistributionTab page export (TASK-0072)
+
+Redeploy to oreochiserver failed `next build`: TASK-0070 exported `DistributionTab`
+directly from `apps/web/src/app/intakes/[id]/page.tsx` so its unit test could import it,
+but Next.js's App Router only allows a fixed set of exports from `page.tsx` files — a
+check enforced only by `next build`'s own type-checking pass, not `tsc --noEmit` or
+`vitest`, so none of TASK-0069/0070/0071's verification commands caught it. Moved
+`DistributionTab` and its private helpers (`RunStatusBadge`, `ProvisioningRunPanel`)
+into a new `apps/web/src/app/intakes/[id]/DistributionTab.tsx`; extracted the shared
+`KV` helper (used by `DistributionTab` and 32 other spots in `page.tsx`) into
+`apps/web/src/components/KV.tsx` so both files could import it without `page.tsx`
+re-exporting anything. `page.tsx` now only has its default export.
+
+`npm run build:core` clean, `npm --prefix apps/web run build` now succeeds (the check
+that was missing), `apps/web` vitest 34/34, `npm test` 795/795, typecheck clean.
+
+**Task log**: `docs/ai/tasks/TASK-0072-distribution-tab-page-export-build-fix.md`

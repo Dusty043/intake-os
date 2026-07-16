@@ -1,6 +1,6 @@
 # Memory Index
 
-Generated at: 2026-07-16T20:18:47.839Z
+Generated at: 2026-07-16T21:50:06.853Z
 
 ## Core Memory
 
@@ -97,6 +97,7 @@ Generated at: 2026-07-16T20:18:47.839Z
 - `docs/ai/tasks/TASK-0069-intake-form-validation-and-dead-field-cleanup.md`
 - `docs/ai/tasks/TASK-0070-discovery-a11y-and-toast-audit.md`
 - `docs/ai/tasks/TASK-0071-intake-form-unsaved-changes-guard.md`
+- `docs/ai/tasks/TASK-0072-distribution-tab-page-export-build-fix.md`
 - `docs/ai/tasks/TASK-DISCOVERY-PHASE1.md`
 - `docs/ai/tasks/TASK-DISCOVERY-PHASE2.md`
 - `docs/ai/tasks/TASK-DISCOVERY-PHASE3.md`

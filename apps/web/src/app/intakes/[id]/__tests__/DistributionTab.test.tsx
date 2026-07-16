@@ -1,7 +1,7 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { DistributionTab } from "../page";
+import { DistributionTab } from "../DistributionTab";
 import * as apiClient from "@/lib/api-client";
 import type { ProjectIntakeRecord, UiActor } from "@/lib/types";
 
