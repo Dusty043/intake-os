@@ -2712,3 +2712,17 @@ re-exporting anything. `page.tsx` now only has its default export.
 that was missing), `apps/web` vitest 34/34, `npm test` 795/795, typecheck clean.
 
 **Task log**: `docs/ai/tasks/TASK-0072-distribution-tab-page-export-build-fix.md`
+
+## 2026-07-17 — Config: Enable live OpenAI provider (TASK-0073)
+
+Local `.env` (gitignored) had `AI_PROVIDER=mock` with `OPENAI_API_KEY` already
+set but `OPENAI_MODEL`/`OPENAI_TASKS_MODEL` blank. Flipped `AI_PROVIDER=openai`
+and set `OPENAI_MODEL=gpt-5.6-sol`, `OPENAI_TASKS_MODEL=gpt-5.6-terra` — these
+match the existing hardcoded fallback defaults in `analysis-provider-config.ts`,
+so no code behavior changes, just makes the provider switch explicit and live.
+
+No code changed, no tests run (config-only). Not runtime-verified this
+session — next session should run a real intake through Discovery to confirm
+live OpenAI calls succeed end-to-end.
+
+**Task log**: `docs/ai/tasks/TASK-0073-enable-live-openai-provider.md`
