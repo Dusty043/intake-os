@@ -1,6 +1,6 @@
 # Memory Index
 
-Generated at: 2026-07-16T14:40:41.482Z
+Generated at: 2026-07-16T20:18:47.839Z
 
 ## Core Memory
 
@@ -93,6 +93,10 @@ Generated at: 2026-07-16T14:40:41.482Z
 - `docs/ai/tasks/TASK-0065-classifier-projecttype-taxonomy-mismatch.md`
 - `docs/ai/tasks/TASK-0066-live-streaming-verification-and-ui-qol-plan.md`
 - `docs/ai/tasks/TASK-0067-project-epic-task-sizing.md`
+- `docs/ai/tasks/TASK-0068-verify-discovery-live-streaming.md`
+- `docs/ai/tasks/TASK-0069-intake-form-validation-and-dead-field-cleanup.md`
+- `docs/ai/tasks/TASK-0070-discovery-a11y-and-toast-audit.md`
+- `docs/ai/tasks/TASK-0071-intake-form-unsaved-changes-guard.md`
 - `docs/ai/tasks/TASK-DISCOVERY-PHASE1.md`
 - `docs/ai/tasks/TASK-DISCOVERY-PHASE2.md`
 - `docs/ai/tasks/TASK-DISCOVERY-PHASE3.md`

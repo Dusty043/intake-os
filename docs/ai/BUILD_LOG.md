@@ -2640,3 +2640,57 @@ exact SSE format, user-confirmed.
 `docs/ai/OPEN_QUESTIONS.md` Q-UX-1 updated to "shipped, verified 2026-07-16".
 
 **Task log**: `docs/ai/tasks/TASK-0068-verify-discovery-live-streaming.md`
+
+## 2026-07-16 — Fix: intake form validation drift + dead SOURCES field cleanup (TASK-0069)
+
+Client-side validation on the intake form only checked non-empty description; the API
+requires `MIN_INTAKE_DESCRIPTION_LENGTH` (20 chars). Added a shared
+`intake-form-validation.ts` module (mirrors backend length constants) and
+`project-types.ts` (mirrors the canonical `ProjectType` enum), both with drift-guard
+parity tests, so frontend/backend can't silently diverge again the way the classifier's
+`projectType` enum did in TASK-0065. The intake form now shows live `N/max` counters,
+inline per-field errors (min-length included) instead of a single top banner, imports
+`PROJECT_TYPES` from the shared constant instead of a hardcoded array, and no longer
+renders the dead `SOURCES` field (no backend `source` field ever consumed it — deleted
+outright per user confirmation, not wired up).
+
+`npm run build:core` clean, `npm test` 795/795, `apps/web` vitest 34/34, `apps/web`
+typecheck clean. Live-verified in browser: inline min-length error renders correctly;
+Project Type options match the canonical enum with no dead controls.
+
+**Task log**: `docs/ai/tasks/TASK-0069-intake-form-validation-and-dead-field-cleanup.md`
+
+## 2026-07-16 — Fix: Discovery view-intake link + a11y/toast audit (TASK-0070)
+
+The Discovery "View intake →" link read `localStorage.getItem('pit:discovery:intake:'+id)`
+instead of the server-persisted `session.linkedIntakeId` (already returned by the API per
+Q-CONC-2/TASK-0058), so the link silently disappeared on another device/browser or after
+clearing storage. Switched both the session-list and session-detail pages to read
+`session.linkedIntakeId` directly, no localStorage fallback. Added `aria-live="polite"`
+to the Discovery conversation header's stage-label region, now always mounted (previously
+only rendered while busy) so screen readers get one stable region to announce stage
+transitions into. Audited `Toast.tsx` call sites across Submit/Gate 1/Gate 2/Execute
+Distribution — the first three already fired success toasts; wired up the missing one
+(`DistributionTab` gained an `onSuccess` callback, fired after `executeDistribution`
+succeeds).
+
+`npm run build:core` clean, `npm test` 795/795, `apps/web` vitest 34/34 (new tests for
+each of the three fixes), typecheck clean. Live-verified: created a real Discovery
+session in-browser, confirmed the `aria-live="polite"` region is present in the DOM.
+
+**Task log**: `docs/ai/tasks/TASK-0070-discovery-a11y-and-toast-audit.md`
+
+## 2026-07-16 — Feat: intake form unsaved-changes guard (TASK-0071)
+
+Added a `beforeunload` warning when the intake form has unsaved input
+(`isIntakeFormDirty`), so a user doesn't lose typed input by accidentally closing the
+tab or navigating to an external link. Deliberately scoped to `beforeunload` only, not
+full localStorage draft persistence or an in-app SPA nav-away confirm — both out of
+scope per the TASK-0066 plan (Discovery's chat already owns the equivalent AI-path case).
+
+`npm run build:core` clean, `npm test` 795/795, `apps/web` vitest 34/34, typecheck clean.
+
+This closes out all 4 items of TASK-0066's plan (Q-UX-1 verification, form validation +
+dead-field cleanup, Discovery a11y/toast audit, unsaved-changes guard).
+
+**Task log**: `docs/ai/tasks/TASK-0071-intake-form-unsaved-changes-guard.md`
