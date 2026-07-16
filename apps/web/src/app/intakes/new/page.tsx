@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useActor } from "@/components/ActorProvider";
 import { ErrorBanner } from "@/components/ErrorBanner";
 import { createIntake } from "@/lib/api-client";
@@ -10,6 +10,7 @@ import type { CreateIntakeInput } from "@/lib/types";
 import { PROJECT_TYPES } from "@/lib/project-types";
 import {
   validateIntakeForm,
+  isIntakeFormDirty,
   MAX_INTAKE_TITLE_LENGTH,
   MIN_INTAKE_DESCRIPTION_LENGTH,
   MAX_INTAKE_DESCRIPTION_LENGTH,
@@ -36,6 +37,16 @@ export default function NewIntakePage() {
   function set(key: keyof CreateIntakeInput, value: string) {
     setForm((f) => ({ ...f, [key]: value }));
   }
+
+  useEffect(() => {
+    function handleBeforeUnload(e: BeforeUnloadEvent) {
+      if (!isIntakeFormDirty(form)) return;
+      e.preventDefault();
+      e.returnValue = "";
+    }
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [form]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();

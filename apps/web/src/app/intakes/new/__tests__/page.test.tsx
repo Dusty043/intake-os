@@ -57,3 +57,24 @@ describe("NewIntakePage validation", () => {
     expect(screen.getByText("12/200")).toBeInTheDocument();
   });
 });
+
+describe("NewIntakePage unsaved-changes guard", () => {
+  it("warns via beforeunload once the form has content", async () => {
+    const user = userEvent.setup();
+    render(<NewIntakePage />);
+
+    const event = new Event("beforeunload", { cancelable: true });
+    const preventDefaultSpy = vi.spyOn(event, "preventDefault");
+
+    // Before typing anything, the guard should not fire.
+    window.dispatchEvent(event);
+    expect(preventDefaultSpy).not.toHaveBeenCalled();
+
+    await user.type(screen.getByLabelText(/Project Title/), "Test project");
+
+    const event2 = new Event("beforeunload", { cancelable: true });
+    const preventDefaultSpy2 = vi.spyOn(event2, "preventDefault");
+    window.dispatchEvent(event2);
+    expect(preventDefaultSpy2).toHaveBeenCalled();
+  });
+});
