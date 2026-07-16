@@ -2615,3 +2615,28 @@ existing fixture harness for this function; relied on live retry).
 ## 2026-07-16 — TASK-0067 project history and epic/task sizing
 
 Traced `origin/main` history through the current 2026-07-16 head (`83d87ea`), grouped completed work into six product-aligned epics, and added Fibonacci estimates to leaf tasks with additive epic totals. Open GitHub findings are listed separately from completed delivery. Added `docs/ai/PROJECT_EPIC_TASK_BREAKDOWN.md` and the TASK-0067 task log. `npm run ai:index` and `git diff --check` pass. The `simple-biz` remote was left unchanged because its fetch requires interactive credentials.
+
+## 2026-07-16 — Verify: Discovery live-streaming on oreochiserver, closes Q-UX-1 (TASK-0068)
+
+`feat/discovery-live-streaming` (TASK-0048–0052) turned out to already be
+merged to `main` via PR #33 (`d2846e4`), 22 commits before main's current
+tip — the OPEN_QUESTIONS.md note claiming "no PR opened yet" was stale, not
+the deployment. oreochiserver is already running main's tip (`83d87ea`) with
+`AI_PROVIDER=openai` (real, not mock).
+
+Verified via curl against the live server: created a real Discovery session
+(real OpenAI calls, `gpt-5.6-terra`), then captured `GET /discovery/:id/stream`
+while concurrently triggering `generateSolutions` — got 100+ real SSE events
+(`stage-start`/`token`/`stage-end`) with genuine per-token JSON fragments for
+the `clarification` and `solution_generation` stages. A non-owner request to
+the same session correctly got 404 (`requireOwnedSession`'s
+indistinguishable-from-missing design).
+
+Frontend rendering was not re-verified in a live browser (tool-level per-site
+approval gate blocked the raw Tailscale IP); accepted as sufficient given
+`discovery-client.test.ts` already unit-tests the frontend parser against this
+exact SSE format, user-confirmed.
+
+`docs/ai/OPEN_QUESTIONS.md` Q-UX-1 updated to "shipped, verified 2026-07-16".
+
+**Task log**: `docs/ai/tasks/TASK-0068-verify-discovery-live-streaming.md`
