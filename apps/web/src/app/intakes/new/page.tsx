@@ -7,29 +7,16 @@ import { useActor } from "@/components/ActorProvider";
 import { ErrorBanner } from "@/components/ErrorBanner";
 import { createIntake } from "@/lib/api-client";
 import type { CreateIntakeInput } from "@/lib/types";
-
-const PROJECT_TYPES = [
-  { value: "internal_tool",        label: "Internal Tool"       },
-  { value: "internal_dashboard",   label: "Dashboard"           },
-  { value: "api_service",          label: "API Service"         },
-  { value: "client_portal",        label: "Client Portal"       },
-  { value: "saas_platform",        label: "SaaS Platform"       },
-  { value: "ai_workflow_tool",     label: "AI Workflow Tool"     },
-  { value: "data_sync_integration", label: "Data Pipeline"       },
-  { value: "n8n_automation",       label: "Automation Script"   },
-  { value: "reporting_automation", label: "Reporting Automation" },
-  { value: "discovery_research",   label: "Discovery / Research" },
-];
-
-const SOURCES = [
-  "Manual",
-  "Email",
-  "Google Chat",
-  "Web Form",
-  "Client Request",
-  "Internal Request",
-  "Meeting Notes",
-];
+import { PROJECT_TYPES } from "@/lib/project-types";
+import {
+  validateIntakeForm,
+  MAX_INTAKE_TITLE_LENGTH,
+  MIN_INTAKE_DESCRIPTION_LENGTH,
+  MAX_INTAKE_DESCRIPTION_LENGTH,
+  MAX_REQUESTER_NAME_LENGTH,
+  MAX_DEPARTMENT_NAME_LENGTH,
+  type IntakeFormErrors,
+} from "@/lib/intake-form-validation";
 
 export default function NewIntakePage() {
   const { actor } = useActor();
@@ -42,6 +29,7 @@ export default function NewIntakePage() {
     department: "",
     projectType: "internal_tool",
   });
+  const [errors, setErrors] = useState<IntakeFormErrors>({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -51,10 +39,10 @@ export default function NewIntakePage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!form.title.trim() || !form.description.trim() || !form.requester.trim()) {
-      setError("Title, description, and requester are required.");
-      return;
-    }
+    const fieldErrors = validateIntakeForm(form);
+    setErrors(fieldErrors);
+    if (Object.keys(fieldErrors).length > 0) return;
+
     setLoading(true);
     setError(null);
     try {
@@ -106,7 +94,10 @@ export default function NewIntakePage() {
 
         <form onSubmit={(e) => { void handleSubmit(e); }} className="mt-5 space-y-5">
           <div>
-            <label htmlFor="title" className="form-label">Project Title *</label>
+            <div className="flex items-center justify-between">
+              <label htmlFor="title" className="form-label">Project Title *</label>
+              <span className="text-xs text-gray-400">{form.title.length}/{MAX_INTAKE_TITLE_LENGTH}</span>
+            </div>
             <input
               id="title"
               type="text"
@@ -114,9 +105,12 @@ export default function NewIntakePage() {
               onChange={(e) => set("title", e.target.value)}
               className="form-input"
               placeholder="e.g. Client Billing Portal"
+              maxLength={MAX_INTAKE_TITLE_LENGTH}
               required
               disabled={loading}
+              aria-invalid={!!errors.title}
             />
+            {errors.title && <p className="text-xs text-red-600 mt-1">{errors.title}</p>}
           </div>
 
           <div className="grid grid-cols-2 gap-4">
@@ -136,7 +130,10 @@ export default function NewIntakePage() {
             </div>
 
             <div>
-              <label htmlFor="requester" className="form-label">Requester *</label>
+              <div className="flex items-center justify-between">
+                <label htmlFor="requester" className="form-label">Requester *</label>
+                <span className="text-xs text-gray-400">{form.requester.length}/{MAX_REQUESTER_NAME_LENGTH}</span>
+              </div>
               <input
                 id="requester"
                 type="text"
@@ -144,14 +141,20 @@ export default function NewIntakePage() {
                 onChange={(e) => set("requester", e.target.value)}
                 className="form-input"
                 placeholder="Team or person"
+                maxLength={MAX_REQUESTER_NAME_LENGTH}
                 required
                 disabled={loading}
+                aria-invalid={!!errors.requester}
               />
+              {errors.requester && <p className="text-xs text-red-600 mt-1">{errors.requester}</p>}
             </div>
           </div>
 
           <div>
-            <label htmlFor="department" className="form-label">Department</label>
+            <div className="flex items-center justify-between">
+              <label htmlFor="department" className="form-label">Department</label>
+              <span className="text-xs text-gray-400">{(form.department ?? "").length}/{MAX_DEPARTMENT_NAME_LENGTH}</span>
+            </div>
             <input
               id="department"
               type="text"
@@ -159,21 +162,31 @@ export default function NewIntakePage() {
               onChange={(e) => set("department", e.target.value)}
               className="form-input"
               placeholder="e.g. Finance"
+              maxLength={MAX_DEPARTMENT_NAME_LENGTH}
               disabled={loading}
+              aria-invalid={!!errors.department}
             />
+            {errors.department && <p className="text-xs text-red-600 mt-1">{errors.department}</p>}
           </div>
 
           <div>
-            <label htmlFor="description" className="form-label">Detailed Description *</label>
+            <div className="flex items-center justify-between">
+              <label htmlFor="description" className="form-label">Detailed Description *</label>
+              <span className="text-xs text-gray-400">{form.description.length}/{MAX_INTAKE_DESCRIPTION_LENGTH}</span>
+            </div>
             <textarea
               id="description"
               value={form.description}
               onChange={(e) => set("description", e.target.value)}
               className="form-textarea h-32"
               placeholder="Describe the project goals, context, and requirements…"
+              maxLength={MAX_INTAKE_DESCRIPTION_LENGTH}
               required
               disabled={loading}
+              aria-invalid={!!errors.description}
             />
+            <p className="text-xs text-gray-400 mt-1">Minimum {MIN_INTAKE_DESCRIPTION_LENGTH} characters.</p>
+            {errors.description && <p className="text-xs text-red-600 mt-1">{errors.description}</p>}
           </div>
 
           <div className="flex items-center gap-3 pt-2">
