@@ -2612,3 +2612,6 @@ too. `npm run build:core` clean, `npm test` 795/795 (no new test — no
 existing fixture harness for this function; relied on live retry).
 
 **Task log**: `docs/ai/tasks/TASK-0065-classifier-projecttype-taxonomy-mismatch.md`
+## 2026-07-16 — TASK-0067 project history and epic/task sizing
+
+Traced `origin/main` history through the current 2026-07-16 head (`83d87ea`), grouped completed work into six product-aligned epics, and added Fibonacci estimates to leaf tasks with additive epic totals. Open GitHub findings are listed separately from completed delivery. Added `docs/ai/PROJECT_EPIC_TASK_BREAKDOWN.md` and the TASK-0067 task log. `npm run ai:index` and `git diff --check` pass. The `simple-biz` remote was left unchanged because its fetch requires interactive credentials.
