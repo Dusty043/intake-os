@@ -158,6 +158,48 @@ export class IntakeHttpController {
     );
   }
 
+  // Orchestrator-path review (A-scoped, TASK-0078): the evaluation is the
+  // reviewable artifact, so these endpoints are keyed by intake id only — the
+  // workflow service resolves the latest ready-for-review evaluation. No draftId.
+  @Post(":id/evaluation/accept")
+  @ApiOperation({ summary: "Accept the latest evaluation as the reviewed project package" })
+  acceptEvaluation(
+    @Param("id") id: string,
+    @Body() body: AcceptAnalysisDraftDto,
+    @CurrentActor() actor: AuthenticatedActor,
+  ) {
+    return this.workflowService.acceptAnalysisDraft(
+      { intakeId: id, reviewerNotes: body.reviewerNotes },
+      toDomainActor(actor),
+    );
+  }
+
+  @Post(":id/evaluation/reject")
+  @ApiOperation({ summary: "Reject the latest evaluation" })
+  rejectEvaluation(
+    @Param("id") id: string,
+    @Body() body: RejectAnalysisDraftDto,
+    @CurrentActor() actor: AuthenticatedActor,
+  ) {
+    return this.workflowService.rejectAnalysisDraft(
+      { intakeId: id, reason: body.reason },
+      toDomainActor(actor),
+    );
+  }
+
+  @Post(":id/evaluation/revise")
+  @ApiOperation({ summary: "Revise the latest evaluation into a human-reviewed project package" })
+  reviseEvaluation(
+    @Param("id") id: string,
+    @Body() body: ReviseAnalysisDraftDto,
+    @CurrentActor() actor: AuthenticatedActor,
+  ) {
+    return this.workflowService.reviseAnalysisDraft(
+      { intakeId: id, reviewedPackage: body.reviewedPackage as any, reviewerNotes: body.reviewerNotes },
+      toDomainActor(actor),
+    );
+  }
+
   @Post(":id/approvals")
   @ApiOperation({ summary: "Approve the currently open approval gate" })
   approve(

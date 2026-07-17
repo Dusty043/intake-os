@@ -2856,3 +2856,37 @@ New test in `discovery-phase-1.test.mjs` confirming rationale is non-empty;
 Follow-up: not yet re-verified against a real live OpenAI call.
 
 **Task log**: `docs/ai/tasks/TASK-0077-require-rationale-for-discovery-assumptions.md`
+
+## 2026-07-17 — Evaluation as source of truth, orchestrator path (TASK-0078, A-scoped)
+
+User flagged the "AI Draft vs Evaluation" redundancy. On the orchestrator
+path (server config), `generateEvaluation` produced a rich evaluation AND a
+down-converted `IntakeAnalysisDraft` twin, shown as two peer tabs, with
+governance operating on the draft. Correction found mid-work: the draft also
+backs a separate live single-call provider engine, so a full delete would
+amputate a subsystem. User chose A-scoped: evaluation authoritative on the
+orchestrator path, single-call engine kept intact.
+
+Orchestrator path now treats the evaluation as the reviewable artifact — no
+draft twin. New `evaluationToReviewedPackage()` builds the reviewed package
+straight from evaluation sections. `generateEvaluation` saves the evaluation
+`ready_for_review` (no draft). accept/reject/revise branch to eval-based
+helpers when a ready-for-review evaluation exists (draft path preserved as
+fallback for the provider engine); regenerate re-runs the orchestrator,
+supersedes the prior evaluation (`needs_revision`), saves a fresh one.
+`in-memory-store.listEvaluationsForIntake` tiebreaks by evaluationVersion.
+New `:id/evaluation/{accept,reject,revise}` endpoints (keyed by intake id).
+Web: one review surface — "AI Draft" tab shows only on the provider path;
+Evaluation tab gains Accept/Reject; `handleAction` routes to eval endpoints
+when no draft.
+
+Retained (out of A-scoped): the provider engine, `IntakeAnalysisDraft`, its
+Prisma columns. `evaluation-draft-mapper.ts` is now unused (barrel export
+only) — future cleanup. Full inline eval "revise" form deferred.
+
+6 tests in `generate-evaluation-service.test.mjs` rewritten to assert on the
+evaluation. `build:core`, `typecheck`, `api:build`, `apps/web build` clean.
+`npm test` 806/806. **Not deployed — dev only.** Added B-020 to
+requirements-trace.
+
+**Task log**: `docs/ai/tasks/TASK-0078-evaluation-source-of-truth-a-scoped.md`

@@ -29,7 +29,10 @@ export interface ReviewedProjectPackageSubtask {
 
 export interface ReviewedProjectPackage {
   id: string;
-  sourceDraftId: string;
+  /** Set when the package was reviewed from a single-call-provider draft (legacy engine). */
+  sourceDraftId?: string;
+  /** Set when the package was reviewed directly from an orchestrator evaluation (source of truth). Exactly one of sourceDraftId/sourceEvaluationId is present. */
+  sourceEvaluationId?: string;
   intakeId: string;
   reviewedBy: string;
   reviewedAt: string;
@@ -70,19 +73,20 @@ export interface ReviewedProjectPackageInput {
 
 export interface AcceptAnalysisDraftInput {
   intakeId: string;
-  draftId: string;
+  /** Omit on the orchestrator path — the latest ready-for-review evaluation is used instead. */
+  draftId?: string;
   reviewerNotes?: string;
 }
 
 export interface RejectAnalysisDraftInput {
   intakeId: string;
-  draftId: string;
+  draftId?: string;
   reason: string;
 }
 
 export interface ReviseAnalysisDraftInput {
   intakeId: string;
-  draftId: string;
+  draftId?: string;
   reviewedPackage: ReviewedProjectPackageInput;
   reviewerNotes?: string;
 }

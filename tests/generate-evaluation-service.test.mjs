@@ -68,7 +68,7 @@ async function createAndSubmitIntake(service) {
 // ─── generateEvaluation: happy path ──────────────────────────────────────────
 
 describe("generateEvaluation — happy path", () => {
-  it("transitions intake from submitted → intake_review with draft", async () => {
+  it("transitions submitted → intake_review; the evaluation is the reviewable artifact (A-scoped)", async () => {
     _seq = 0;
     const orchestrator = makeOrchestrator();
     const service = makeServiceWithOrchestrator(orchestrator);
@@ -77,9 +77,11 @@ describe("generateEvaluation — happy path", () => {
     const result = await service.generateEvaluation(submitted.id, { depth: "standard", provider: "mock" }, intakeOwner);
 
     assert.equal(result.status, "intake_review");
-    assert.ok(result.latestAnalysisDraft, "latestAnalysisDraft must be set");
-    assert.equal(result.latestAnalysisDraft.reviewStatus, "draft");
-    assert.ok(result.analysisDrafts?.length >= 1, "analysisDrafts must contain the new draft");
+    // A-scoped (TASK-0078): no derived draft twin on the orchestrator path.
+    assert.ok(!result.latestAnalysisDraft, "no legacy draft twin should be created");
+    const evaluation = await service["store"].getLatestEvaluationForIntake(submitted.id);
+    assert.ok(evaluation, "evaluation must be persisted as the reviewable artifact");
+    assert.equal(evaluation.status, "ready_for_review");
   });
 
   it("persists the evaluation in the store", async () => {
@@ -103,7 +105,7 @@ describe("generateEvaluation — happy path", () => {
     assert.ok(evaluations[0].sections.length > 0, "evaluation must have sections");
   });
 
-  it("links draft to evaluation via draft id in audit trail", async () => {
+  it("audit trail links the evaluation, not a draft", async () => {
     _seq = 0;
     const orchestrator = makeOrchestrator();
     const store = new InMemoryProjectIntakeStore();
@@ -115,31 +117,33 @@ describe("generateEvaluation — happy path", () => {
     });
 
     const submitted = await createAndSubmitIntake(service);
-    const result = await service.generateEvaluation(submitted.id, { depth: "standard", provider: "mock" }, intakeOwner);
+    await service.generateEvaluation(submitted.id, { depth: "standard", provider: "mock" }, intakeOwner);
 
     const auditTrail = await service.getAuditTrail(submitted.id, intakeOwner);
     const evalEvent = auditTrail.find((e) => e.action === "EVALUATION_GENERATED");
     assert.ok(evalEvent, "EVALUATION_GENERATED audit event must exist");
     assert.ok(evalEvent.metadata?.evaluationId, "audit event must include evaluationId");
-    assert.ok(evalEvent.metadata?.draftId, "audit event must include draftId");
-    assert.equal(evalEvent.metadata.draftId, result.latestAnalysisDraft.id);
+    assert.ok(!evalEvent.metadata?.draftId, "audit event must not reference a draft (A-scoped)");
   });
 
-  it("draft has required fields populated from evaluation sections", async () => {
+  it("accepting the evaluation builds a reviewed package sourced from its sections", async () => {
     _seq = 0;
     const orchestrator = makeOrchestrator();
     const service = makeServiceWithOrchestrator(orchestrator);
     const submitted = await createAndSubmitIntake(service);
 
-    const result = await service.generateEvaluation(submitted.id, { depth: "standard", provider: "mock" }, intakeOwner);
-    const draft = result.latestAnalysisDraft;
+    await service.generateEvaluation(submitted.id, { depth: "standard", provider: "mock" }, intakeOwner);
+    const evaluation = await service["store"].getLatestEvaluationForIntake(submitted.id);
 
-    assert.ok(draft.id, "draft must have id");
-    assert.equal(draft.intakeId, submitted.id);
-    assert.ok(draft.estimatedStoryPoints > 0, "estimatedStoryPoints must be positive");
-    assert.ok(draft.subtasks.length > 0, "subtasks must be present");
-    assert.ok(draft.recommendedTechStack.length > 0, "tech stack must be present");
-    assert.ok(draft.brief.problemStatement, "problemStatement must be set");
+    const accepted = await service.acceptAnalysisDraft({ intakeId: submitted.id }, intakeOwner);
+    const pkg = accepted.reviewedProjectPackage;
+
+    assert.ok(pkg, "accepting the evaluation must create a reviewed package");
+    assert.equal(pkg.sourceEvaluationId, evaluation.id, "package must be sourced from the evaluation");
+    assert.equal(pkg.intakeId, submitted.id);
+    assert.ok(pkg.estimatedStoryPoints > 0, "estimatedStoryPoints must be positive");
+    assert.ok(pkg.subtasks.length > 0, "subtasks must be present");
+    assert.ok(pkg.brief.problem, "brief.problem must be set");
   });
 });
 
@@ -257,17 +261,17 @@ describe("regenerateAnalysisDraft — orchestrator routing", () => {
     );
 
     assert.equal(result.status, "intake_review", "status must stay intake_review after regen");
-    assert.ok(result.latestAnalysisDraft, "new draft must exist");
-    assert.equal(result.latestAnalysisDraft.reviewStatus, "draft");
     assert.equal(result.analysisDraftRegenerationCount, 1);
 
-    // Verify old draft superseded
-    const superseded = result.analysisDrafts?.find((d) => d.reviewStatus === "superseded");
-    assert.ok(superseded, "previous draft must be superseded");
-
-    // Two evaluations should be persisted (initial + regen)
+    // A-scoped: two evaluations persisted — the fresh one ready_for_review,
+    // the prior one superseded (needs_revision). No draft twins.
+    assert.ok(!result.latestAnalysisDraft, "no draft twin on the orchestrator path");
     const evaluations = await store.listEvaluationsForIntake(submitted.id);
     assert.equal(evaluations.length, 2, "both initial and regen evaluations must be persisted");
+    const latest = await store.getLatestEvaluationForIntake(submitted.id);
+    assert.equal(latest.status, "ready_for_review", "regenerated evaluation is the reviewable one");
+    const superseded = evaluations.find((e) => e.status === "needs_revision");
+    assert.ok(superseded, "previous evaluation must be superseded (needs_revision)");
   });
 
   it("audit trail contains EVALUATION_REGENERATED event", async () => {
@@ -288,8 +292,7 @@ describe("regenerateAnalysisDraft — orchestrator routing", () => {
     const regenEvent = audit.find((e) => e.action === "EVALUATION_REGENERATED");
     assert.ok(regenEvent, "EVALUATION_REGENERATED audit event must exist");
     assert.ok(regenEvent.metadata?.evaluationId, "must include evaluationId");
-    assert.ok(regenEvent.metadata?.previousDraftId, "must include previousDraftId");
-    assert.ok(regenEvent.metadata?.newDraftId, "must include newDraftId");
+    assert.ok(regenEvent.metadata?.previousEvaluationId, "must include previousEvaluationId");
   });
 });
 
@@ -364,6 +367,8 @@ describe("generateEvaluation — orchestrator failure", () => {
 
     const result = await service.generateEvaluation(submitted.id, { depth: "standard", provider: "mock" }, intakeOwner);
     assert.equal(result.status, "intake_review");
-    assert.ok(result.latestAnalysisDraft, "retry must produce a draft");
+    const evaluation = await service["store"].getLatestEvaluationForIntake(submitted.id);
+    assert.ok(evaluation, "retry must produce an evaluation");
+    assert.equal(evaluation.status, "ready_for_review");
   });
 });

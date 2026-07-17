@@ -76,7 +76,9 @@ export class InMemoryProjectIntakeStore implements ProjectIntakeStore {
   async listEvaluationsForIntake(intakeId: string): Promise<IntakeEvaluation[]> {
     return Array.from(this.evaluations.values())
       .filter((ev) => ev.intakeId === intakeId)
-      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+      // Newest first; tiebreak by evaluationVersion so a regenerated evaluation
+      // sorts ahead of the one it superseded even when createdAt is identical.
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt) || b.evaluationVersion - a.evaluationVersion)
       .map((ev) => structuredClone(ev));
   }
 

@@ -28,6 +28,9 @@ import {
   resubmitIntake,
   retryProvisioningRun,
   reviseAnalysisDraft,
+  acceptEvaluation,
+  rejectEvaluation,
+  reviseEvaluation,
   submitIntake,
 } from "@/lib/api-client";
 import { formatDate, formatProjectType } from "@/lib/formatting";
@@ -989,7 +992,7 @@ function IntakeDetailContent() {
   const searchParams = useSearchParams();
 
   const activeTab = searchParams.get("tab") ?? "Overview";
-  const TABS = actor.role === "admin" ? ADMIN_TABS : BASE_TABS;
+  const baseTabs = actor.role === "admin" ? ADMIN_TABS : BASE_TABS;
 
   const [intake, setIntake] = useState<ProjectIntakeRecord | null>(null);
   const [audit, setAudit] = useState<AuditEvent[]>([]);
@@ -1063,17 +1066,19 @@ function IntakeDetailContent() {
       case "submit":        updated = await submitIntake(iid, actor); break;
       case "resubmit":      updated = await resubmitIntake(iid, actor, payload as Array<{ question: string; answer: string }> | undefined); break;
       case "mock_draft":    updated = await generateMockAnalysisDraft(iid, actor); break;
-      case "accept_draft":  updated = await acceptAnalysisDraft(iid, draft!.id, actor, payload as string); break;
-      case "reject_draft":  updated = await rejectAnalysisDraft(iid, draft!.id, actor, payload as string); break;
+      // A-scoped: when there's no derived draft (orchestrator path), the
+      // evaluation itself is the reviewable artifact — route to eval endpoints.
+      case "accept_draft":  updated = draft ? await acceptAnalysisDraft(iid, draft.id, actor, payload as string) : await acceptEvaluation(iid, actor, payload as string); break;
+      case "reject_draft":  updated = draft ? await rejectAnalysisDraft(iid, draft.id, actor, payload as string) : await rejectEvaluation(iid, actor, payload as string); break;
       case "regen_draft":   updated = await regenerateAnalysisDraft(iid, actor, payload as string); break;
-      case "revise_draft":  updated = await reviseAnalysisDraft(iid, draft!.id, actor, payload as ReviseAnalysisDraftInput); break;
+      case "revise_draft":  updated = draft ? await reviseAnalysisDraft(iid, draft.id, actor, payload as ReviseAnalysisDraftInput) : await reviseEvaluation(iid, actor, payload as ReviseAnalysisDraftInput); break;
       case "approve_gate1": updated = await approveGate(iid, actor, "gate_1", payload as string); break;
       case "approve_gate2": updated = await approveGate(iid, actor, "gate_2", payload as string); break;
       case "reject_gate1":  updated = await rejectGate(iid, actor, payload as string); break;
       case "reject_gate2":  updated = await rejectGate(iid, actor, payload as string); break;
       case "request_changes": updated = await requestChanges(iid, actor, payload as string); break;
       case "gen_plan":      setTab("Distribution"); return;
-      case "goto_draft":    setTab("AI Draft"); return;
+      case "goto_draft":    setTab(evaluation ? "Evaluation" : "AI Draft"); return;
       default: return;
     }
     setIntake(updated);
@@ -1104,6 +1109,11 @@ function IntakeDetailContent() {
   const s = intake.status;
   const hasDraftPending = intake.latestAnalysisDraft?.reviewStatus === "draft";
   const hasPkg = !!intake.reviewedProjectPackage;
+  // A-scoped (TASK-0078): the evaluation is the reviewable artifact. Show the
+  // legacy "AI Draft" tab only on the provider engine path (a draft exists and
+  // no evaluation) — otherwise the Evaluation tab is the single review surface.
+  const showDraftTab = !!intake.latestAnalysisDraft && !evaluation;
+  const TABS = baseTabs.filter((t) => t !== "AI Draft" || showDraftTab);
   const hasPlan = !!intake.provisioningPlan;
   const gate1Done = ["devops_review", "approved", "provisioning", "distributed"].includes(s);
   const gate2Done = ["approved", "provisioning", "distributed"].includes(s);
@@ -1197,7 +1207,33 @@ function IntakeDetailContent() {
         </div>
       )}
       {activeTab === "Evaluation" && (
-        <EvaluationPanel
+        <div className="space-y-4">
+          {evaluation && !hasPkg && ["submitted", "intake_review"].includes(intake.status) &&
+            ["intake_owner", "devops_lead", "admin"].includes(actor.role) && (
+            <div className="card p-4 flex flex-wrap items-center gap-3">
+              <span className="text-sm font-medium text-brand-text">
+                This evaluation is ready for review. Accepting creates the reviewed package for Gate 1.
+              </span>
+              <div className="flex gap-2 ml-auto">
+                <button
+                  className="btn-primary"
+                  onClick={() => { void handleAction("accept_draft", "Accepted as reviewed."); }}
+                >
+                  Accept Evaluation
+                </button>
+                <button
+                  className="btn-secondary"
+                  onClick={() => {
+                    const reason = window.prompt("Reason for rejecting this evaluation?");
+                    if (reason) void handleAction("reject_draft", reason);
+                  }}
+                >
+                  Reject
+                </button>
+              </div>
+            </div>
+          )}
+          <EvaluationPanel
           evaluation={evaluation}
           agentRuns={agentRuns}
           loading={evalLoading}
@@ -1220,7 +1256,8 @@ function IntakeDetailContent() {
             setAudit(freshAudit);
             void loadEvaluation(intake.id);
           }}
-        />
+          />
+        </div>
       )}
       {activeTab === "Reviewed Package" && (
         <ReviewedPackageTab intake={intake} />

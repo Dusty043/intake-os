@@ -112,6 +112,45 @@ export async function reviseAnalysisDraft(
   });
 }
 
+// ─── Orchestrator-path review (A-scoped): keyed by intake id, no draftId ──────
+// The evaluation itself is the reviewable artifact.
+
+export async function acceptEvaluation(
+  id: string,
+  actor: UiActor,
+  reviewerNotes?: string,
+): Promise<ProjectIntakeRecord> {
+  return request(`/intakes/${id}/evaluation/accept`, {
+    method: "POST",
+    headers: actorHeaders(actor),
+    body: JSON.stringify({ reviewerNotes: reviewerNotes ?? "Accepted as reviewed." }),
+  });
+}
+
+export async function rejectEvaluation(
+  id: string,
+  actor: UiActor,
+  reason: string,
+): Promise<ProjectIntakeRecord> {
+  return request(`/intakes/${id}/evaluation/reject`, {
+    method: "POST",
+    headers: actorHeaders(actor),
+    body: JSON.stringify({ reason }),
+  });
+}
+
+export async function reviseEvaluation(
+  id: string,
+  actor: UiActor,
+  input: ReviseAnalysisDraftInput,
+): Promise<ProjectIntakeRecord> {
+  return request(`/intakes/${id}/evaluation/revise`, {
+    method: "POST",
+    headers: actorHeaders(actor),
+    body: JSON.stringify({ reviewedPackage: input, reviewerNotes: input.reviewerNotes }),
+  });
+}
+
 export async function approveGate(
   id: string,
   actor: UiActor,

@@ -10,7 +10,7 @@ import { applyWorkflowTransition, getNextStatus, isApprovalComplete } from "../d
 import type { LifecycleAction } from "../domain/lifecycle-transitions.js";
 import { validateLifecycleTransition } from "../domain/lifecycle-transitions.js";
 import { createAuditEvent } from "./audit.js";
-import { evaluationToLegacyDraft } from "./evaluation-draft-mapper.js";
+import { evaluationToReviewedPackage } from "./evaluation-reviewed-package.js";
 import { agentRunsFromEvaluation } from "./evaluation-persistence.js";
 import type { AgentRunRecord } from "./evaluation-persistence.js";
 import type { IntakeEvaluation } from "./intake-evaluation.js";
@@ -537,47 +537,42 @@ export class IntakeWorkflowService {
       return withClarification;
     }
 
-    // evaluation_ready path
+    // evaluation_ready path — the evaluation IS the reviewable artifact
+    // (A-scoped, TASK-0078). No derived IntakeAnalysisDraft twin: governance
+    // (accept/reject/revise) operates on the evaluation directly, and the
+    // reviewed package is built from it via evaluationToReviewedPackage.
     const { evaluation } = result;
+    const reviewableEval = { ...evaluation, status: "ready_for_review" as const };
 
     await this.store.saveEvaluation({
-      evaluation,
-      agentRuns: agentRunsFromEvaluation(evaluation),
+      evaluation: reviewableEval,
+      agentRuns: agentRunsFromEvaluation(reviewableEval),
     });
 
-    const draft = evaluationToLegacyDraft(evaluation, { idFactory: this.idFactory, now });
-    const validation = validateIntakeAnalysisDraft(draft);
-    if (!validation.valid) {
-      throw new ValidationError(`Evaluation draft failed validation: ${validation.errors.join(", ")}`);
-    }
-
-    const withDraft: ProjectIntakeRecord = {
+    const cleaned: ProjectIntakeRecord = {
       ...record,
-      analysisDrafts: [...(record.analysisDrafts ?? []), draft],
-      latestAnalysisDraft: draft,
       pendingClarification: undefined,
       priorClarifications: undefined,
       updatedAt: now,
     };
 
-    const saved = await this.store.saveIntake(withDraft);
+    const saved = await this.store.saveIntake(cleaned);
     await this.audit({
       record: saved,
       actor,
       action: "EVALUATION_GENERATED",
       timestamp: now,
       metadata: {
-        evaluationId: evaluation.id,
-        draftId: draft.id,
-        depth: evaluation.depth,
-        qualityScore: evaluation.qualityScore?.overall,
-        sectionCount: evaluation.sections.length,
+        evaluationId: reviewableEval.id,
+        depth: reviewableEval.depth,
+        qualityScore: reviewableEval.qualityScore?.overall,
+        sectionCount: reviewableEval.sections.length,
       },
     });
 
     const readyForReview = await this.applyTransitionToRecord(saved, "success", actor, now, {
-      reason: "AI evaluation complete, draft ready for human review.",
-      metadata: { evaluationId: evaluation.id, draftId: draft.id },
+      reason: "AI evaluation complete, ready for human review.",
+      metadata: { evaluationId: reviewableEval.id },
     });
     await this.notifier?.notify({
       eventType: "intake_review",
@@ -595,19 +590,34 @@ export class IntakeWorkflowService {
   ): Promise<ProjectIntakeRecord> {
     ensurePermission(actor, "generate_evaluation");
 
-    let record = await this.requireIntake(id);
-    // Idempotent no-op: a draft already exists (e.g. discovery's fire-and-forget
-    // auto-draft finished before a manual "Generate Mock AI Draft" click raced it,
-    // or a duplicate request replayed). Re-attempting the transition below would
-    // throw InvalidTransitionError since "generate_evaluation" only fires from
-    // "submitted" — return the completed record instead of erroring.
+    const record = await this.requireIntake(id);
+
+    if (this.orchestrator) {
+      // Idempotent no-op: the evaluation already ran and advanced the intake
+      // past submitted/evaluating (e.g. discovery's fire-and-forget auto-eval
+      // finished before a manual "Generate" click raced it, or a replay).
+      // Re-attempting the transition below would throw InvalidTransitionError
+      // since "generate_evaluation" only fires from "submitted".
+      if (record.status !== "submitted" && record.status !== "evaluating") {
+        return record;
+      }
+      return this.generateEvaluation(id, { depth: "standard", provider: "mock" }, actor);
+    }
+
+    // Provider path (no orchestrator): idempotent no-op if a draft already exists.
     if (record.latestAnalysisDraft && record.status !== "evaluating") {
       return record;
     }
 
-    if (this.orchestrator) {
-      return this.generateEvaluation(id, { depth: "standard", provider: "mock" }, actor);
-    }
+    return this.generateProviderDraft(id, input, actor);
+  }
+
+  private async generateProviderDraft(
+    id: string,
+    input: GenerateMockAnalysisDraftInput,
+    actor: Actor,
+  ): Promise<ProjectIntakeRecord> {
+    let record = await this.requireIntake(id);
 
     const now = this.clock();
     // If the intake is already at "evaluating" (e.g. a prior attempt transitioned the status
@@ -692,13 +702,6 @@ export class IntakeWorkflowService {
       throw new ConflictError(`Regeneration is only allowed when intake is in intake_review status. Current status: ${record.status}.`);
     }
 
-    const currentDraft = record.latestAnalysisDraft;
-    if (!currentDraft || (currentDraft.reviewStatus !== "draft" && currentDraft.reviewStatus !== "rejected")) {
-      throw new ConflictError(
-        "No draft available for regeneration. The current draft must be awaiting review or have been rejected.",
-      );
-    }
-
     const regenLimit = 5;
     const regenCount = record.analysisDraftRegenerationCount ?? 0;
     if (regenCount >= regenLimit) {
@@ -706,9 +709,18 @@ export class IntakeWorkflowService {
     }
 
     const now = this.clock();
-    const supersededDraft = { ...currentDraft, reviewStatus: "superseded" as const };
 
     if (this.orchestrator) {
+      // Orchestrator path (A-scoped, TASK-0078): regenerate the evaluation
+      // directly — no draft twin. The prior evaluation is marked needs_revision
+      // and a fresh ready_for_review evaluation supersedes it.
+      const currentEval = await this.getReviewableEvaluation(record.id);
+      if (!currentEval) {
+        throw new ConflictError(
+          "No evaluation available for regeneration. The current evaluation must be awaiting review.",
+        );
+      }
+
       const orchResult = await this.orchestrator.orchestrate(record, {
         actor,
         depth: "standard",
@@ -721,24 +733,18 @@ export class IntakeWorkflowService {
         throw new ConflictError("Re-evaluation halted: clarification required. Provide more complete guidance.");
       }
 
-      const { evaluation } = orchResult;
-      await this.store.saveEvaluation({ evaluation, agentRuns: agentRunsFromEvaluation(evaluation) });
+      const supersededEval = { ...currentEval, status: "needs_revision" as const };
+      await this.store.saveEvaluation({ evaluation: supersededEval, agentRuns: agentRunsFromEvaluation(supersededEval) });
 
-      const newDraft = evaluationToLegacyDraft(evaluation, { idFactory: this.idFactory, now });
-      const evalValidation = validateIntakeAnalysisDraft(newDraft);
-      if (!evalValidation.valid) {
-        throw new ValidationError(`Regenerated evaluation draft failed validation: ${evalValidation.errors.join(", ")}`);
-      }
-
-      const regenDrafts = [
-        ...(record.analysisDrafts ?? []).map((d) => (d.id === currentDraft.id ? supersededDraft : d)),
-        newDraft,
-      ];
+      const freshEval = {
+        ...orchResult.evaluation,
+        status: "ready_for_review" as const,
+        evaluationVersion: currentEval.evaluationVersion + 1,
+      };
+      await this.store.saveEvaluation({ evaluation: freshEval, agentRuns: agentRunsFromEvaluation(freshEval) });
 
       const regenRecord: ProjectIntakeRecord = {
         ...record,
-        analysisDrafts: regenDrafts,
-        latestAnalysisDraft: newDraft,
         analysisDraftRegenerationCount: regenCount + 1,
         updatedAt: now,
       };
@@ -750,17 +756,25 @@ export class IntakeWorkflowService {
         action: "EVALUATION_REGENERATED",
         timestamp: now,
         metadata: {
-          previousDraftId: currentDraft.id,
-          newDraftId: newDraft.id,
-          evaluationId: evaluation.id,
+          previousEvaluationId: currentEval.id,
+          evaluationId: freshEval.id,
           guidance: input.guidance.slice(0, 500),
           regenerationCount: regenCount + 1,
           requestedBy: input.requestedBy,
-          qualityScore: evaluation.qualityScore?.overall,
+          qualityScore: freshEval.qualityScore?.overall,
         },
       });
       return regenSaved;
     }
+
+    // Provider path (no orchestrator): draft-based regeneration.
+    const currentDraft = record.latestAnalysisDraft;
+    if (!currentDraft || (currentDraft.reviewStatus !== "draft" && currentDraft.reviewStatus !== "rejected")) {
+      throw new ConflictError(
+        "No draft available for regeneration. The current draft must be awaiting review or have been rejected.",
+      );
+    }
+    const supersededDraft = { ...currentDraft, reviewStatus: "superseded" as const };
 
     const result = await this.analysisProvider.generateDraft(record, {
       actor,
@@ -815,6 +829,12 @@ export class IntakeWorkflowService {
   async acceptAnalysisDraft(input: AcceptAnalysisDraftInput, actor: Actor): Promise<ProjectIntakeRecord> {
     ensurePermission(actor, "review_analysis_draft");
     const record = await this.requireIntake(input.intakeId);
+
+    const evaluation = await this.getReviewableEvaluation(record.id);
+    if (evaluation) {
+      return this.acceptFromEvaluation(record, evaluation, input, actor);
+    }
+
     const draft = requireDraft(record, input.draftId);
     requireDraftPendingReview(draft);
 
@@ -884,6 +904,12 @@ export class IntakeWorkflowService {
   async rejectAnalysisDraft(input: RejectAnalysisDraftInput, actor: Actor): Promise<ProjectIntakeRecord> {
     ensurePermission(actor, "review_analysis_draft");
     const record = await this.requireIntake(input.intakeId);
+
+    const evaluation = await this.getReviewableEvaluation(record.id);
+    if (evaluation) {
+      return this.rejectFromEvaluation(record, evaluation, input, actor);
+    }
+
     const draft = requireDraft(record, input.draftId);
     requireDraftPendingReview(draft);
 
@@ -910,6 +936,12 @@ export class IntakeWorkflowService {
   async reviseAnalysisDraft(input: ReviseAnalysisDraftInput, actor: Actor): Promise<ProjectIntakeRecord> {
     ensurePermission(actor, "review_analysis_draft");
     const record = await this.requireIntake(input.intakeId);
+
+    const evaluation = await this.getReviewableEvaluation(record.id);
+    if (evaluation) {
+      return this.reviseFromEvaluation(record, evaluation, input, actor);
+    }
+
     const draft = requireDraft(record, input.draftId);
     requireDraftPendingReview(draft);
 
@@ -948,6 +980,116 @@ export class IntakeWorkflowService {
       action: "REVIEWED_PROJECT_PACKAGE_CREATED",
       timestamp: now,
       metadata: { packageId: pkg.id, sourceDraftId: draft.id, reviewDecision: "revised" },
+    });
+    return saved;
+  }
+
+  // ─── Evaluation-based review (orchestrator path, A-scoped TASK-0078) ────────
+  // The evaluation is the reviewable artifact; there's no derived draft twin.
+
+  /**
+   * Returns the intake's latest evaluation when it is awaiting human review.
+   * Undefined when there's no evaluation or it's already been acted on — in
+   * those cases accept/reject/revise fall back to the provider draft path.
+   */
+  private async getReviewableEvaluation(intakeId: string): Promise<IntakeEvaluation | undefined> {
+    const evaluation = await this.store.getLatestEvaluationForIntake(intakeId);
+    return evaluation && evaluation.status === "ready_for_review" ? evaluation : undefined;
+  }
+
+  private async acceptFromEvaluation(
+    record: ProjectIntakeRecord,
+    evaluation: IntakeEvaluation,
+    input: AcceptAnalysisDraftInput,
+    actor: Actor,
+  ): Promise<ProjectIntakeRecord> {
+    const now = this.clock();
+    const pkg = evaluationToReviewedPackage(evaluation, {
+      actor,
+      now,
+      idFactory: this.idFactory,
+      reviewDecision: "accepted",
+      reviewerNotes: input.reviewerNotes,
+    });
+    await this.store.saveEvaluation({
+      evaluation: { ...evaluation, status: "accepted" },
+      agentRuns: agentRunsFromEvaluation(evaluation),
+    });
+    const saved = await this.store.saveIntake({ ...record, reviewedProjectPackage: pkg, updatedAt: now });
+    await this.audit({
+      record: saved,
+      actor,
+      action: "ANALYSIS_DRAFT_ACCEPTED",
+      timestamp: now,
+      metadata: { evaluationId: evaluation.id, reviewerNotes: input.reviewerNotes },
+    });
+    await this.audit({
+      record: saved,
+      actor,
+      action: "REVIEWED_PROJECT_PACKAGE_CREATED",
+      timestamp: now,
+      metadata: { packageId: pkg.id, sourceEvaluationId: evaluation.id, reviewDecision: "accepted" },
+    });
+    return saved;
+  }
+
+  private async rejectFromEvaluation(
+    record: ProjectIntakeRecord,
+    evaluation: IntakeEvaluation,
+    input: RejectAnalysisDraftInput,
+    actor: Actor,
+  ): Promise<ProjectIntakeRecord> {
+    const now = this.clock();
+    await this.store.saveEvaluation({
+      evaluation: { ...evaluation, status: "rejected" },
+      agentRuns: agentRunsFromEvaluation(evaluation),
+    });
+    const saved = await this.store.saveIntake({ ...record, updatedAt: now });
+    await this.audit({
+      record: saved,
+      actor,
+      action: "ANALYSIS_DRAFT_REJECTED",
+      timestamp: now,
+      metadata: { evaluationId: evaluation.id, reason: input.reason },
+    });
+    return saved;
+  }
+
+  private async reviseFromEvaluation(
+    record: ProjectIntakeRecord,
+    evaluation: IntakeEvaluation,
+    input: ReviseAnalysisDraftInput,
+    actor: Actor,
+  ): Promise<ProjectIntakeRecord> {
+    const now = this.clock();
+    const pkg: ReviewedProjectPackage = {
+      id: this.idFactory("RPKG"),
+      sourceEvaluationId: evaluation.id,
+      intakeId: record.id,
+      reviewedBy: actor.id,
+      reviewedAt: now,
+      reviewDecision: "revised",
+      reviewerNotes: input.reviewerNotes,
+      ...input.reviewedPackage,
+    };
+    await this.store.saveEvaluation({
+      evaluation: { ...evaluation, status: "accepted" },
+      agentRuns: agentRunsFromEvaluation(evaluation),
+    });
+    const saved = await this.store.saveIntake({ ...record, reviewedProjectPackage: pkg, updatedAt: now });
+    await this.audit({
+      record: saved,
+      actor,
+      action: "ANALYSIS_DRAFT_REVISED",
+      timestamp: now,
+      metadata: { evaluationId: evaluation.id, reviewerNotes: input.reviewerNotes },
+    });
+    await this.audit({
+      record: saved,
+      actor,
+      action: "REVIEWED_PROJECT_PACKAGE_CREATED",
+      timestamp: now,
+      metadata: { packageId: pkg.id, sourceEvaluationId: evaluation.id, reviewDecision: "revised" },
     });
     return saved;
   }
@@ -1672,7 +1814,10 @@ function inferApprovalGate(status: RequestStatus): ApprovalGate {
   throw new ValidationError(`No approval gate is open while request is in ${status}.`);
 }
 
-function requireDraft(record: ProjectIntakeRecord, draftId: string) {
+function requireDraft(record: ProjectIntakeRecord, draftId: string | undefined) {
+  if (!draftId) {
+    throw new ValidationError("draftId is required to review a provider-generated analysis draft.");
+  }
   const draft = record.analysisDrafts?.find((d) => d.id === draftId);
   if (!draft) {
     throw new NotFoundError("Analysis draft", draftId);
