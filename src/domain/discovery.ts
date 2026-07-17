@@ -123,6 +123,16 @@ export interface DiscoveryTimelineEvent {
 
 // ─── Problem Frame ────────────────────────────────────────────────────────────
 
+/**
+ * An assumption the AI made to bridge a gap between what's known and what
+ * isn't, instead of blocking on it. `rationale` is required — a bare claim
+ * with no stated reasoning can't be evaluated or safely relied on downstream.
+ */
+export interface DiscoveryAssumption {
+  assumption: string;
+  rationale: string;
+}
+
 export interface ProblemFrame {
   problemStatement: string;
   affectedUsers: string[];
@@ -130,7 +140,7 @@ export interface ProblemFrame {
   painPoints: string[];
   businessImpact: string;
   successCriteria: string[];
-  assumptions: string[];
+  assumptions: DiscoveryAssumption[];
   unknowns: string[];
 }
 
@@ -279,7 +289,7 @@ export interface ProjectProposal {
   suggestedTasks: string[];
 
   // Visible assumptions and unknowns surfaced to evaluators
-  assumptions: string[];
+  assumptions: DiscoveryAssumption[];
   unknowns: string[];
 
   confidence: DiscoveryConfidence;

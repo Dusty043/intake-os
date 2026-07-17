@@ -260,6 +260,21 @@ describe("DiscoveryOrchestrator.startDiscovery", () => {
 
     assert.ok(session.intent?.solutionBiasDetected, "should detect chatbot solution bias");
   });
+
+  test("assumptions include both assumption and rationale (TASK-0077 — rationale required, not just assumptions)", async () => {
+    const { orchestrator } = makeOrchestrator();
+    const session = await orchestrator.startDiscovery({
+      userId: "user_1",
+      rawMessage: "We need a chatbot to help our customers.",
+    });
+
+    assert.ok(session.problemFrame?.assumptions.length > 0, "solution bias should produce an assumption");
+    const [assumption] = session.problemFrame.assumptions;
+    assert.equal(typeof assumption.assumption, "string");
+    assert.ok(assumption.assumption.length > 0, "assumption text must be non-empty");
+    assert.equal(typeof assumption.rationale, "string");
+    assert.ok(assumption.rationale.length > 0, "rationale must be provided, not just the bare assumption");
+  });
 });
 
 describe("DiscoveryOrchestrator.addMessage", () => {

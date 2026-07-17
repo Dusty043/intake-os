@@ -172,7 +172,7 @@ function generateReadme(proposal: ProjectProposal, session: DiscoverySession, ap
     lines.push("## Assumptions");
     lines.push("");
     for (const a of proposal.assumptions) {
-      lines.push(`- ${a}`);
+      lines.push(`- ${a.assumption} (Rationale: ${a.rationale})`);
     }
     lines.push("");
   }

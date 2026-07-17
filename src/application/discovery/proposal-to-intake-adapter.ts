@@ -93,7 +93,9 @@ export function proposalToIntakeRecord(
           ? `Open unknowns from discovery: ${proposal.unknowns.join("; ")}`
           : null,
         proposal.assumptions.length > 0
-          ? `Unconfirmed assumptions discovery made without asking the user: ${proposal.assumptions.join("; ")}`
+          ? `Unconfirmed assumptions discovery made without asking the user: ${proposal.assumptions
+              .map((a) => `${a.assumption} (Rationale: ${a.rationale})`)
+              .join("; ")}`
           : null,
       ]
         .filter((part): part is string => part !== null)

@@ -1,4 +1,4 @@
-import type { ProjectProposal } from "../../../../domain/discovery.js";
+import type { DiscoveryAssumption, ProjectProposal } from "../../../../domain/discovery.js";
 import { emptyProjectProposal } from "../../../../domain/discovery.js";
 import type { DiscoveryAgentOptions, IProposalComposerAgent } from "../discovery-agent-contract.js";
 import { completeWithUsage } from "../discovery-agent-contract.js";
@@ -26,7 +26,18 @@ const schema = {
     infrastructure: { type: ["string", "null"] },
     suggestedEpics: { type: "array", items: { type: "string" } },
     suggestedTasks: { type: "array", items: { type: "string" } },
-    assumptions: { type: "array", items: { type: "string" } },
+    assumptions: {
+      type: "array",
+      items: {
+        type: "object",
+        required: ["assumption", "rationale"],
+        additionalProperties: false,
+        properties: {
+          assumption: { type: "string" },
+          rationale: { type: "string" },
+        },
+      },
+    },
     unknowns: { type: "array", items: { type: "string" } },
     status: { type: "string", enum: ["draft", "evaluation_ready"] },
   },
@@ -48,7 +59,7 @@ type Output = {
   infrastructure: string | null;
   suggestedEpics: string[];
   suggestedTasks: string[];
-  assumptions: string[];
+  assumptions: DiscoveryAssumption[];
   unknowns: string[];
   status: "draft" | "evaluation_ready";
 };
@@ -61,7 +72,8 @@ Guidelines:
 - status: use "evaluation_ready" if requirements are clear enough to evaluate; "draft" if key information is still missing
 - Be specific and actionable — avoid vague language
 - architectureRecommendation: choose "monolith" for most internal tools and dashboards; "microservices" only when independently deployable services are clearly needed
-- Story points: use only values 1, 2, 3, 5, 8, 13 (Fibonacci scale) — never other values`;
+- Story points: use only values 1, 2, 3, 5, 8, 13 (Fibonacci scale) — never other values
+- assumptions: for each one, provide both the assumption itself and a rationale explaining why you filled that gap rather than leaving it blocking, and what makes it the safe (reversible, low-risk, easily corrected) choice if wrong. Never provide an assumption without a rationale.`;
 
 export class OpenAIProposalComposerAgent implements IProposalComposerAgent {
   constructor(private readonly client: LlmClient, private readonly model: string) {}

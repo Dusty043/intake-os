@@ -148,7 +148,10 @@ export class MockProblemFramingAgent implements IProblemFramingAgent {
       businessImpact: "Not yet quantified",
       successCriteria: [],
       assumptions: ctx.intent?.solutionBiasDetected
-        ? [`User requested a specific solution: "${ctx.intent.requestedSolution}" — underlying problem may differ.`]
+        ? [{
+            assumption: `The underlying problem matches the requested solution "${ctx.intent.requestedSolution}".`,
+            rationale: "The user named a specific solution instead of describing the underlying pain point, so this hasn't been confirmed — proceeding on the safest assumption that the named solution is in fact what's needed, subject to correction.",
+          }]
         : [],
       unknowns: extractUnknowns(text),
     };

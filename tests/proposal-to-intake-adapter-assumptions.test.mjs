@@ -63,7 +63,10 @@ describe("proposalToIntakeRecord — assumptions surfaced to Intake", () => {
     const proposal = {
       ...session.proposal,
       unknowns: ["What is the expected user count?"],
-      assumptions: ["Assuming this is for internal staff only, not external customers."],
+      assumptions: [{
+        assumption: "This is for internal staff only, not external customers.",
+        rationale: "The request came through the internal AI & Automation team channel with no mention of external users.",
+      }],
     };
 
     const record = proposalToIntakeRecord(proposal, session, idFactory, fixedNow());
@@ -72,6 +75,8 @@ describe("proposalToIntakeRecord — assumptions surfaced to Intake", () => {
     assert.ok(record.discovery.notes.includes("expected user count"));
     assert.ok(record.discovery.notes.includes("Unconfirmed assumptions discovery made without asking the user:"));
     assert.ok(record.discovery.notes.includes("internal staff only"));
+    assert.ok(record.discovery.notes.includes("Rationale:"));
+    assert.ok(record.discovery.notes.includes("AI & Automation team channel"));
   });
 
   test("notes is undefined when there are neither unknowns nor assumptions", async () => {
@@ -89,10 +94,18 @@ describe("proposalToIntakeRecord — assumptions surfaced to Intake", () => {
     const directed = await startAndSelectDirection(orchestrator, "We need an internal tool for something.");
     const session = await orchestrator.composeProposal(directed.id);
 
-    const proposal = { ...session.proposal, unknowns: [], assumptions: ["Assuming a web app, not mobile."] };
+    const proposal = {
+      ...session.proposal,
+      unknowns: [],
+      assumptions: [{
+        assumption: "This is a web app, not mobile.",
+        rationale: "No platform preference was stated and the conversation described browser-based usage.",
+      }],
+    };
     const record = proposalToIntakeRecord(proposal, session, idFactory, fixedNow());
     assert.ok(!record.discovery.notes.includes("Open unknowns from discovery:"));
     assert.ok(record.discovery.notes.includes("Unconfirmed assumptions discovery made without asking the user:"));
     assert.ok(record.discovery.notes.includes("web app, not mobile"));
+    assert.ok(record.discovery.notes.includes("Rationale:"));
   });
 });

@@ -132,7 +132,7 @@ export class MockProposalComposerAgent implements IProposalComposerAgent {
           successMatrix: pf.successCriteria.length > 0
             ? pf.successCriteria
             : ["TBD — success criteria not yet defined"],
-          constraints: pf.assumptions,
+          constraints: pf.assumptions.map((a) => a.assumption),
         },
         Math.min(conf.problemUnderstanding + 0.10, 0.95),
         problemSource,

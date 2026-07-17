@@ -1,4 +1,4 @@
-import type { DiscoveryConfidence, ProblemFrame } from "../../../../domain/discovery.js";
+import type { DiscoveryAssumption, DiscoveryConfidence, ProblemFrame } from "../../../../domain/discovery.js";
 import type { DiscoveryAgentContext, DiscoveryAgentOptions, IProblemFramingAgent } from "../discovery-agent-contract.js";
 import { completeWithUsage } from "../discovery-agent-contract.js";
 import type { LlmClient } from "../../../llm-client.js";
@@ -15,7 +15,18 @@ const schema = {
     painPoints: { type: "array", items: { type: "string" } },
     businessImpact: { type: "string" },
     successCriteria: { type: "array", items: { type: "string" } },
-    assumptions: { type: "array", items: { type: "string" } },
+    assumptions: {
+      type: "array",
+      items: {
+        type: "object",
+        required: ["assumption", "rationale"],
+        additionalProperties: false,
+        properties: {
+          assumption: { type: "string" },
+          rationale: { type: "string" },
+        },
+      },
+    },
     unknowns: { type: "array", items: { type: "string" } },
     confidence: {
       type: "object",
@@ -40,7 +51,7 @@ type Output = {
   painPoints: string[];
   businessImpact: string;
   successCriteria: string[];
-  assumptions: string[];
+  assumptions: DiscoveryAssumption[];
   unknowns: string[];
   confidence: DiscoveryConfidence;
 };
@@ -55,7 +66,12 @@ Score each confidence dimension 0.0–1.0:
 - stakeholderClarity: how clear the stakeholders and ownership are — score ≥ 0.7 for any clearly internal team request
 - downstreamMapping: how clear the Monday/GitHub work items would be — score ≥ 0.7 when the project type clearly maps to one of the known project types
 
-Score 0.3 when information is sparse. Score 0.8+ when the information is thorough.`;
+Score 0.3 when information is sparse. Score 0.8+ when the information is thorough.
+
+For each assumption, provide both:
+- assumption: the specific thing you're filling in for a gap between what's known and what isn't
+- rationale: why you chose this specific fill rather than leaving it blocking, and what makes it the safe (reversible, low-risk, easily corrected) choice if wrong
+A bare assumption with no rationale is not acceptable — never omit rationale.`;
 
 export class OpenAIProblemFramingAgent implements IProblemFramingAgent {
   constructor(private readonly client: LlmClient, private readonly model: string) {}

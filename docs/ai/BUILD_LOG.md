@@ -2825,3 +2825,34 @@ Follow-up: not yet re-verified live. Mock-provider path unaffected
 (Q-DISC-1, still doesn't read discoveryNotes at all).
 
 **Task log**: `docs/ai/tasks/TASK-0076-surface-discovery-assumptions-to-intake.md`
+
+## 2026-07-17 — Require rationale for every discovery assumption (TASK-0077)
+
+Follow-up to TASK-0076. User feedback: "rationale must be provided-- not
+just assumptions. the ai is solving the gap between what is known and not.
+and providing a safe way to achieve it." Assumptions were still bare
+strings — no stated reasoning for why the AI filled a gap instead of
+blocking, or what made it safe.
+
+Introduced `DiscoveryAssumption { assumption: string; rationale: string }`
+in `domain/discovery.ts`; `ProblemFrame.assumptions` and
+`ProjectProposal.assumptions` both changed from `string[]` to this type.
+Updated every producer/consumer: `openai-problem-framing-agent.ts` and
+`openai-proposal-composer-agent.ts` schemas now require `rationale`
+(`additionalProperties: false` — the model can't omit it), system prompts
+instruct stating both the assumption and why it's the safe/reversible
+choice; `mock-problem-framing-agent.ts` synthesizes a rationale for its
+solution-bias case; `mock-proposal-composer-agent.ts`,
+`mock-manifest-generator-agent.ts`, `discovery-orchestrator.ts`
+(`buildAnalysisReply`, the user-facing "moving forward with assumptions"
+chat message), `proposal-to-intake-adapter.ts` (TASK-0076's notes string),
+and `apps/web/src/lib/discovery-types.ts` all updated to the new shape.
+
+New test in `discovery-phase-1.test.mjs` confirming rationale is non-empty;
+`proposal-to-intake-adapter-assumptions.test.mjs` fixtures updated.
+`npm run build:core`, `typecheck`, `api:build`, `apps/web build` all clean.
+`npm test` 806/806 pass.
+
+Follow-up: not yet re-verified against a real live OpenAI call.
+
+**Task log**: `docs/ai/tasks/TASK-0077-require-rationale-for-discovery-assumptions.md`

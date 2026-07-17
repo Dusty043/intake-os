@@ -676,7 +676,7 @@ export class DiscoveryOrchestrator {
 
     if (tier === "propose_with_assumptions" || tier === "recommend_evaluation") {
       if (frame?.assumptions && frame.assumptions.length > 0) {
-        const assumptions = frame.assumptions.slice(0, 3).map((a) => `- ${a}`).join("\n");
+        const assumptions = frame.assumptions.slice(0, 3).map((a) => `- ${a.assumption} (${a.rationale})`).join("\n");
         parts.push(`\n\nI'm moving forward with a few assumptions:\n${assumptions}`);
       }
       if (frame?.successCriteria && frame.successCriteria.length > 0) {

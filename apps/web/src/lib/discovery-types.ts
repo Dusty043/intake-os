@@ -68,7 +68,7 @@ export type DiscoveryProposal = {
   requirements: unknown;
   suggestedEpics: string[];
   suggestedTasks: string[];
-  assumptions: string[];
+  assumptions: { assumption: string; rationale: string }[];
   unknowns: string[];
   status: string;
 };
