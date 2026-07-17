@@ -2726,3 +2726,33 @@ session — next session should run a real intake through Discovery to confirm
 live OpenAI calls succeed end-to-end.
 
 **Task log**: `docs/ai/tasks/TASK-0073-enable-live-openai-provider.md`
+
+## 2026-07-17 — Fix: Discovery→Intake clarification re-block (TASK-0074)
+
+First live-AI Discovery run surfaced a real bug: Discovery's proposal
+composer wrote 4 concrete open unknowns into `discovery.notes`, but
+Discovery's separate confidence-scoring agent scored all dimensions
+0.8–0.98 and asked zero clarification questions. The session reached
+`sent_to_evaluation` with `clarificationQuestions: []`, and Intake's
+`OpenAIClarificationQuestionsAgent` — which never read `ctx.discoveryNotes`
+(only `intake.title`/`description` + `priorClarifications`) — independently
+re-derived the same unknowns and blocked with `clarification_required`,
+re-asking near-identical questions. Root cause: two independently-tuned
+live LLM judgments (Discovery confidence vs. Intake clarification-blocking)
+share no context. This exact gap was Q-DISC-1 in OPEN_QUESTIONS.md, scoped
+out during TASK-0061 as untested-under-live-AI.
+
+Fix: `openai-clarification-questions-agent.ts` now includes
+`ctx.discoveryNotes` in its prompt ("Notes from discovery" section) so it
+treats Discovery-surfaced unknowns as known context rather than blindly
+re-blocking on them. Does not force `isBlocking=false` from notes alone
+(only `priorClarifications`, i.e. answered questions, does that) — notes
+are unstructured and may themselves say something is still unresolved.
+
+2 new tests in `tests/openai-clarification-questions-agent.test.mjs`.
+`npm run build:core` clean, `npm test` 797/797 pass.
+
+Follow-up: Q-DISC-1 still open for the other 12 evaluation agents. Not yet
+re-verified against a live end-to-end Discovery→Intake run.
+
+**Task log**: `docs/ai/tasks/TASK-0074-discovery-notes-clarification-context-fix.md`

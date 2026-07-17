@@ -67,4 +67,32 @@ describe("OpenAIClarificationQuestionsAgent", () => {
     await agent.run(ctx, baseOpts);
     assert.ok(capturedPrompt.includes("Next.js and Postgres"));
   });
+
+  test("includes discoveryNotes in the prompt sent to the model", async () => {
+    let capturedPrompt = null;
+    const client = {
+      completeStructured: async (args) => {
+        capturedPrompt = args.userPrompt;
+        return { content: { isBlocking: false, questions: [], missingFields: [] }, inputTokens: 10, outputTokens: 5, finishReason: "stop" };
+      },
+    };
+    const agent = new OpenAIClarificationQuestionsAgent(client, "gpt-5.6-terra");
+    const ctx = baseCtx({
+      discoveryNotes: ["Open unknowns from discovery: the hardcoded price table and currency must be supplied before release."],
+    });
+    await agent.run(ctx, baseOpts);
+    assert.ok(capturedPrompt.includes("hardcoded price table and currency"));
+  });
+
+  test("does not force isBlocking=false from discoveryNotes alone — only priorClarifications resolves blocking", async () => {
+    const agent = new OpenAIClarificationQuestionsAgent(
+      stubClient({ isBlocking: true, questions: [{ id: "q1", question: "x", reason: "y", required: true }], missingFields: ["price_table"] }),
+      "gpt-5.6-terra",
+    );
+    const ctx = baseCtx({
+      discoveryNotes: ["Open unknowns from discovery: price table unresolved."],
+    });
+    const output = await agent.run(ctx, baseOpts);
+    assert.equal(output.content.isBlocking, true);
+  });
 });
