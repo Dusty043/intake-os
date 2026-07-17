@@ -17,6 +17,8 @@ import {
   OpenAIClarificationAgent,
   OpenAIProposalComposerAgent,
 } from "../../../../../src/application/discovery/index.js";
+import { MockClarificationQuestionsAgent } from "../../../../../src/application/agents/mock/index.js";
+import { OpenAIClarificationQuestionsAgent } from "../../../../../src/application/agents/openai/index.js";
 import { loadAnalysisProviderConfig } from "../../../../../src/application/providers/analysis-provider-config.js";
 import { createLlmClient, resolveModel, resolveTasksModel } from "../../../../../src/application/providers/llm-client-factory.js";
 import { DISCOVERY_SESSION_STORE, PROJECT_INTAKE_STORE } from "../../persistence/store.token.js";
@@ -68,6 +70,14 @@ function buildOrchestrator(
 
   const manifestAgent = new MockManifestGeneratorAgent();
 
+  // Same agent Intake evaluation uses to decide isBlocking — reused here so
+  // Discovery's exit gate can't hand off something Intake would immediately
+  // re-block on (TASK-0075). Lower-cost tier: same extraction/classification
+  // shape as the other clarification check.
+  const finalClarificationCheckAgent = llmClient
+    ? new OpenAIClarificationQuestionsAgent(llmClient, tasksModel)
+    : new MockClarificationQuestionsAgent();
+
   const orchestrator = new DiscoveryOrchestrator(
     store,
     intentAgent,
@@ -88,6 +98,7 @@ function buildOrchestrator(
         ? () => settingsService.getOrgContext()
         : undefined,
       streamRegistry,
+      finalClarificationCheckAgent,
     },
   );
 

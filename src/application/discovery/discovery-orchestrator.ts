@@ -1,4 +1,5 @@
 import type {
+  ClarificationQuestion,
   ConversationMessage,
   DiscoveryAgentUsageRecord,
   DiscoverySession,
@@ -26,6 +27,12 @@ import { loadModelCostConfig } from "../providers/model-cost-registry.js";
 import { estimateCost } from "../providers/token-cost.js";
 import { NotFoundError, ValidationError } from "../errors.js";
 import type { DiscoveryStreamRegistry } from "./discovery-stream-registry.js";
+import type { EvaluationAgent } from "../agents/agent-contract.js";
+import type { ClarificationQuestionsSectionContent } from "../intake-evaluation.js";
+
+// System actor used only to satisfy EvaluationAgent.run()'s AgentRunOptions.actor —
+// the intake-side clarification agent doesn't read it, but the field is required.
+const FINAL_CLARIFICATION_CHECK_ACTOR = { id: "discovery-engine", role: "intake_owner" as const, displayName: "Discovery Engine" };
 
 // ─── Public input/output types ────────────────────────────────────────────────
 
@@ -52,7 +59,8 @@ export interface SelectDirectionInput {
 
 export interface SendToEvaluationResult {
   session: DiscoverySession;
-  intakeRecord: ProjectIntakeRecord;
+  /** Absent when the final clarification check (see finalClarificationCheckAgent) blocked the handoff — the session is left at clarification_needed with new questions instead. */
+  intakeRecord?: ProjectIntakeRecord;
 }
 
 export interface DiscoveryOrchestratorOptions {
@@ -66,6 +74,14 @@ export interface DiscoveryOrchestratorOptions {
   getOrgContext?: () => Promise<string>;
   /** When set, every real agent call publishes stage-start/token/stage-end/error events here, keyed by session ID. Optional — omit for no live progress (e.g. tests using mock agents). */
   streamRegistry?: DiscoveryStreamRegistry;
+  /**
+   * Runs the same clarification-blocking check Intake evaluation uses, right
+   * before sendToEvaluation hands off — so Discovery's own confidence-score
+   * gate and Intake's isBlocking verdict can't disagree (see TASK-0075).
+   * Optional — omit to skip the check entirely (prior behavior, and what
+   * every existing test still does).
+   */
+  finalClarificationCheckAgent?: EvaluationAgent<ClarificationQuestionsSectionContent>;
 }
 
 // ─── Orchestrator ─────────────────────────────────────────────────────────────
@@ -79,6 +95,7 @@ export class DiscoveryOrchestrator {
   private readonly getConfidenceThreshold: () => Promise<number>;
   private readonly getOrgContext: () => Promise<string>;
   private readonly streamRegistry: DiscoveryStreamRegistry | undefined;
+  private readonly finalClarificationCheckAgent: EvaluationAgent<ClarificationQuestionsSectionContent> | undefined;
 
   constructor(
     private readonly store: IDiscoverySessionStore,
@@ -98,6 +115,7 @@ export class DiscoveryOrchestrator {
     this.getConfidenceThreshold = opts.getConfidenceThreshold ?? (() => Promise.resolve(0.65));
     this.getOrgContext = opts.getOrgContext ?? (() => Promise.resolve(""));
     this.streamRegistry = opts.streamRegistry;
+    this.finalClarificationCheckAgent = opts.finalClarificationCheckAgent;
   }
 
   // ─── Start a new discovery session ───────────────────────────────────────
@@ -413,6 +431,19 @@ export class DiscoveryOrchestrator {
       now,
     );
 
+    const finalCheck = await this.checkFinalClarification(intakeRecord, now);
+
+    if (finalCheck?.isBlocking) {
+      const updatedSession = await this.store.update(session.id, {
+        clarificationQuestions: [...session.clarificationQuestions, ...finalCheck.questions],
+        status: "clarification_needed",
+        timeline: [...session.timeline, this.event("clarification_needed", now)],
+        usageRecords: this.appendUsage(session, finalCheck.usageEvents, now),
+        updatedAt: now,
+      });
+      return { session: updatedSession };
+    }
+
     const savedIntake = this.intakeStore
       ? await this.intakeStore.saveIntake(intakeRecord)
       : intakeRecord;
@@ -425,10 +456,63 @@ export class DiscoveryOrchestrator {
       status: nextStatus,
       linkedIntakeId: savedIntake.id,
       timeline: [...session.timeline, ...newEvents],
+      usageRecords: this.appendUsage(session, finalCheck?.usageEvents ?? [], now),
       updatedAt: now,
     });
 
     return { session: updatedSession, intakeRecord: savedIntake };
+  }
+
+  /**
+   * Runs the same clarification-blocking check Intake evaluation uses,
+   * against the about-to-be-created intake record, so Discovery's exit gate
+   * can't hand off something Intake would immediately re-block on (TASK-0075).
+   * Returns null when no check agent is configured (prior behavior).
+   */
+  private async checkFinalClarification(
+    intakeRecord: ProjectIntakeRecord,
+    now: string,
+  ): Promise<{ isBlocking: boolean; questions: ClarificationQuestion[]; usageEvents: DiscoveryAgentUsageEvent[] } | null> {
+    const agent = this.finalClarificationCheckAgent;
+    if (!agent) return null;
+
+    const output = await agent.run(
+      {
+        intake: intakeRecord,
+        discoveryNotes: intakeRecord.discovery?.notes ? [intakeRecord.discovery.notes] : undefined,
+        priorClarifications: intakeRecord.priorClarifications ? [...intakeRecord.priorClarifications] : undefined,
+        depth: "standard",
+        sections: {},
+      },
+      {
+        actor: FINAL_CLARIFICATION_CHECK_ACTOR,
+        provider: this.provider,
+        idFactory: this.idFactory,
+        now,
+      },
+    );
+
+    const usageEvents: DiscoveryAgentUsageEvent[] = output.usage
+      ? [{
+          agentRole: "final_clarification_check",
+          inputTokens: output.usage.inputTokens,
+          outputTokens: output.usage.outputTokens,
+          latencyMs: output.usage.latencyMs,
+        }]
+      : [];
+
+    const isBlocking = output.isClarificationBlocking === true || output.content.isBlocking === true;
+    const questions: ClarificationQuestion[] = isBlocking
+      ? output.content.questions.map((q) => ({
+          id: q.id,
+          question: q.question,
+          impact: q.required ? ("blocking" as const) : ("important" as const),
+          affectedDimensions: [],
+          answered: false,
+        }))
+      : [];
+
+    return { isBlocking, questions, usageEvents };
   }
 
   // ─── Generate provisioning manifest ──────────────────────────────────────

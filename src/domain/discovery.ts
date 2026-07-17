@@ -457,7 +457,8 @@ export type DiscoveryAgentRole =
   | "solution_generation"
   | "clarification"
   | "proposal_composition"
-  | "manifest_generation";
+  | "manifest_generation"
+  | "final_clarification_check";
 
 export interface DiscoveryAgentUsageRecord {
   id: string;

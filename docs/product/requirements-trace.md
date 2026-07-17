@@ -99,6 +99,7 @@ The numbers can be adjusted as the trace becomes more detailed.
 | B-014 | Evaluation UI shows all 12 section kinds with agent provenance | `ai-orchestration.md` | EvaluationSectionCard, EvaluationPanel | TASK-0021 | manual UI verification | tested | `EvaluationPanel` + `EvaluationSectionCard` with 12 renderers deployed. |
 | B-015 | Quality score and readiness band are displayed to reviewers | `ai-orchestration.md` | EvaluationPanel | TASK-0021 | manual UI verification | tested | `QualityScoreBadge` and `QualityScoreBreakdown` components in `EvaluationPanel`. |
 | B-016 | Reviewers can trigger evaluation regeneration from the UI | `ai-orchestration.md` | EvaluationRegenerateForm | TASK-0021 | manual UI verification | tested | `EvaluationRegenerateForm` integrated in Evaluation tab; calls `regenerateAnalysisDraft`. |
+| B-017 | Discovery's clarification gate and Intake's clarification gate cannot disagree | `ai-orchestration.md` | `DiscoveryOrchestrator.sendToEvaluation` → `finalClarificationCheckAgent` | TASK-0074, TASK-0075 | `tests/discovery-final-clarification-gate.test.mjs` (5 tests) | tested | Discovery's exit gate (numeric confidence threshold) and Intake's gate (LLM `isBlocking` verdict) were independently tuned and could disagree under live AI — TASK-0074 bridged context only (discoveryNotes), TASK-0075 centralizes the criterion by running Intake's own clarification-blocking agent inside Discovery's `sendToEvaluation` before handoff. Optional/no-op unless wired; adds one LLM call per handoff when active. |
 
 ---
 

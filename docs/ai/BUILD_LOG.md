@@ -2756,3 +2756,38 @@ Follow-up: Q-DISC-1 still open for the other 12 evaluation agents. Not yet
 re-verified against a live end-to-end Discovery→Intake run.
 
 **Task log**: `docs/ai/tasks/TASK-0074-discovery-notes-clarification-context-fix.md`
+
+## 2026-07-17 — Centralize Discovery↔Intake clarification gate (TASK-0075)
+
+Follow-up to TASK-0074, which only bridged context (discoveryNotes) but left
+the actual blocking criterion split: Discovery's exit gate uses a numeric
+confidence threshold (0.65 default) across 6 dimensions; Intake's gate is a
+boolean `isBlocking` from a wholly separate LLM judgment call with no shared
+threshold. User chose to centralize by making Discovery authoritative: it
+now runs the same clarification-blocking check Intake uses before handing
+off, so Discovery can't send something Intake would immediately re-block.
+
+`discovery-orchestrator.ts`: new optional `finalClarificationCheckAgent` on
+`DiscoveryOrchestratorOptions` (omitted everywhere existing — fully backward
+compatible, no-op unless wired). `sendToEvaluation()` builds the intakeRecord
+first, then runs the check against its title/description/discovery.notes/
+priorClarifications; if blocking, no intake is saved — questions map into
+`ClarificationQuestion[]` (required→blocking, else→important), session
+reverts to `clarification_needed`, `sendToEvaluation` returns `{ session }`
+with no `intakeRecord`. `SendToEvaluationResult.intakeRecord` is now
+optional — the controller and web frontend already handled this via
+optional chaining, no changes needed there.
+
+`domain/discovery.ts`: added `"final_clarification_check"` to
+`DiscoveryAgentRole` for cost attribution. `discovery.module.ts`: wires the
+check to the same `OpenAIClarificationQuestionsAgent`/
+`MockClarificationQuestionsAgent` Intake uses (lower-cost tier).
+
+5 new tests in `tests/discovery-final-clarification-gate.test.mjs`. Added
+B-017 to `docs/product/requirements-trace.md`. `npm run build:core`,
+`npm run typecheck`, `npm run api:build` clean. `npm test` 802/802 pass.
+
+Follow-up: adds one extra LLM call per sendToEvaluation (accepted cost
+tradeoff for making Discovery authoritative). Not yet re-verified live.
+
+**Task log**: `docs/ai/tasks/TASK-0075-centralize-discovery-intake-clarification-gate.md`
