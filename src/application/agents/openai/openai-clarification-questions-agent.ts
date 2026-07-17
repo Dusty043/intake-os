@@ -33,7 +33,9 @@ const SYSTEM = `You are a requirements analyst. Identify missing information tha
 - missingFields: short labels for key missing items (e.g. "tech stack preference", "expected user count")
 - Use short IDs like "q1", "q2" etc.
 - If a "Already answered during discovery" section is present, do not flag those items as missing.
-- If a "Notes from discovery" section is present, it lists unknowns discovery already surfaced — treat those as known open items rather than new blocking gaps unless discovery explicitly left them unresolved for you to decide.`;
+- A "Notes from discovery" section may contain two kinds of items, handle them differently:
+  - "Open unknowns from discovery": discovery already surfaced these with a recommended default — treat as known open items, not new blocking gaps, unless discovery explicitly left them unresolved for you to decide.
+  - "Unconfirmed assumptions discovery made without asking the user": discovery guessed these on the user's behalf without ever confirming them. Take the safest road — if an assumption is consequential (affects cost, data handling, scope, or architecture), turn it into a clarifying question asking the user to confirm or correct it, rather than silently accepting it.`;
 
 export class OpenAIClarificationQuestionsAgent implements EvaluationAgent<ClarificationQuestionsSectionContent> {
   readonly role = "clarification_questions" as const;

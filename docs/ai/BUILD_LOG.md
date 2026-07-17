@@ -2791,3 +2791,37 @@ Follow-up: adds one extra LLM call per sendToEvaluation (accepted cost
 tradeoff for making Discovery authoritative). Not yet re-verified live.
 
 **Task log**: `docs/ai/tasks/TASK-0075-centralize-discovery-intake-clarification-gate.md`
+
+## 2026-07-17 — Surface unconfirmed discovery assumptions to Intake (TASK-0076)
+
+User feedback: "proceeding with current assumptions is too weak... since
+we're using ai anyway bridge the gap to take the safest road to the goal."
+Found `proposal.assumptions` (things discovery guessed on the user's behalf
+without asking — populated at the `propose_with_assumptions` confidence
+tier or via the "wing it" escape valve in `runAnalysis`) were silently
+dropped: `proposal-to-intake-adapter.ts` only folded `proposal.unknowns`
+into `discovery.notes`, never assumptions. Neither TASK-0074's clarification
+context fix nor TASK-0075's final-clarification-check gate ever saw them.
+
+Fix: `discovery.notes` now includes assumptions as a second, distinctly
+labeled paragraph ("Unconfirmed assumptions discovery made without asking
+the user: ...") alongside unknowns ("Open unknowns from discovery: ...").
+`OpenAIClarificationQuestionsAgent`'s SYSTEM prompt updated to handle the
+two differently: unknowns stay treated as resolved (unchanged); assumptions
+should be turned into a clarifying question when consequential, per "take
+the safest road" — rather than silently accepted.
+
+Deliberately did not touch the `propose_with_assumptions` tier or "wing it"
+regex itself — that's a deliberate UX escape valve against infinite
+clarification loops; changing it would reintroduce the friction it exists
+to avoid. This fix instead makes sure whatever gets assumed there reaches
+the AI checks that already exist.
+
+3 new tests in `tests/proposal-to-intake-adapter-assumptions.test.mjs`.
+`npm run build:core`, `npm run typecheck`, `npm run api:build` clean.
+`npm test` 805/805 pass.
+
+Follow-up: not yet re-verified live. Mock-provider path unaffected
+(Q-DISC-1, still doesn't read discoveryNotes at all).
+
+**Task log**: `docs/ai/tasks/TASK-0076-surface-discovery-assumptions-to-intake.md`

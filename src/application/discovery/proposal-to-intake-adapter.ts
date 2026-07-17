@@ -81,10 +81,23 @@ export function proposalToIntakeRecord(
       intentType !== "microtask" &&
       intentType !== "bug_fix" &&
       intentType !== "not_a_project",
+    // Unknowns carry a recommended default from discovery — safe for Intake
+    // to treat as already resolved. Assumptions are things discovery guessed
+    // FOR the user without confirmation — labeled separately so Intake's
+    // clarification agent (and the final-clarification-check gate, TASK-0075)
+    // knows to actively confirm these rather than silently accept them
+    // (TASK-0076: unconfirmed assumptions were previously dropped entirely).
     notes:
-      proposal.unknowns.length > 0
-        ? `Open unknowns from discovery: ${proposal.unknowns.join("; ")}`
-        : undefined,
+      [
+        proposal.unknowns.length > 0
+          ? `Open unknowns from discovery: ${proposal.unknowns.join("; ")}`
+          : null,
+        proposal.assumptions.length > 0
+          ? `Unconfirmed assumptions discovery made without asking the user: ${proposal.assumptions.join("; ")}`
+          : null,
+      ]
+        .filter((part): part is string => part !== null)
+        .join("\n\n") || undefined,
     completedBy: { id: session.userId, role: "request_creator" },
     completedAt: now,
   };
