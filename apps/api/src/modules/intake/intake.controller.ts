@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Post, HttpCode, Query } from "@nestjs/common";
+import { Body, Controller, Delete, Get, GoneException, Param, Post, HttpCode, Query } from "@nestjs/common";
 import { Throttle } from "@nestjs/throttler";
 import { loadRateLimitConfig } from "../../config/rate-limit.config.js";
 import { toEvaluationSummaryDto } from "./dto/evaluation.dto.js";
@@ -237,7 +237,7 @@ export class IntakeHttpController {
     @Body() body: GenerateProvisioningPlanDto,
     @CurrentActor() actor: AuthenticatedActor,
   ) {
-    return this.workflowService.generateProvisioningPlan(id, body, toDomainActor(actor));
+    throw new GoneException("Provisioning is disabled in Phase 0 packet mode.");
   }
 
   @Post(":id/provisioning-ready")
@@ -246,7 +246,7 @@ export class IntakeHttpController {
     @Param("id") id: string,
     @CurrentActor() actor: AuthenticatedActor,
   ) {
-    return this.workflowService.markReadyForProvisioning(id, toDomainActor(actor));
+    throw new GoneException("Provisioning is disabled in Phase 0 packet mode.");
   }
 
   @Post(":id/distribution/execute")
@@ -255,8 +255,7 @@ export class IntakeHttpController {
     @Param("id") id: string,
     @CurrentActor() actor: AuthenticatedActor,
   ) {
-    const run = await this.workflowService.executeDistribution(id, toDomainActor(actor));
-    return toProvisioningRunDto(run);
+    throw new GoneException("External distribution is disabled. Download the Phase 0 packet instead.");
   }
 
   @Get(":id/distribution/runs")
@@ -277,8 +276,7 @@ export class IntakeHttpController {
     @Param("runId") runId: string,
     @CurrentActor() actor: AuthenticatedActor,
   ) {
-    const run = await this.workflowService.retryFailedProvisioningTargets(id, runId, toDomainActor(actor));
-    return toProvisioningRunDto(run);
+    throw new GoneException("Provisioning retries are disabled in Phase 0 packet mode.");
   }
 
   @Post(":id/provisioning-targets/:targetId/mark-resolved")
@@ -290,8 +288,7 @@ export class IntakeHttpController {
     @Body() dto: MarkResolvedDto,
     @CurrentActor() actor: AuthenticatedActor,
   ) {
-    await this.workflowService.markProvisioningTargetResolved(id, targetId, toDomainActor(actor), dto.note);
-    return { ok: true };
+    throw new GoneException("Provisioning recovery mutations are disabled in Phase 0 packet mode.");
   }
 
   @Get(":id/audit")

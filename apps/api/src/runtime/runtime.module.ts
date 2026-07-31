@@ -7,9 +7,6 @@ import { createAllEvaluationAgents } from "../../../../src/application/agents/op
 import { loadAnalysisProviderConfig } from "../../../../src/application/providers/analysis-provider-config.js";
 import { AnalysisProviderRouter } from "../../../../src/application/providers/analysis-provider-router.js";
 import { createLlmClient, resolveModel, resolveTasksModel } from "../../../../src/application/providers/llm-client-factory.js";
-import { ProvisioningRegistry } from "../../../../src/application/provisioning/provisioning-executor.js";
-import { createMockRegistry } from "../../../../src/application/provisioning/mock-executor.js";
-import type { MockExecutorMode } from "../../../../src/application/provisioning/mock-executor.js";
 import { GoogleChatNotifier } from "../../../../src/application/notifications/google-chat-notifier.js";
 import { loadGoogleChatConfig } from "../../../../src/application/notifications/google-chat-config.js";
 import { RosterApiClient } from "../../../../src/application/roster/index.js";
@@ -51,19 +48,9 @@ const logger = new Logger("RuntimeModule");
         analysisProvider: AnalysisProviderRouter,
         orchestrator: EvaluationOrchestrator,
       ) => {
-        const useOrchestrator = process.env["ANALYSIS_ENGINE"] === "orchestrator";
-        if (useOrchestrator) {
-          logger.log("Analysis engine: orchestrator");
-        } else {
-          logger.log("Analysis engine: legacy provider");
-        }
+        logger.log("Analysis engine: orchestrator (Phase 0 packet mode)");
 
-        const executorMode = (process.env["PROVISIONING_EXECUTOR_MODE"] as MockExecutorMode | undefined) ?? "success";
-        const provisioningRegistry = new ProvisioningRegistry();
-        for (const executor of createMockRegistry(executorMode)) {
-          provisioningRegistry.register(executor);
-        }
-        logger.log(`Provisioning executor: mock (mode=${executorMode})`);
+        logger.log("Provisioning executors: disabled (Phase 0 packet mode)");
 
         const chatConfig = loadGoogleChatConfig();
         const notifier = new GoogleChatNotifier(chatConfig.webhookUrl, chatConfig.intakeBaseUrl);
@@ -86,8 +73,7 @@ const logger = new Logger("RuntimeModule");
         return new IntakeWorkflowService({
           store,
           analysisProvider,
-          orchestrator: useOrchestrator ? orchestrator : undefined,
-          provisioningRegistry,
+          orchestrator,
           notifier,
           rosterClient,
         });

@@ -10,6 +10,7 @@ import type {
   RequestStatus,
 } from "../domain/types.js";
 import type { RepositoryNameResult } from "../domain/repository-naming.js";
+import type { PhaseZeroSourceSnapshot } from "../domain/discovery.js";
 import type { GenerateMockAnalysisDraftInput, IntakeAnalysisDraft } from "./intake-analysis.js";
 
 export type AnalysisDraftReviewDecision = "accepted" | "revised";
@@ -249,6 +250,10 @@ export interface ProjectIntakeRecord extends ProjectRequestSnapshot {
 export interface RegenerateAnalysisDraftInput {
   guidance: string;
   requestedBy: string;
+  depth?: EvaluationDepth;
+  provider?: "mock" | "openai" | "anthropic" | "bedrock";
+  discoveryContext?: PhaseZeroSourceSnapshot;
+  nonBlockingClarifications?: boolean;
 }
 
 export interface CreateIntakeInput {
@@ -288,6 +293,10 @@ export interface GenerateEvaluationInput {
   provider?: "mock" | "openai" | "anthropic" | "bedrock";
   model?: string;
   allowDepthUpgrade?: boolean;
+  /** Complete frozen Discovery evidence supplied to every evaluation agent. */
+  discoveryContext?: PhaseZeroSourceSnapshot;
+  /** Generate best-effort planning material rather than stopping for another question. */
+  nonBlockingClarifications?: boolean;
 }
 
 export interface ApprovalDecisionInput {

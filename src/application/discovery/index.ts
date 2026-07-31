@@ -3,6 +3,8 @@ export * from "./discovery-stream-registry.js";
 export * from "./discovery-orchestrator.js";
 export * from "./discovery-controller.js";
 export * from "./proposal-to-intake-adapter.js";
+export * from "./phase-zero-packet.js";
+export * from "./phase-zero-packet-service.js";
 export * from "./agents/discovery-agent-contract.js";
 export * from "./agents/mock-intent-extraction-agent.js";
 export * from "./agents/mock-problem-framing-agent.js";

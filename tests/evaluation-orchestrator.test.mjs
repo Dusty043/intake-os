@@ -311,13 +311,14 @@ describe("EvaluationOrchestrator — depth routing", () => {
     assert.deepEqual(kinds, EVALUATION_DEPTH_ROUTING_TABLE.standard);
   });
 
-  it("full depth produces all 12 section kinds", async () => {
+  it("full depth produces all active Phase 0 section kinds", async () => {
     const orch = makeOrchestrator();
     const result = await orch.orchestrate(makeIntake(), { ...baseOpts("full"), allowDepthUpgrade: false });
     assert.equal(result.kind, "evaluation_ready");
     const kinds = result.evaluation.sections.map((s) => s.kind);
     assert.deepEqual(kinds, EVALUATION_DEPTH_ROUTING_TABLE.full);
-    assert.equal(kinds.length, 12);
+    assert.equal(kinds.length, 11);
+    assert.ok(!kinds.includes("distribution_plan"));
   });
 
   it("section order is deterministic — matches routing table order", async () => {
@@ -341,7 +342,7 @@ describe("EvaluationOrchestrator — depth routing", () => {
     });
     assert.equal(result.kind, "evaluation_ready");
     assert.equal(result.evaluation.depth, "full");
-    assert.equal(result.evaluation.sections.length, 12);
+    assert.equal(result.evaluation.sections.length, 11);
   });
 
   it("classifier cannot downgrade depth", async () => {
@@ -561,13 +562,12 @@ describe("EvaluationOrchestrator — validation", () => {
     );
   });
 
-  it("dryRunOnly is always true in distribution_plan section", async () => {
+  it("does not generate a downstream distribution plan", async () => {
     const orch = makeOrchestrator();
     const result = await orch.orchestrate(makeIntake(), { ...baseOpts("full"), allowDepthUpgrade: false });
     assert.equal(result.kind, "evaluation_ready");
     const distSection = result.evaluation.sections.find((s) => s.kind === "distribution_plan");
-    assert.ok(distSection, "distribution_plan section should exist");
-    assert.equal(distSection.content.dryRunOnly, true);
+    assert.equal(distSection, undefined);
   });
 
   it("final IntakeEvaluation passes validateIntakeEvaluation", async () => {

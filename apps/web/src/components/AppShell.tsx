@@ -9,8 +9,6 @@ import { UserMenu } from "./UserMenu";
 type NavItem = { href: string; label: string; soon?: boolean };
 
 const NAV: NavItem[] = [
-  { href: "/intakes",     label: "Intakes"      },
-  { href: "/intakes/new", label: "Create Intake" },
   { href: "/discovery",   label: "Discovery"     },
   { href: "/reports",     label: "Reports"       },
   { href: "/settings",    label: "Settings"      },
@@ -26,9 +24,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <aside className="w-60 shrink-0 bg-sidebar flex flex-col overflow-y-auto">
         <div className="px-5 py-5 border-b border-slate-700">
           <p className="text-xs font-semibold text-indigo-400 uppercase tracking-widest mb-0.5">
-            Project Intake OS
+            Project Discovery
           </p>
-          <p className="text-xs text-slate-400">Operational Control</p>
+          <p className="text-xs text-slate-400">Phase 0 Workspace</p>
         </div>
 
         <nav className="flex-1 px-3 py-4 space-y-0.5" aria-label="Main navigation">
@@ -50,7 +48,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 className={`flex items-center px-3 py-2 rounded-lg text-sm transition-colors
                   ${
                     pathname === item.href ||
-                    (item.href !== "/" && pathname.startsWith(item.href) && item.href !== "/intakes/new")
+                    (item.href !== "/" && pathname.startsWith(item.href))
                       ? "bg-indigo-600 text-white"
                       : "text-slate-300 hover:bg-slate-800 hover:text-white"
                   }

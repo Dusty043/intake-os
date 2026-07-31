@@ -12,6 +12,16 @@ AI does not approve projects.
 
 Humans retain approval authority.
 
+## Active Phase 0 mode
+
+Discovery supplies a frozen structured snapshot containing the conversation, selected direction, proposal, confidence, assumptions, and answered clarifications. Every evaluation agent receives that evidence through the shared context.
+
+The active path always requests `full` evaluation depth. Clarification analysis still runs, but blocking findings are preserved as assumptions and unresolved risks rather than stopping for more requester input. The Distribution Planner remains a legacy agent but is excluded from active standard/full routing.
+
+After synthesis, Critic/QA reviews the complete schema-bounded evaluation sections rather than arbitrary text fragments. Its output allowance is sized separately from the shared default because review of a full evaluation requires more reasoning headroom. Full-depth Work Breakdown and final Synthesis likewise reserve schema-specific completion allowances: a 5–12-task plan with acceptance criteria and a cross-section final recommendation must not be cut off by the shared default. A score below 90 triggers one feedback-guided full-depth regeneration using the critic's weaknesses, required revisions, and reviewer warnings, followed by a fresh synthesis and critic score. The pass is bounded to one repair attempt.
+
+A deterministic packet composer then maps evaluated evidence into the required 00–10 document tree. Server-owned paths, content validation, hashes, and a manifest guarantee a complete archive. A score of 90 or above is `ready`; lower or unavailable scores are `ready_with_warnings` and remain downloadable because export is not approval. A user may explicitly improve `ready_with_warnings`; a `ready` packet remains immutable.
+
 Architecture note: n8n is not used as Project Intake OS orchestration/plumbing. References to low-code evaluation are about the type of requested project or implementation recommendation, not about the OS runtime.
 
 ---

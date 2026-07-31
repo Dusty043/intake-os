@@ -2,34 +2,32 @@ import {
   Body,
   Controller,
   Get,
+  GoneException,
   HttpCode,
   Inject,
-  Logger,
   Optional,
   Param,
   Post,
   Query,
   Sse,
+  StreamableFile,
   type MessageEvent,
 } from "@nestjs/common";
 import { ApiOperation, ApiTags } from "@nestjs/swagger";
 import { Throttle } from "@nestjs/throttler";
 import { Observable } from "rxjs";
 import type { DiscoveryController } from "../../../../../src/application/discovery/index.js";
-import { DiscoveryStreamRegistry } from "../../../../../src/application/discovery/index.js";
+import { DiscoveryStreamRegistry, PhaseZeroPacketService } from "../../../../../src/application/discovery/index.js";
 import type { DiscoverySession } from "../../../../../src/domain/discovery.js";
 import { auditVisibilityForRole } from "../../../../../src/domain/permissions.js";
-import type { ProjectIntakeRecord } from "../../../../../src/application/types.js";
 import { NotFoundError } from "../../../../../src/application/errors.js";
-import { IntakeWorkflowService } from "../../../../../src/application/intake-workflow-service.js";
 import { CurrentActor } from "../auth/auth.decorators.js";
 import type { AuthenticatedActor } from "../auth/auth.types.js";
 import { loadRateLimitConfig } from "../../config/rate-limit.config.js";
 import { DiscoveryMessageDto } from "./dto/discovery-message.dto.js";
 import { AnswerClarificationDto } from "./dto/answer-clarification.dto.js";
 import { SelectDirectionDto } from "./dto/select-direction.dto.js";
-
-const DISCOVERY_SYSTEM_ACTOR = { id: "discovery-engine", role: "intake_owner" as const, name: "Discovery Engine" };
+import { GeneratePhaseZeroDto } from "./dto/generate-phase-zero.dto.js";
 
 const DISCOVERY_STREAM_HEARTBEAT_MS = 15_000;
 // Injectable override for tests only — production never provides this token,
@@ -45,17 +43,20 @@ const AI_THROTTLE = { global: { ttl: rlConfig.aiEvaluation.ttl * 1000, limit: rl
 @ApiTags("discovery")
 @Controller("discovery")
 export class DiscoveryHttpController {
-  private readonly logger = new Logger(DiscoveryHttpController.name);
-
   constructor(
     @Inject("DISCOVERY_CONTROLLER")
     private readonly discovery: DiscoveryController,
-    private readonly workflowService: IntakeWorkflowService,
     private readonly streamRegistry: DiscoveryStreamRegistry,
+    private readonly phaseZero: PhaseZeroPacketService,
     @Optional()
     @Inject(DISCOVERY_STREAM_HEARTBEAT_MS_TOKEN)
     private readonly heartbeatMs?: number,
   ) {}
+
+  private publicSession(session: DiscoverySession) {
+    const { linkedIntakeId: _internalIntakeId, ...publicSession } = session;
+    return { ...publicSession, manifest: null };
+  }
 
   // No dedicated "view any discovery session" permission exists in
   // permissions.ts yet — reuse the "full" audit-visibility tier (admin
@@ -82,26 +83,26 @@ export class DiscoveryHttpController {
   @Post()
   @Throttle(AI_THROTTLE)
   @ApiOperation({ summary: "Start a new discovery session" })
-  startDiscovery(
+  async startDiscovery(
     @Body() body: DiscoveryMessageDto,
     @CurrentActor() actor: AuthenticatedActor,
   ) {
-    return this.discovery.startDiscovery({ userId: actor.id, message: body.message });
+    return this.publicSession(await this.discovery.startDiscovery({ userId: actor.id, message: body.message }));
   }
 
   // GET /discovery?userId=…
   @Get()
   @ApiOperation({ summary: "List discovery sessions for the current user" })
-  listSessions(@CurrentActor() actor: AuthenticatedActor, @Query("userId") userId?: string) {
+  async listSessions(@CurrentActor() actor: AuthenticatedActor, @Query("userId") userId?: string) {
     const targetUserId = this.canAccessAnySession(actor) ? (userId ?? actor.id) : actor.id;
-    return this.discovery.listSessions(targetUserId);
+    return (await this.discovery.listSessions(targetUserId)).map((session) => this.publicSession(session));
   }
 
   // GET /discovery/:id
   @Get(":id")
   @ApiOperation({ summary: "Get a discovery session by ID" })
-  getSession(@Param("id") id: string, @CurrentActor() actor: AuthenticatedActor) {
-    return this.requireOwnedSession(id, actor);
+  async getSession(@Param("id") id: string, @CurrentActor() actor: AuthenticatedActor) {
+    return this.publicSession(await this.requireOwnedSession(id, actor));
   }
 
   // GET /discovery/:id/stream — live progress events (SSE) for a discovery
@@ -144,7 +145,8 @@ export class DiscoveryHttpController {
     @CurrentActor() actor: AuthenticatedActor,
   ) {
     await this.requireOwnedSession(id, actor);
-    return this.discovery.addMessage(id, { message: body.message });
+    const session = await this.discovery.addMessage(id, { message: body.message });
+    return this.publicSession(session.selectedSolutionId ? await this.phaseZero.queue(id) : session);
   }
 
   // POST /discovery/:id/solutions
@@ -153,7 +155,7 @@ export class DiscoveryHttpController {
   @ApiOperation({ summary: "Generate solution options for a discovery session" })
   async generateSolutions(@Param("id") id: string, @CurrentActor() actor: AuthenticatedActor) {
     await this.requireOwnedSession(id, actor);
-    return this.discovery.generateSolutions(id);
+    return this.publicSession(await this.discovery.generateSolutions(id));
   }
 
   // POST /discovery/:id/clarifications/answer
@@ -166,10 +168,11 @@ export class DiscoveryHttpController {
     @CurrentActor() actor: AuthenticatedActor,
   ) {
     await this.requireOwnedSession(id, actor);
-    return this.discovery.answerClarification(id, {
+    const session = await this.discovery.answerClarification(id, {
       questionId: body.questionId,
       answer: body.answer,
     });
+    return this.publicSession(session.selectedSolutionId ? await this.phaseZero.queue(id) : session);
   }
 
   // POST /discovery/:id/clarifications/skip
@@ -178,7 +181,8 @@ export class DiscoveryHttpController {
   @ApiOperation({ summary: "Skip remaining clarification questions and proceed with current confidence" })
   async skipClarifications(@Param("id") id: string, @CurrentActor() actor: AuthenticatedActor) {
     await this.requireOwnedSession(id, actor);
-    return this.discovery.skipClarifications(id);
+    const session = await this.discovery.skipClarifications(id);
+    return this.publicSession(session.selectedSolutionId ? await this.phaseZero.queue(id) : session);
   }
 
   // POST /discovery/:id/direction
@@ -190,7 +194,8 @@ export class DiscoveryHttpController {
     @CurrentActor() actor: AuthenticatedActor,
   ) {
     await this.requireOwnedSession(id, actor);
-    return this.discovery.selectDirection(id, { solutionId: body.solutionId });
+    await this.discovery.selectDirection(id, { solutionId: body.solutionId });
+    return this.publicSession(await this.phaseZero.queue(id));
   }
 
   // POST /discovery/:id/proposal
@@ -199,7 +204,8 @@ export class DiscoveryHttpController {
   @ApiOperation({ summary: "Compose a proposal for the selected direction" })
   async composeProposal(@Param("id") id: string, @CurrentActor() actor: AuthenticatedActor) {
     await this.requireOwnedSession(id, actor);
-    return this.discovery.composeProposal(id);
+    const session = await this.discovery.composeProposal(id);
+    return this.publicSession(session.selectedSolutionId ? await this.phaseZero.queue(id) : session);
   }
 
   // POST /discovery/:id/manifest
@@ -208,7 +214,7 @@ export class DiscoveryHttpController {
   @ApiOperation({ summary: "Generate a provisioning manifest for the session proposal" })
   async generateManifest(@Param("id") id: string, @CurrentActor() actor: AuthenticatedActor) {
     await this.requireOwnedSession(id, actor);
-    return this.discovery.generateManifest(id);
+    throw new GoneException("Provisioning manifests are disabled. Generate a Phase 0 packet instead.");
   }
 
   // POST /discovery/:id/send-to-evaluation
@@ -217,16 +223,36 @@ export class DiscoveryHttpController {
   @ApiOperation({ summary: "Send the discovery session to evaluation, returning session and intake record" })
   async sendToEvaluation(@Param("id") id: string, @CurrentActor() actor: AuthenticatedActor) {
     await this.requireOwnedSession(id, actor);
-    const result = await this.discovery.sendToEvaluation(id);
-    const intake = result.intakeRecord as ProjectIntakeRecord | null;
-    if (intake?.id) {
-      // Fire evaluation in the background — don't block the response
-      this.workflowService
-        .generateMockAnalysisDraft(intake.id, {}, DISCOVERY_SYSTEM_ACTOR)
-        .catch((err: unknown) => {
-          this.logger.warn(`Auto-evaluation failed for intake ${intake.id}: ${String(err)}`);
-        });
-    }
-    return result;
+    throw new GoneException("Manual Intake handoff is disabled. Phase 0 generation is automatic after Discovery.");
+  }
+
+  @Post(":id/phase-zero/generate")
+  @Throttle(AI_THROTTLE)
+  @ApiOperation({ summary: "Generate or retry a Phase 0 packet with the current Discovery evidence" })
+  async generatePhaseZero(
+    @Param("id") id: string,
+    @Body() body: GeneratePhaseZeroDto,
+    @CurrentActor() actor: AuthenticatedActor,
+  ) {
+    await this.requireOwnedSession(id, actor);
+    return this.publicSession(await this.phaseZero.queue(id, body.force ?? true));
+  }
+
+  @Get(":id/phase-zero")
+  @ApiOperation({ summary: "Get Phase 0 packet metadata and documents" })
+  async getPhaseZero(@Param("id") id: string, @CurrentActor() actor: AuthenticatedActor) {
+    await this.requireOwnedSession(id, actor);
+    return this.phaseZero.getPacket(id);
+  }
+
+  @Get(":id/phase-zero.zip")
+  @ApiOperation({ summary: "Download the Phase 0 packet as a ZIP archive" })
+  async downloadPhaseZero(@Param("id") id: string, @CurrentActor() actor: AuthenticatedActor) {
+    await this.requireOwnedSession(id, actor);
+    const archive = await this.phaseZero.download(id);
+    return new StreamableFile(Buffer.from(archive), {
+      type: "application/zip",
+      disposition: `attachment; filename="phase-zero-${id}.zip"`,
+    });
   }
 }

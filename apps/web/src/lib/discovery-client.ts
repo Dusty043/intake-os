@@ -1,4 +1,4 @@
-import type { DiscoverySession } from "./discovery-types";
+import type { DiscoverySession, PhaseZeroPacket } from "./discovery-types";
 import type { UiActor } from "./types";
 import { actorHeaders, request, BASE } from "./http";
 
@@ -156,6 +156,36 @@ export async function sendToEvaluation(
     headers: actorHeaders(actor),
     body: JSON.stringify({}),
   });
+}
+
+export async function generatePhaseZero(
+  id: string,
+  actor: UiActor,
+): Promise<DiscoverySession> {
+  return request(`/discovery/${id}/phase-zero/generate`, {
+    method: "POST",
+    headers: actorHeaders(actor),
+    body: JSON.stringify({ force: true }),
+  });
+}
+
+export async function getPhaseZeroPacket(
+  id: string,
+  actor: UiActor,
+): Promise<PhaseZeroPacket> {
+  return request(`/discovery/${id}/phase-zero`, { headers: actorHeaders(actor) });
+}
+
+export async function downloadPhaseZero(
+  id: string,
+  actor: UiActor,
+): Promise<Blob> {
+  const res = await fetch(`${BASE}/discovery/${id}/phase-zero.zip`, {
+    headers: actorHeaders(actor),
+    credentials: "include",
+  });
+  if (!res.ok) throw new Error(`Unable to download packet (HTTP ${res.status}).`);
+  return res.blob();
 }
 
 export async function getDiscoverySession(

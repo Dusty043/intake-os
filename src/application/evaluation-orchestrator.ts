@@ -75,6 +75,7 @@ export interface EvaluationOrchestrationOptions {
   discoveryNotes?: string[];
   priorClarifications?: Array<{ question: string; answer: string }>;
   allowDepthUpgrade?: boolean;
+  allowClarificationBlocking?: boolean;
 }
 
 export interface ClarificationOutcome {
@@ -190,7 +191,7 @@ export class EvaluationOrchestrator {
       const isBlocking =
         clarResult.output.isClarificationBlocking === true || clarContent.isBlocking === true;
 
-      if (isBlocking) {
+      if (isBlocking && options.allowClarificationBlocking !== false) {
         return {
           kind: "clarification_required",
           clarification: {
@@ -377,8 +378,17 @@ function buildCtx(
   sections: Partial<Record<EvaluationSectionKind, EvaluationSection>>,
   options: Pick<EvaluationOrchestrationOptions, "discoveryNotes" | "priorClarifications">,
 ): AgentRunContext {
+  const discoveryEvidence = [
+    ...(options.discoveryNotes ?? []),
+    ...(options.priorClarifications ?? []).map((item) => `${item.question}\nAnswer: ${item.answer}`),
+  ].filter(Boolean).join("\n\n");
+  // Every agent already reads intake.description. Enrich that shared seam once
+  // instead of duplicating context plumbing across twelve agent implementations.
+  const contextualIntake = discoveryEvidence
+    ? { ...intake, description: `${intake.description}\n\nDiscovery evidence:\n${discoveryEvidence}` }
+    : intake;
   return {
-    intake,
+    intake: contextualIntake,
     depth,
     sections: { ...sections },
     discoveryNotes: options.discoveryNotes,

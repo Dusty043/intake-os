@@ -468,9 +468,13 @@ export class IntakeWorkflowService {
       depth,
       provider,
       model: input.model,
-      discoveryNotes: record.discovery?.notes ? [record.discovery.notes] : undefined,
+      discoveryNotes: [
+        ...(record.discovery?.notes ? [record.discovery.notes] : []),
+        ...(input.discoveryContext ? [JSON.stringify(input.discoveryContext)] : []),
+      ],
       priorClarifications: record.priorClarifications ? [...record.priorClarifications] : undefined,
       allowDepthUpgrade: input.allowDepthUpgrade ?? true,
+      allowClarificationBlocking: input.nonBlockingClarifications !== true,
     };
 
     let result: Awaited<ReturnType<typeof this.orchestrator.orchestrate>>;
@@ -723,10 +727,14 @@ export class IntakeWorkflowService {
 
       const orchResult = await this.orchestrator.orchestrate(record, {
         actor,
-        depth: "standard",
-        provider: "mock",
-        discoveryNotes: [input.guidance],
+        depth: input.depth ?? currentEval.depth,
+        provider: input.provider ?? currentEval.sections.find((section) => !section.supersededById)?.provenance.provider ?? "mock",
+        discoveryNotes: [
+          input.guidance,
+          ...(input.discoveryContext ? [JSON.stringify(input.discoveryContext)] : []),
+        ],
         allowDepthUpgrade: false,
+        allowClarificationBlocking: input.nonBlockingClarifications !== true,
       });
 
       if (orchResult.kind === "clarification_required") {

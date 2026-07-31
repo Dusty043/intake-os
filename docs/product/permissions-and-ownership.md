@@ -8,6 +8,14 @@ The system must enforce who can create, edit, review, approve, provision, retry,
 
 Permissions should protect the approval workflow and prevent unauthorized distribution.
 
+## Phase 0 packet permissions
+
+- A Discovery owner may generate, preview, retry, and download their own Phase 0 packet.
+- An Admin with full audit visibility may access another user's Discovery packet.
+- Other users receive the same not-found response as an unknown session.
+- Packet export needs no approval because it creates no external resource and carries an unapproved-material label.
+- No role can invoke legacy provisioning mutations while Phase 0 packet mode is active; those endpoints return HTTP 410.
+
 ---
 
 ## Canonical Roles

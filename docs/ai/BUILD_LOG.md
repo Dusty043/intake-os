@@ -2890,3 +2890,128 @@ evaluation. `build:core`, `typecheck`, `api:build`, `apps/web build` clean.
 requirements-trace.
 
 **Task log**: `docs/ai/tasks/TASK-0078-evaluation-source-of-truth-a-scoped.md`
+
+## 2026-07-31 — Discovery-first Phase 0 packet (TASK-0079 through TASK-0082)
+
+Replaced the user-facing intake entry point with Discovery. Selecting a direction
+above 80% confidence now freezes the Discovery source and queues a full,
+non-blocking evaluation; low-confidence sessions expose a forced generation
+action. The packet state machine is idempotent in process, supports failed-run
+retry, converts clarification gaps into explicit assumptions or risks, and keeps
+the internal intake compatibility ID private.
+
+Added the complete static 00-10 Phase 0 document tree, deterministic SVG and
+Mermaid assets, critic warning/repair behavior, SHA-256 document metadata,
+`PACKET-MANIFEST.json`, preview endpoints, and an in-memory `fflate` ZIP. ZIP
+export is classified by ADR-0004 as unapproved planning material rather than
+external distribution. Runtime provisioning executors are disabled and legacy
+manifest, target-resolution, distribution, and provisioning mutations return
+410 while read-only records remain available.
+
+The web app now routes `/` and `/intakes/new` to Discovery, removes intake
+creation from primary navigation, and provides packet progress, document tree,
+plain-text preview, warnings, assumptions, retry, and download. Product specs,
+requirements trace P0-001 through P0-008, open questions, memory index, and four
+task logs were updated.
+
+Verification: `npm test` 810/810; `npm run test:api` 10/10; web tests 33/33;
+core and web typechecks, API build, web production build, and
+`git diff --check` passed. Browser verification confirmed root redirect,
+Discovery-only primary navigation, Phase 0 branding, and packet status. Live
+API generation was not exercised because local Postgres on port 5433 was not
+running; a real-provider smoke test remains opt-in because it incurs AI cost.
+
+Follow-up: add durable queue/restart recovery when required and run a deliberate
+real-provider smoke test in an environment with Postgres and approved AI spend.
+
+**Task logs**: `docs/ai/tasks/TASK-0079-discovery-first-product-contract.md`,
+`TASK-0080-phase-zero-generation-pipeline.md`,
+`TASK-0081-phase-zero-packet-zip.md`, and
+`TASK-0082-discovery-ui-legacy-shutdown.md`
+
+## 2026-07-31 — Phase 0 branch deployed to oreochiserver for testing (TASK-0082)
+
+Updated `/home/oreo/intake-os` from its older `main` checkout to commit
+`a19b3e2` on `feat/different-direction`. Preserved `.env.server`, the Postgres
+volume, and a pre-existing unrelated local modification to `docker-compose.yml`.
+Rebuilt and started the API, web, Postgres, and Caddy services with
+`docker-compose.server.yml`.
+
+`deploy/healthcheck-server.sh` passed web, API liveness, database readiness, and
+OpenAPI. `/discovery` returned HTTP 200 locally and through the server's Tailscale
+address. API logs confirmed `Analysis engine: orchestrator (Phase 0 packet mode)`
+and `Provisioning executors: disabled (Phase 0 packet mode)`. The health endpoint
+reported the OpenAI provider enabled and live provisioning disabled. No real
+packet generation was run, avoiding an unapproved AI-cost-bearing smoke test.
+
+## 2026-07-31 — Fix live Phase 0 custom-build truncation (TASK-0082)
+
+The first cost-bearing packet attempt on oreochiserver failed because the
+`custom_build` agent reached `max_completion_tokens=6000` before
+`gpt-5.6-sol` closed its JSON response. This recurred despite the earlier
+six-item, concise-phrase prompt bound, confirming the remaining constraint was
+reasoning/completion headroom rather than requested output size.
+
+Raised only the `custom_build` allowance to 16,000 tokens. Phase 0 background
+failures now persist and stream a short retry-safe message instead of exposing
+raw partial provider JSON in the UI. Added regression checks for the agent token
+budget and failure-message sanitization.
+
+Verification: focused Phase 0 tests 6/6, full core suite 812/812, core
+typecheck, API build, and `git diff --check` passed.
+
+## 2026-07-31 — Add bounded Phase 0 quality repair (TASK-0083)
+
+The live 46.5/100 packet exposed that Critic/QA received only the first 300
+characters of every evaluation section. Its warnings therefore described nearly
+all sections as truncated even though the persisted sections were complete. The
+`repairing` state also did not perform a repair.
+
+Critic/QA now receives complete schema-bounded section content. Scores below 90
+feed weaknesses, required revisions, and reviewer warnings into exactly one
+full-depth regeneration, followed by a fresh score. A failed repair preserves
+the original downloadable packet with a warning. `ready_with_warnings` packets
+offer **Improve packet**; `ready` remains immutable.
+
+Verification before deployment: focused Phase 0 tests 9/9, full core suite
+816/816, full web suite 34/34, core and web typechecks, API build, web production
+build, and `git diff --check` passed. Live oreochiserver verification follows
+before completion.
+
+Live verification deployed the repair path and invoked it against the existing
+46.5 packet. The packet entered `repairing`; when the repair evaluation failed
+before version 2 persisted, the original ZIP remained downloadable and gained
+the expected repair warning. The expanded Critic/QA request was the only new
+model-call shape and still used the shared 4,000-token ceiling, so Critic/QA now
+reserves 12,000 tokens. Fallback diagnostics identify a truncated schema without
+persisting raw provider output. A second paid pass was left to an authorized
+user through the deployed **Improve packet** action.
+
+## 2026-07-31 — Fix Phase 0 work-breakdown repair truncation (TASK-0083)
+
+The subsequent authorized improvement attempt retained the 46.5 packet because
+the `work_breakdown` response exhausted its 3,000-token allowance before valid
+JSON completed. This was a separate response-budget constraint from the critic
+input expansion. The packet fallback correctly preserved the downloadable ZIP
+and exposed only the schema name, never raw provider content.
+
+Raised only the full-depth Work Breakdown allowance to 16,000 tokens, matching
+the existing custom-build headroom and preserving the bounded 5–12-task schema.
+Added regression coverage for the allowance and the safe `work_breakdown`
+fallback. Verification: core suite 817/817, core typecheck, API build, and
+`git diff --check` passed. Deployment intentionally does not trigger another
+cost-bearing repair run; the authorized user can use **Improve packet**.
+
+## 2026-07-31 — Fix Phase 0 synthesis repair truncation (TASK-0083)
+
+The next authorized repair passed Work Breakdown and exposed the remaining
+response-budget failure: final `synthesis` was capped at 2,000 tokens. The
+original 46.5 packet again remained downloadable, with a safe warning naming
+only the failing schema.
+
+Raised only final Synthesis to 16,000 tokens and added its allowance regression
+test. Verification: core suite 818/818, core typecheck, API build, and
+`git diff --check` passed. Deployment does not initiate another paid AI run.
+Oreochiserver was rebuilt with API-only changes; health, database, and OpenAPI
+checks passed at `a696c3a`, with the synthesized response allowance verified in
+the running image.

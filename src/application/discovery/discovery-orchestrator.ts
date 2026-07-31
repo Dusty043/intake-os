@@ -63,6 +63,11 @@ export interface SendToEvaluationResult {
   intakeRecord?: ProjectIntakeRecord;
 }
 
+export interface SendToEvaluationOptions {
+  /** Phase 0 generation treats missing information as assumptions instead of asking another question. */
+  nonBlockingClarifications?: boolean;
+}
+
 export interface DiscoveryOrchestratorOptions {
   provider?: DiscoveryAgentOptions["provider"];
   model?: string;
@@ -392,7 +397,10 @@ export class DiscoveryOrchestrator {
 
   // ─── Send to evaluation ───────────────────────────────────────────────────
 
-  async sendToEvaluation(sessionId: string): Promise<SendToEvaluationResult> {
+  async sendToEvaluation(
+    sessionId: string,
+    options: SendToEvaluationOptions = {},
+  ): Promise<SendToEvaluationResult> {
     const now = this.nowFn();
 
     let session = await this.store.getById(sessionId);
@@ -431,7 +439,9 @@ export class DiscoveryOrchestrator {
       now,
     );
 
-    const finalCheck = await this.checkFinalClarification(intakeRecord, now);
+    const finalCheck = options.nonBlockingClarifications
+      ? null
+      : await this.checkFinalClarification(intakeRecord, now);
 
     if (finalCheck?.isBlocking) {
       const updatedSession = await this.store.update(session.id, {

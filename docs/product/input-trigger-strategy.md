@@ -2,9 +2,9 @@
 
 ## Principle
 
-All project inquiries normalize into the same internal `IntakeSource` and `ProjectIntake` contract before analysis or approval begins.
+All user-facing project inquiries begin in Discovery. Discovery normalizes the conversation into a frozen proposal and an internal `ProjectIntake` compatibility record before full evaluation begins.
 
-Input channels are adapters. The Project Intake OS owns orchestration, state, retries, auditability, prompts, schema validation, approvals, and downstream distribution behavior.
+Input channels are adapters. The OS owns Discovery, evaluation, packet state, retries, schema validation, and ZIP export. External provisioning is disabled.
 
 ## Explicit Architecture Decision
 
@@ -23,15 +23,15 @@ The OS may still create or manage projects whose type is `n8n_automation`; it sh
 
 | Priority | Trigger | Role |
 | --- | --- | --- |
-| 1 | Manual paste / native web form | Best first-class MVP input. |
+| 1 | Native Discovery conversation | Sole first-class user-facing input. |
 | 2 | Native authenticated webhook endpoint | Controlled external ingestion after the normalized contract stabilizes. |
 | 3 | Email parser owned by the OS | Useful after missing-information and retention rules are stable. |
 | 4 | Google Chat app | Best future chat-native intake UX. |
 | 5 | Google Chat incoming webhook | Outbound notifications only, not intake capture. |
 
-## Why Manual/Web First
+## Why Discovery First
 
-A native form lets the OS establish the canonical intake fields, validation rules, and review flow without being blocked by Chat or email integration details.
+A native Discovery conversation captures context, challenges solution bias, selects a direction, and produces the structured evidence needed for a complete Phase 0 packet. The manual Create Intake form is retired from the product surface.
 
 Minimum MVP fields:
 

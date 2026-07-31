@@ -367,7 +367,8 @@ describe("evaluationToLegacyDraft", () => {
   it("requiredEvaluationSections reflects depth routing for 'full'", () => {
     const evaluation = makeFullEvaluation();
     const draft = evaluationToLegacyDraft(evaluation, { idFactory: testIdFactory, now: NOW });
-    assert.equal(draft.requiredEvaluationSections.length, 12);
+    assert.equal(draft.requiredEvaluationSections.length, 11);
+    assert.ok(!draft.requiredEvaluationSections.includes("distribution_plan"));
   });
 });
 

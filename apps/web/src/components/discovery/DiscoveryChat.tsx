@@ -4,10 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import type {
   ClarificationQuestion,
   DiscoveryConfidence,
-  DiscoveryManifest,
   DiscoveryMessage,
   DiscoveryProposal,
-  DiscoveryStatus,
 } from "@/lib/discovery-types";
 
 function overallConfidence(c: DiscoveryConfidence): number {
@@ -29,7 +27,6 @@ const STAGE_LABELS: Record<string, string> = {
   solution_generation: "Generating solution options",
   clarification: "Planning clarifying questions",
   proposal_composition: "Composing the proposal",
-  manifest_generation: "Generating the manifest",
 };
 
 // Live stage labels when we have them; falls back to a generic message when
@@ -248,106 +245,16 @@ function ProposalCard({ proposal }: { proposal: DiscoveryProposal }) {
   );
 }
 
-type ManifestCardProps = {
-  manifest: DiscoveryManifest;
-  discoveryStatus: DiscoveryStatus;
-  busy: boolean;
-  onSendToEvaluation: () => Promise<void>;
-};
-
-function ManifestCard({ manifest, discoveryStatus, busy, onSendToEvaluation }: ManifestCardProps) {
-  return (
-    <div className="flex justify-start">
-      <div className="w-full max-w-[92%] border border-gray-200 rounded-2xl rounded-tl-sm bg-white p-4 space-y-3">
-        <div className="flex items-center justify-between">
-          <p className="text-xs font-semibold text-indigo-600 uppercase tracking-wide">Manifest</p>
-          <span className="text-xs font-medium bg-indigo-100 text-indigo-700 border border-indigo-200 px-1.5 py-0.5 rounded">
-            {manifest.recommendedAction.replace(/_/g, " ")}
-          </span>
-        </div>
-
-        {(manifest.monday.roadmapEpics.length > 0 || manifest.monday.projectsPortfolio) && (
-          <div>
-            <p className="text-xs font-semibold text-gray-500 mb-1">Monday</p>
-            {manifest.monday.projectsPortfolio && (
-              <div className="space-y-0.5 mb-1 text-sm">
-                <p className="text-gray-700">
-                  <span className="font-medium">Project:</span> {manifest.monday.projectsPortfolio.name}
-                  <span className="text-gray-400 ml-1">
-                    ({manifest.monday.projectsPortfolio.projectType})
-                  </span>
-                </p>
-                <p className="text-gray-600">
-                  <span className="font-medium">Status:</span> {manifest.monday.projectsPortfolio.status}
-                </p>
-              </div>
-            )}
-            {manifest.monday.roadmapEpics.length > 0 && (
-              <div className="space-y-0.5">
-                {manifest.monday.roadmapEpics.map((epic, i) => (
-                  <div key={i} className="flex items-center justify-between text-sm text-gray-600">
-                    <span className="flex gap-1.5 min-w-0">
-                      <span className="text-indigo-400 shrink-0">▸</span>
-                      <span className="truncate">{epic.title}</span>
-                    </span>
-                    {epic.estimatedSP && (
-                      <span className="shrink-0 ml-1 text-gray-400 text-xs">{epic.estimatedSP} SP</span>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-            {manifest.monday.sprintTasks.length > 0 && (
-              <p className="text-xs text-gray-500 mt-1">
-                + {manifest.monday.sprintTasks.length} task{manifest.monday.sprintTasks.length !== 1 ? "s" : ""} → Backlog
-              </p>
-            )}
-          </div>
-        )}
-
-        {manifest.github.createRepo && (
-          <div>
-            <p className="text-xs font-semibold text-gray-500 mb-1">GitHub</p>
-            <p className="text-sm text-gray-700">
-              <span className="font-medium">Repo:</span> <span className="font-mono">{manifest.github.repoName}</span>
-            </p>
-            {manifest.github.readme && (
-              <p className="text-xs text-gray-500 mt-0.5">
-                README · {manifest.github.labels.length} labels · {manifest.github.initialIssues.length} issues
-              </p>
-            )}
-          </div>
-        )}
-
-        {!manifest.readyForLiveAdapter && (
-          <p className="text-xs text-amber-600">Mock manifest — live adapter not yet connected</p>
-        )}
-
-        <button
-          onClick={onSendToEvaluation}
-          disabled={busy || discoveryStatus === "sent_to_evaluation"}
-          className="btn-primary w-full justify-center mt-1"
-        >
-          {discoveryStatus === "sent_to_evaluation" ? "Sent to Evaluation" : "Send to Evaluation"}
-        </button>
-      </div>
-    </div>
-  );
-}
-
 type Props = {
   messages: DiscoveryMessage[];
   clarificationQuestions: ClarificationQuestion[];
   confidence: DiscoveryConfidence;
   proposal: DiscoveryProposal | null;
-  manifest: DiscoveryManifest | null;
-  discoveryStatus: DiscoveryStatus;
   busy: boolean;
   activeStages: Set<string>;
   onSendMessage: (text: string) => Promise<void>;
   onAnswerClarification: (questionId: string, answer: string) => Promise<void>;
   onSkipClarifications: () => Promise<void>;
-  onSendToEvaluation: () => Promise<void>;
 };
 
 export function DiscoveryChat({
@@ -355,14 +262,11 @@ export function DiscoveryChat({
   clarificationQuestions,
   confidence,
   proposal,
-  manifest,
-  discoveryStatus,
   busy,
   activeStages,
   onSendMessage,
   onAnswerClarification,
   onSkipClarifications,
-  onSendToEvaluation,
 }: Props) {
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
@@ -444,15 +348,6 @@ export function DiscoveryChat({
         ))}
 
         {proposal && <ProposalCard proposal={proposal} />}
-        {manifest && (
-          <ManifestCard
-            manifest={manifest}
-            discoveryStatus={discoveryStatus}
-            busy={busy}
-            onSendToEvaluation={onSendToEvaluation}
-          />
-        )}
-
         {/* Typing indicator */}
         {(sending || busy) && (
           <div className="flex justify-start">

@@ -33,7 +33,7 @@ export class OpenAIFinalSynthesisAgent implements EvaluationAgent<SynthesisSecti
       .join("\n");
     const userPrompt = `Title: ${intake.title}\nDescription:\n${intake.description}\n\nEvaluation sections:\n${sectionSummary}`;
     const { content: out } = await this.client.completeStructured<SynthesisSectionContent>({
-      model: this.model, systemPrompt: SYSTEM, userPrompt: userPrompt, schemaName: "synthesis", schema: schema as unknown as Record<string,unknown>, maxTokens: 2000,
+      model: this.model, systemPrompt: SYSTEM, userPrompt: userPrompt, schemaName: "synthesis", schema: schema as unknown as Record<string,unknown>, maxTokens: 16000,
     });
     const isBlocking = out.approvalReadinessSummary.startsWith("NOT READY");
     return { sectionKind: "synthesis", content: out, confidence: isBlocking ? 0.55 : 0.85, warnings: isBlocking ? ["Evaluation is not ready for approval."] : [] };

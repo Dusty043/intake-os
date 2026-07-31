@@ -16,6 +16,10 @@ Project types drive:
 
 Project types should be centrally managed and should not be hardcoded casually across the application.
 
+## Phase 0 override
+
+Project type remains classification evidence, but every Discovery-first Phase 0 packet runs at `full` evaluation depth. GitHub requirement and distribution mode are retained only for historical compatibility while external provisioning is disabled. They do not alter packet availability or contents.
+
 This document should be referenced by the AI classifier, evaluation pipeline, distribution planner, provisioning logic, and admin configuration.
 
 ---

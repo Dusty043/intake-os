@@ -2,7 +2,17 @@
 
 ## Principle
 
-The Project Intake OS is the pre-distribution source of truth. Monday and GitHub are downstream execution destinations.
+The active product exports a Phase 0 ZIP and performs no Monday or GitHub writes.
+
+## Phase 0 export boundary
+
+- Export is owner-scoped local download.
+- It creates no downstream resource and is not a workflow approval.
+- It is labeled AI-generated, unapproved planning material.
+- It contains a manifest, hashes, quality warnings, and explicit assumptions.
+- Provisioning executors are not registered and mutation routes return HTTP 410.
+
+The historical rules below remain authoritative only if external distribution is re-enabled. Re-enabling requires a new product decision and must preserve both approval gates.
 
 Distribution happens only after:
 

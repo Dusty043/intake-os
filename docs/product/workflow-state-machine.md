@@ -20,6 +20,21 @@ The workflow should prioritize:
 
 No work should be distributed before required approvals are complete.
 
+## Discovery-first Phase 0 workflow
+
+The user-facing workflow is independent from the legacy `RequestStatus` lifecycle below:
+
+`idle → queued → generating → repairing → ready | ready_with_warnings | failed`
+
+- A selected direction plus overall confidence above `0.80` queues automatically.
+- A selected direction may be forced below the threshold with current information.
+- Queueing freezes the Discovery evidence used by evaluation.
+- Clarification gaps become assumptions and do not transition the request to `clarification_required` on this path.
+- `failed` may retry idempotently; ready packets do not regenerate in v1.
+- ZIP download is local export, not `distributed`, and requires no approval transition.
+
+The canonical request states remain for internal compatibility and historical records. Provisioning transitions have no active executor or mutation endpoint in Phase 0 packet mode.
+
 ---
 
 ## Canonical Lifecycle States

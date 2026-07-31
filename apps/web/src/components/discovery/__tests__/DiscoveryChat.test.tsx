@@ -16,12 +16,9 @@ const BASE_PROPS = {
   clarificationQuestions: [],
   confidence: CONFIDENCE,
   proposal: null,
-  manifest: null,
-  discoveryStatus: "conversation_started" as const,
   onSendMessage: vi.fn(),
   onAnswerClarification: vi.fn(),
   onSkipClarifications: vi.fn(),
-  onSendToEvaluation: vi.fn(),
 };
 
 describe("DiscoveryChat streaming status announcement", () => {
