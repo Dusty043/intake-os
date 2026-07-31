@@ -1,6 +1,6 @@
 # TASK-0080 — Phase 0 generation pipeline
 
-**Status:** In progress  
+**Status:** Complete
 **GitHub:** https://github.com/Dusty043/intake-os/issues/41
 
 ## Request
@@ -16,4 +16,20 @@ Automatically run a full, non-blocking evaluation after Discovery selects a dire
 
 ## Handoff
 
-No durable job queue or production deployment is in scope.
+Added the packet state machine, frozen Discovery source snapshots, strict
+greater-than-80-percent automatic triggering, forced low-confidence generation,
+idempotent in-process queueing, failed-run retry, non-blocking clarification
+conversion, and full-depth evaluation. Phase 0 generation always receives the
+configured full orchestrator at runtime; the distribution planner is excluded
+from standard and full active evaluation routes.
+
+## Verification
+
+- `npm test`: 810 passed.
+- `npm run typecheck`: passed.
+- `npm run api:build`: passed.
+
+## Follow-up
+
+No durable job queue, restart recovery, production deployment, or real-provider
+cost-bearing smoke test is included.

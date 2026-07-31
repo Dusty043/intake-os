@@ -6,21 +6,21 @@ Digital Solutions Project Intake OS
 
 ## One-Line Definition
 
-An internal pre-distribution control plane that captures discovery outputs, generates AI-assisted evaluations, routes projects through human approval gates, and distributes approved work to Monday and GitHub.
+An internal Discovery workspace that turns the best available project evidence into a complete, downloadable Phase 0 planning packet.
 
 ## Core Operating Principle
 
-The app owns the boundary.
+Discovery owns the planning boundary.
 
-Monday and GitHub distribute the work.
+The Phase 0 packet prepares implementation; it does not approve or provision it.
 
 Developers own implementation.
 
 ## Why This Exists
 
-The system exists to make project intake, evaluation, approval, provisioning, and handoff traceable and controlled.
+The system exists to turn one Discovery conversation into traceable, implementation-ready planning material when no further requester information is available.
 
-It should prevent work from being distributed before review, preserve audit history, and give DevOps and downstream developers a clear handoff package.
+It preserves evidence, exposes assumptions, runs a full multi-agent evaluation, and gives delivery teams a portable Phase 0 document set.
 
 ## Primary Users
 
@@ -34,27 +34,21 @@ It should prevent work from being distributed before review, preserve audit hist
 
 The app owns:
 
-- intake requests
-- discovery notes and attachments
+- discovery sessions and frozen source snapshots
 - AI-assisted evaluations
-- clarification workflows
-- approval records
-- distribution packages
-- provisioning history
+- visible assumptions and unresolved risks
+- Phase 0 packets and ZIP exports
+- legacy approval and provisioning history for compatibility
 - audit logs
 - lightweight post-distribution status
 
 ## Downstream Responsibilities
 
-Monday and GitHub are execution destinations.
-
-Monday may receive project summaries, epics, stories, subtasks, dependencies, and operational metadata depending on the distribution mode.
-
-GitHub may receive repositories, labels, README files, milestones, issue templates, and initial issues when custom code is required.
+No downstream execution system is written by the active product flow. Monday and GitHub integrations remain disabled legacy capabilities.
 
 ## AI Responsibilities
 
-AI may help normalize intake, generate evaluations, identify risks, estimate effort, create work breakdowns, and draft handoff materials.
+AI may normalize Discovery evidence, generate evaluations, identify risks, estimate effort, create work breakdowns, and draft the complete Phase 0 packet.
 
 AI does not approve projects.
 
@@ -62,21 +56,21 @@ Humans retain approval authority.
 
 ## Approval Philosophy
 
-No project should be distributed until the required human approval gates are complete.
+Phase 0 ZIP export requires no approval because it creates no external resource and is explicitly marked as unapproved planning material.
+
+Any future external distribution still requires the existing human approval gates.
 
 Approval records should be preserved and should not be casually modified after completion.
 
 ## Distribution Philosophy
 
-The app is the pre-distribution control plane.
-
-It should package and provision approved work, but it should not become a deep bidirectional sync engine for every downstream Monday or GitHub update.
+The app packages planning work for download. It does not provision or synchronize downstream execution systems in the active product mode.
 
 ## Product Boundaries Agents Must Preserve
 
-Agents must preserve the boundary between intake governance and downstream execution.
+Agents must preserve the boundary between unapproved Phase 0 planning material and downstream implementation.
 
-The app should make approved work clear, traceable, and provisionable. It should not take over every delivery workflow after handoff.
+The app should make evidence, assumptions, risks, and implementation plans clear and portable. It must not present generated documents as approved decisions or create downstream resources.
 
 Agents must not weaken approval gates, bypass review, mutate completed approval history casually, create duplicate downstream resources during retries, or treat AI-generated recommendations as final decisions.
 
@@ -84,21 +78,17 @@ Agents must not weaken approval gates, bypass review, mutate completed approval 
 
 The system is expected to include these major modules:
 
-- intake
-- workflow state machine
+- discovery conversation and proposal
+- Phase 0 packet state machine
 - AI evaluation and orchestration
-- clarification
-- approval
+- assumption and confidence tracking
+- deterministic document and ZIP generation
 - project type registry
-- distribution package generation
-- Monday integration
-- GitHub integration
-- provisioning and retry handling
 - permissions and ownership
 - audit logging
 - AI cost governance
 - admin configuration
-- lightweight post-distribution lifecycle tracking
+- legacy intake, approval, provisioning, and lifecycle compatibility
 
 ## Non-Goals
 

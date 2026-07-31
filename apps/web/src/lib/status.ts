@@ -58,8 +58,8 @@ const DISCOVERY_STATUS_MAP: Record<DiscoveryStatus, StatusInfo> = {
   clarification_needed: { label: "Clarification Needed", variant: "warning" },
   direction_selected:   { label: "Direction Selected",  variant: "reviewed" },
   proposal_generated:   { label: "Proposal Ready",      variant: "reviewed" },
-  evaluation_ready:     { label: "Evaluation Ready",    variant: "preview"  },
-  sent_to_evaluation:   { label: "Sent to Evaluation",  variant: "info"     },
+  evaluation_ready:     { label: "Packet Ready",        variant: "preview"  },
+  sent_to_evaluation:   { label: "Source Locked",       variant: "info"     },
 };
 
 export function getDiscoveryStatusInfo(status: DiscoveryStatus): StatusInfo {

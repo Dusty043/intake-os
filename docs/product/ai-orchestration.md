@@ -12,6 +12,14 @@ AI does not approve projects.
 
 Humans retain approval authority.
 
+## Active Phase 0 mode
+
+Discovery supplies a frozen structured snapshot containing the conversation, selected direction, proposal, confidence, assumptions, and answered clarifications. Every evaluation agent receives that evidence through the shared context.
+
+The active path always requests `full` evaluation depth. Clarification analysis still runs, but blocking findings are preserved as assumptions and unresolved risks rather than stopping for more requester input. The Distribution Planner remains a legacy agent but is excluded from active standard/full routing.
+
+After synthesis and Critic/QA, a deterministic packet composer maps evaluated evidence into the required 00–10 document tree. Server-owned paths, content validation, hashes, and a manifest guarantee a complete archive. A score of 90 or above is `ready`; lower or unavailable scores are `ready_with_warnings` and remain downloadable because export is not approval.
+
 Architecture note: n8n is not used as Project Intake OS orchestration/plumbing. References to low-code evaluation are about the type of requested project or implementation recommendation, not about the OS runtime.
 
 ---

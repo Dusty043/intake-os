@@ -1,35 +1,30 @@
 # Project Intake OS
 
-Internal pre-distribution control plane for Digital Solutions project intake — AI-assisted evaluation, multi-gate approval, dry-run provisioning, and controlled handoff to Monday, GitHub, and Google Chat.
+Internal Discovery workspace that turns the best available project evidence into a complete, downloadable Phase 0 planning packet.
 
 ## What it does
 
-A project request enters as an intake. It moves through a governed workflow:
+A project begins as a Discovery conversation:
 
 ```
-Create → Submit → AI Evaluation → Human Review → Gate 1 → Gate 2 → Distribution Preview → Provision
+Discovery → Direction → Full Evaluation → Quality Review → Phase 0 ZIP
 ```
 
-The app owns the governance spine. Monday and GitHub receive the output. Developers work in those tools. The OS does not sync back.
+The ZIP is AI-generated, unapproved planning material. It creates no Monday or GitHub resource. The existing Intake, approval, and provisioning models remain internal compatibility code.
 
-**Governance enforced:**
-- AI evaluates, AI never approves
-- Gate 1 requires a human-reviewed project package
-- Gate 2 requires Gate 1 to be complete
-- Distribution only executes after both gates pass
-- All approvals, overrides, and provisioning runs are audited
-- Rejected and archived requests cannot provision
-- Retries are idempotent — no duplicate downstream resources
+**Active product guarantees:**
+- Discovery is the only user-facing entry point
+- Full evaluation receives a frozen Discovery snapshot
+- Missing information is surfaced as assumptions, not hidden
+- Every ZIP contains the required 00–10 document tree and manifest
+- Packet preview and download are owner-scoped
+- External provisioning mutations return HTTP 410
 
 ---
 
 ## Build state
 
-The governance spine (intake → evaluation → approval → dry-run distribution) is feature-complete
-and running on oreochiserver in `dev_headers` auth mode. Live external write integrations
-(Monday, GitHub, email intake, Chat slash command) are **not implemented** — only their specs
-and mock executors exist. Don't provision real credentials for those expecting code to activate;
-it doesn't exist yet.
+The Discovery-first Phase 0 flow is implemented on `feat/different-direction` and is not deployed by this task. The previous governance and provisioning code remains for historical compatibility but is not registered as an active execution path.
 
 Status buckets: **Built** (real, in the running app) · **Built, mock-only** (real code path, but
 writes to a mock/in-memory implementation, not an external system) · **Built, env-gated** (real
@@ -42,9 +37,10 @@ no spec yet).
 | Intake lifecycle + governance | Built |
 | Discovery Engine (ambiguity resolution) | Built — mock agents by default; live OpenAI/Anthropic/Bedrock via `AI_PROVIDER` |
 | AI evaluation orchestrator (multi-agent) | Built — mock agents by default; `ANALYSIS_ENGINE=orchestrator` + `AI_PROVIDER` for live models |
+| Phase 0 document packet + ZIP export | Built — deterministic complete tree from full evaluated evidence |
 | Multi-gate approval | Built |
 | Distribution preview (dry-run) | Built |
-| Provisioning execution + retry (incl. scheduled background retry) | Built, mock-only — `src/application/provisioning/mock-executor.ts`, no live Monday/GitHub executor exists |
+| Provisioning execution + retry | Disabled — executors are not registered and mutation routes return HTTP 410 |
 | Monday adapter | Spec-ready, not implemented — see `docs/ai/tasks/TASK-0023D-monday-adapter.md`; no `MondayProvisioningExecutor` in code |
 | GitHub adapter | Spec-ready, not implemented — see `docs/ai/tasks/TASK-0023E-github-adapter.md`; no GitHub provisioning executor in code |
 | Email intake | Spec-ready, not implemented — see `docs/ai/tasks/TASK-0025-email-intake.md`; no `/intake-sources/email` route exists |
@@ -171,6 +167,9 @@ Swagger/OpenAPI: **http://localhost:3000/docs**
 |--------|------|-------------|
 | GET | /health | Liveness check |
 | GET | /health/db | Readiness check |
+| POST | /discovery/:id/phase-zero/generate | Force or retry Phase 0 generation |
+| GET | /discovery/:id/phase-zero | Preview Phase 0 metadata and documents |
+| GET | /discovery/:id/phase-zero.zip | Download the Phase 0 ZIP |
 | GET | /intakes | List intakes |
 | GET | /intakes/:id | Get intake |
 | POST | /intakes | Create intake |
@@ -184,10 +183,10 @@ Swagger/OpenAPI: **http://localhost:3000/docs**
 | POST | /intakes/:id/approvals | Gate 1 or Gate 2 approval |
 | POST | /intakes/:id/rejections | Reject at current gate |
 | POST | /intakes/:id/request-changes | Request changes before gate |
-| POST | /intakes/:id/provisioning-plan | Generate dry-run distribution preview |
-| POST | /intakes/:id/provisioning-ready | Mark plan ready for execution |
-| POST | /intakes/:id/distribution/execute | Execute provisioning |
-| POST | /intakes/:id/distribution/runs/:runId/retry | Retry failed run |
+| POST | /intakes/:id/provisioning-plan | Disabled (HTTP 410) |
+| POST | /intakes/:id/provisioning-ready | Disabled (HTTP 410) |
+| POST | /intakes/:id/distribution/execute | Disabled (HTTP 410) |
+| POST | /intakes/:id/distribution/runs/:runId/retry | Disabled (HTTP 410) |
 | POST | /intakes/:id/assignment | Override developer assignment |
 | DELETE | /intakes/:id/assignment | Clear assignment override |
 | POST | /intakes/:id/lifecycle/:action | Post-distribution lifecycle transition |

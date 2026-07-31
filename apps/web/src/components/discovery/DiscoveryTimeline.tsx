@@ -11,8 +11,8 @@ const STATUS_STEPS: { key: DiscoveryStatus; label: string }[] = [
   { key: "clarification_needed", label: "Clarification"      },
   { key: "direction_selected",   label: "Direction Selected" },
   { key: "proposal_generated",   label: "Proposal Ready"     },
-  { key: "evaluation_ready",     label: "Evaluation Ready"   },
-  { key: "sent_to_evaluation",   label: "Sent to Evaluation" },
+  { key: "evaluation_ready",     label: "Packet Ready"       },
+  { key: "sent_to_evaluation",   label: "Source Locked"      },
 ];
 
 function formatTime(iso: string): string {

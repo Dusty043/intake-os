@@ -84,7 +84,7 @@ export default function DiscoveryListPage() {
         <div>
           <h1 className="text-2xl font-semibold text-brand-text">Discovery Sessions</h1>
           <p className="text-sm text-brand-muted mt-0.5">
-            AI-guided conversations to clarify project intent before intake.
+            Shape an idea, select a direction, and generate its complete Phase 0 packet.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -108,7 +108,7 @@ export default function DiscoveryListPage() {
           <div className="p-12 text-center">
             <p className="text-brand-muted text-sm font-medium">No discovery sessions yet.</p>
             <p className="text-gray-400 text-sm mt-1">
-              Start a guided AI conversation to clarify a project idea before submitting an intake.
+              Start a guided conversation to turn a project idea into implementation-ready planning material.
             </p>
             <button
               onClick={() => setShowStartModal(true)}
@@ -122,7 +122,7 @@ export default function DiscoveryListPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-gray-100 bg-gray-50">
-                  {["Session", "Status", "Last Activity"].map((h) => (
+                  {["Session", "Discovery", "Phase 0 Packet", "Last Activity"].map((h) => (
                     <th
                       key={h}
                       className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide"
@@ -139,10 +139,6 @@ export default function DiscoveryListPage() {
                   const lastActivity =
                     lastEvent?.occurredAt ?? lastMessage?.createdAt ?? session.id;
                   const title = getSessionTitle(session);
-                  const linkedIntakeId = session.status === "sent_to_evaluation"
-                    ? session.linkedIntakeId
-                    : null;
-
                   return (
                     <tr
                       key={session.id}
@@ -163,16 +159,22 @@ export default function DiscoveryListPage() {
                           <span className="font-mono text-xs text-gray-400">
                             {session.id.slice(0, 10)}…
                           </span>
-                          {linkedIntakeId && (
-                            <Link
-                              href={`/intakes/${linkedIntakeId}`}
-                              className="text-xs text-indigo-600 hover:text-indigo-800 hover:underline"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              View intake →
-                            </Link>
-                          )}
                         </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        {session.phaseZeroPacket ? (
+                          <span className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-medium ${
+                            session.phaseZeroPacket.state === "ready"
+                              ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                              : session.phaseZeroPacket.state === "failed"
+                                ? "border-red-200 bg-red-50 text-red-700"
+                                : "border-indigo-200 bg-indigo-50 text-indigo-700"
+                          }`}>
+                            {session.phaseZeroPacket.state.replaceAll("_", " ")}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-gray-400">Not started</span>
+                        )}
                       </td>
                       <td className="px-4 py-3">
                         {(() => { const s = getDiscoveryStatusInfo(session.status); return (

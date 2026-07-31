@@ -76,12 +76,12 @@ describe("EVALUATION_DEPTH_ROUTING_TABLE", () => {
     assert.equal(EVALUATION_DEPTH_ROUTING_TABLE.light.length, 5);
   });
 
-  it("standard has 10 sections", () => {
-    assert.equal(EVALUATION_DEPTH_ROUTING_TABLE.standard.length, 10);
+  it("standard has 9 active sections", () => {
+    assert.equal(EVALUATION_DEPTH_ROUTING_TABLE.standard.length, 9);
   });
 
-  it("full has 12 sections", () => {
-    assert.equal(EVALUATION_DEPTH_ROUTING_TABLE.full.length, 12);
+  it("full has 11 active sections", () => {
+    assert.equal(EVALUATION_DEPTH_ROUTING_TABLE.full.length, 11);
   });
 
   it("light is a subset of standard", () => {

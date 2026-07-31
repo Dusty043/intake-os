@@ -31,6 +31,12 @@ The system should avoid:
 - hidden background errors
 - irreversible state transitions without audit history
 
+## Phase 0 packet recovery
+
+Packet generation exposes `queued`, `generating`, `repairing`, `ready`, `ready_with_warnings`, and `failed` states on the Discovery session. Repeated active or completed triggers are idempotent. A failed run may be retried with the same frozen evidence; archive validation failures prevent download.
+
+The current implementation reuses the single-process, in-memory background continuation used elsewhere in the application. A process restart may leave an active state without automatic recovery. A durable unique job key and startup sweep are required before horizontal scaling or restart recovery becomes a product requirement.
+
 ---
 
 ## Failure Categories

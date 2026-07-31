@@ -1,4 +1,4 @@
-import type { DiscoveryOrchestrator } from "./discovery-orchestrator.js";
+import type { DiscoveryOrchestrator, SendToEvaluationOptions } from "./discovery-orchestrator.js";
 
 // ─── Request/response shapes (framework-neutral) ──────────────────────────────
 
@@ -90,7 +90,7 @@ export class DiscoveryController {
     return this.orchestrator.generateManifest(sessionId);
   }
 
-  sendToEvaluation(sessionId: string) {
-    return this.orchestrator.sendToEvaluation(sessionId);
+  sendToEvaluation(sessionId: string, options?: SendToEvaluationOptions) {
+    return this.orchestrator.sendToEvaluation(sessionId, options);
   }
 }

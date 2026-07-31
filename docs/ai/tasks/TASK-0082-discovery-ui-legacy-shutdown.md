@@ -1,6 +1,6 @@
 # TASK-0082 — Discovery UI and legacy shutdown
 
-**Status:** In progress  
+**Status:** Complete
 **GitHub:** https://github.com/Dusty043/intake-os/issues/44
 
 ## Request
@@ -16,4 +16,18 @@ Make Discovery the primary workspace, add packet progress/preview/download, and 
 
 ## Handoff
 
-Legacy records and read-only history remain available for compatibility.
+The root and legacy create route now lead to Discovery; primary navigation no
+longer exposes Intakes or Create Intake. Discovery streams packet states and
+shows a document tree, plain-text preview, warnings, assumptions, and download.
+Legacy manifest/distribution/provisioning mutations return 410 and provisioning
+executors are absent from runtime registration. Legacy records and read-only
+history remain available for compatibility.
+
+## Verification
+
+- Web tests: 33 passed.
+- Web production build: passed.
+- Browser check confirmed `/` redirects to `/discovery`, the Discovery-only
+  primary navigation, Phase 0 branding, and packet-state column.
+- A live end-to-end generation was not run because local Postgres on port 5433
+  was unavailable; API and ownership behavior are covered by automated tests.

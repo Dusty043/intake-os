@@ -2890,3 +2890,41 @@ evaluation. `build:core`, `typecheck`, `api:build`, `apps/web build` clean.
 requirements-trace.
 
 **Task log**: `docs/ai/tasks/TASK-0078-evaluation-source-of-truth-a-scoped.md`
+
+## 2026-07-31 — Discovery-first Phase 0 packet (TASK-0079 through TASK-0082)
+
+Replaced the user-facing intake entry point with Discovery. Selecting a direction
+above 80% confidence now freezes the Discovery source and queues a full,
+non-blocking evaluation; low-confidence sessions expose a forced generation
+action. The packet state machine is idempotent in process, supports failed-run
+retry, converts clarification gaps into explicit assumptions or risks, and keeps
+the internal intake compatibility ID private.
+
+Added the complete static 00-10 Phase 0 document tree, deterministic SVG and
+Mermaid assets, critic warning/repair behavior, SHA-256 document metadata,
+`PACKET-MANIFEST.json`, preview endpoints, and an in-memory `fflate` ZIP. ZIP
+export is classified by ADR-0004 as unapproved planning material rather than
+external distribution. Runtime provisioning executors are disabled and legacy
+manifest, target-resolution, distribution, and provisioning mutations return
+410 while read-only records remain available.
+
+The web app now routes `/` and `/intakes/new` to Discovery, removes intake
+creation from primary navigation, and provides packet progress, document tree,
+plain-text preview, warnings, assumptions, retry, and download. Product specs,
+requirements trace P0-001 through P0-008, open questions, memory index, and four
+task logs were updated.
+
+Verification: `npm test` 810/810; `npm run test:api` 10/10; web tests 33/33;
+core and web typechecks, API build, web production build, and
+`git diff --check` passed. Browser verification confirmed root redirect,
+Discovery-only primary navigation, Phase 0 branding, and packet status. Live
+API generation was not exercised because local Postgres on port 5433 was not
+running; a real-provider smoke test remains opt-in because it incurs AI cost.
+
+Follow-up: add durable queue/restart recovery when required and run a deliberate
+real-provider smoke test in an environment with Postgres and approved AI spend.
+
+**Task logs**: `docs/ai/tasks/TASK-0079-discovery-first-product-contract.md`,
+`TASK-0080-phase-zero-generation-pipeline.md`,
+`TASK-0081-phase-zero-packet-zip.md`, and
+`TASK-0082-discovery-ui-legacy-shutdown.md`

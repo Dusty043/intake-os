@@ -208,6 +208,21 @@ The numbers can be adjusted as the trace becomes more detailed.
 
 ---
 
+## Appendix J — Discovery-first Phase 0 Packet
+
+| ID | Requirement | Product Spec | Implementation Area | Related Tasks | Test Coverage | Status | Notes |
+|---|---|---|---|---|---|---|---|
+| P0-001 | Discovery is the sole user-facing entry point | `product-overview.md`, `input-trigger-strategy.md` | Web navigation and redirects | TASK-0082 | web route and Discovery list tests | implemented | Root and retired Create Intake route redirect to `/discovery`; Intake navigation is removed. |
+| P0-002 | Direction plus confidence above 80% automatically queues one full evaluation | `workflow-state-machine.md`, `ai-orchestration.md` | `PhaseZeroPacketService` | TASK-0080 | `tests/phase-zero-packet.test.mjs` | tested | Low-confidence sessions may force generation after selecting a direction. |
+| P0-003 | Evaluation uses a frozen complete Discovery snapshot and does not block for more clarification | `ai-orchestration.md` | Evaluation shared context | TASK-0080 | Phase 0 non-blocking orchestration test | tested | Clarification findings remain visible as assumptions/open questions. |
+| P0-004 | Packet contains every required static 00–10 document path | `product-overview.md` | `phase-zero-packet.ts` | TASK-0081 | packet tree and ZIP tests | tested | Non-applicable documents contain a rationale and revisit condition. |
+| P0-005 | Packet exposes quality, assumptions, evidence, confidence, and hashes | `ai-orchestration.md` | Packet contract and manifest | TASK-0081 | packet validation tests | tested | Score below 90 remains downloadable as `ready_with_warnings`. |
+| P0-006 | Packet preview/download is scoped to the Discovery owner or Admin | `permissions-and-ownership.md` | Discovery HTTP controller | TASK-0081 | existing shared ownership gate plus endpoint coverage | implemented | Internal intake IDs are stripped from public session responses. |
+| P0-007 | ZIP export is unapproved local planning material, not external distribution | `distribution-rules.md`, ADR-0004 | ZIP endpoint and manifest | TASK-0079, TASK-0081 | ZIP manifest test | tested | Download does not change request lifecycle state. |
+| P0-008 | Legacy provisioning mutations and executors are disabled | `distribution-rules.md` | Runtime registration and mutation controllers | TASK-0082 | API build and shutdown coverage | implemented | Read-only historical records remain available. |
+
+---
+
 ## Cross-Cutting — API Input Validation
 
 | ID | Requirement | Product Spec | Implementation Area | Related Tasks | Test Coverage | Status | Notes |

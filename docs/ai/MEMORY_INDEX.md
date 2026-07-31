@@ -114,6 +114,7 @@ Generated at: 2026-07-16T21:50:06.853Z
 - `docs/ai/decisions/ADR-0001-domain-first-monolith-foundation.md`
 - `docs/ai/decisions/ADR-0002-portable-nestjs-ready-runtime.md`
 - `docs/ai/decisions/ADR-0003-os-owned-orchestration-no-n8n.md`
+- `docs/ai/decisions/ADR-0004-discovery-first-phase-zero-export.md`
 
 ## R&D Docs
 

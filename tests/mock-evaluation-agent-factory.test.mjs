@@ -75,16 +75,16 @@ describe("createMockEvaluationAgentsForDepth", () => {
     assert.equal(agents.length, 5);
   });
 
-  it("standard depth returns 10 agents", () => {
+  it("standard depth returns 9 active agents", () => {
     const agents = createMockEvaluationAgentsForDepth("standard");
     assert.equal(agents.length, EVALUATION_DEPTH_ROUTING_TABLE.standard.length);
-    assert.equal(agents.length, 10);
+    assert.equal(agents.length, 9);
   });
 
-  it("full depth returns 12 agents", () => {
+  it("full depth returns 11 active agents", () => {
     const agents = createMockEvaluationAgentsForDepth("full");
     assert.equal(agents.length, EVALUATION_DEPTH_ROUTING_TABLE.full.length);
-    assert.equal(agents.length, 12);
+    assert.equal(agents.length, 11);
   });
 
   it("light depth agents match routing table kinds", () => {
@@ -145,7 +145,7 @@ describe("runMockEvaluationAgentsSequentiallyForTest", () => {
   it("returns sections for full depth", async () => {
     const intake = makeIntake();
     const sections = await runMockEvaluationAgentsSequentiallyForTest(intake, "full", baseOpts);
-    assert.equal(sections.length, 12);
+    assert.equal(sections.length, 11);
   });
 
   it("each section has id, evaluationId, kind, content, version, provenance", async () => {

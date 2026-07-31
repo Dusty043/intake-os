@@ -44,20 +44,27 @@ vi.mock("@/lib/discovery-client", () => ({
 import * as discoveryClient from "@/lib/discovery-client";
 
 describe("DiscoveryListPage", () => {
-  it("shows the 'View intake →' link from session.linkedIntakeId, not localStorage", async () => {
+  it("shows packet readiness without exposing the internal intake link", async () => {
     vi.mocked(discoveryClient.listDiscoverySessions).mockResolvedValue([
-      makeSession({ linkedIntakeId: "intake-42" }),
+      makeSession({
+        linkedIntakeId: "intake-42",
+        phaseZeroPacket: {
+          version: "1.0",
+          state: "ready",
+          assumptions: [],
+          warnings: [],
+          documents: [],
+        },
+      }),
     ]);
-    // Deliberately do not touch localStorage — the old bug required this key to
-    // be set for the link to appear; the fix must not depend on it.
 
     render(<DiscoveryListPage />);
 
-    const link = await screen.findByRole("link", { name: /View intake/i });
-    expect(link).toHaveAttribute("href", "/intakes/intake-42");
+    expect(await screen.findByText("ready")).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /View intake/i })).not.toBeInTheDocument();
   });
 
-  it("does not show the link when linkedIntakeId is absent", async () => {
+  it("shows Not started before packet generation", async () => {
     vi.mocked(discoveryClient.listDiscoverySessions).mockResolvedValue([
       makeSession({ linkedIntakeId: undefined }),
     ]);
@@ -65,6 +72,6 @@ describe("DiscoveryListPage", () => {
     render(<DiscoveryListPage />);
 
     await screen.findAllByText(/sess-1/i);
-    expect(screen.queryByRole("link", { name: /View intake/i })).not.toBeInTheDocument();
+    expect(screen.getByText("Not started")).toBeInTheDocument();
   });
 });

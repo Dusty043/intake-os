@@ -459,6 +459,55 @@ export interface ProvisioningManifest {
   generatedAt: string;
 }
 
+// ─── Phase 0 Packet ──────────────────────────────────────────────────────────
+
+export const phaseZeroPacketStates = [
+  "idle",
+  "queued",
+  "generating",
+  "repairing",
+  "ready",
+  "ready_with_warnings",
+  "failed",
+] as const;
+
+export type PhaseZeroPacketState = (typeof phaseZeroPacketStates)[number];
+
+export interface PhaseZeroSourceSnapshot {
+  capturedAt: string;
+  confidence: DiscoveryConfidence;
+  messages: ConversationMessage[];
+  problemFrame: ProblemFrame | null;
+  selectedSolution: SolutionOption | null;
+  proposal: ProjectProposal;
+  clarifications: ClarificationQuestion[];
+}
+
+export interface PhaseZeroDocument {
+  id: string;
+  path: string;
+  mediaType: "text/markdown" | "text/plain" | "image/svg+xml";
+  status: "generated" | "not_applicable";
+  content: string;
+  evidence: string[];
+  assumptions: string[];
+  confidence: number;
+  sha256: string;
+}
+
+export interface PhaseZeroPacket {
+  version: "1.0";
+  state: PhaseZeroPacketState;
+  source: PhaseZeroSourceSnapshot;
+  evaluationId?: string;
+  qualityScore?: number;
+  assumptions: string[];
+  warnings: string[];
+  documents: PhaseZeroDocument[];
+  generatedAt?: string;
+  error?: string;
+}
+
 // ─── Discovery Agent Usage ─────────────────────────────────────────────────────
 
 export type DiscoveryAgentRole =
@@ -502,6 +551,9 @@ export interface DiscoverySession {
 
   proposal: ProjectProposal | null;
   manifest: ProvisioningManifest | null;
+
+  /** User-facing Phase 0 planning artifact. This is not an approval record or external distribution. */
+  phaseZeroPacket?: PhaseZeroPacket;
 
   /** Set once `sendToEvaluation()` creates the downstream intake (Q-CONC-2) — lets a
    *  repeat call return the existing intake instead of creating an orphaned duplicate. */

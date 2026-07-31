@@ -5,6 +5,7 @@ import {
   DiscoveryOrchestrator,
   DiscoveryController,
   DiscoveryStreamRegistry,
+  PhaseZeroPacketService,
   MockIntentExtractionAgent,
   MockProblemFramingAgent,
   MockSolutionGenerationAgent,
@@ -25,6 +26,7 @@ import { DISCOVERY_SESSION_STORE, PROJECT_INTAKE_STORE } from "../../persistence
 import { DiscoveryHttpController } from "./discovery.controller.js";
 import { GlobalSettingsService } from "../admin/global-settings.service.js";
 import { AdminModule } from "../admin/admin.module.js";
+import { IntakeWorkflowService } from "../../../../../src/application/intake-workflow-service.js";
 
 function buildOrchestrator(
   sessionStore: IDiscoverySessionStore,
@@ -119,6 +121,19 @@ function buildOrchestrator(
         intakeStore: ProjectIntakeStore,
         settings: GlobalSettingsService,
       ) => buildOrchestrator(sessionStore, streamRegistry, intakeStore, settings),
+    },
+    {
+      provide: PhaseZeroPacketService,
+      inject: ["DISCOVERY_CONTROLLER", DISCOVERY_SESSION_STORE, IntakeWorkflowService, DiscoveryStreamRegistry],
+      useFactory: (
+        discovery: DiscoveryController,
+        sessionStore: IDiscoverySessionStore,
+        workflow: IntakeWorkflowService,
+        streamRegistry: DiscoveryStreamRegistry,
+      ) => new PhaseZeroPacketService(discovery, sessionStore, workflow, {
+        provider: loadAnalysisProviderConfig().provider,
+        streamRegistry,
+      }),
     },
   ],
 })

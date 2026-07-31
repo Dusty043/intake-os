@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useActor } from "@/components/ActorProvider";
 import { ErrorBanner } from "@/components/ErrorBanner";
@@ -9,14 +9,15 @@ import { DiscoveryLayout } from "@/components/discovery/DiscoveryLayout";
 import { DiscoveryTimeline } from "@/components/discovery/DiscoveryTimeline";
 import { DiscoveryChat } from "@/components/discovery/DiscoveryChat";
 import { DiscoveryUnderstanding } from "@/components/discovery/DiscoveryUnderstanding";
+import { PhaseZeroPacketPanel } from "@/components/discovery/PhaseZeroPacketPanel";
 import {
   answerClarification,
-  generateManifest,
+  downloadPhaseZero,
+  generatePhaseZero,
   generateSolutions,
   getDiscoverySession,
   selectDirection,
   sendMessage,
-  sendToEvaluation,
   skipClarifications,
   streamDiscoverySession,
 } from "@/lib/discovery-client";
@@ -33,16 +34,28 @@ const AI_PROCESSING_STATUSES = new Set([
   "direction_selected",
 ]);
 
+const PACKET_PROCESSING_STATES = new Set(["queued", "generating", "repairing"]);
+
+function isProcessing(session: DiscoverySession): boolean {
+  return AI_PROCESSING_STATUSES.has(session.status)
+    || PACKET_PROCESSING_STATES.has(session.phaseZeroPacket?.state ?? "");
+}
+
+function overallConfidence(session: DiscoverySession): number {
+  const values = Object.values(session.confidence) as number[];
+  return values.reduce((sum, value) => sum + value, 0) / values.length;
+}
+
 export default function DiscoverySessionPage() {
   const { id } = useParams<{ id: string }>();
   const { actor } = useActor();
-  const router = useRouter();
 
   const [session, setSession] = useState<DiscoverySession | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [activeStages, setActiveStages] = useState<Set<string>>(new Set());
+  const [view, setView] = useState<"discovery" | "packet">("discovery");
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const stopPolling = useCallback(() => {
@@ -69,10 +82,15 @@ export default function DiscoverySessionPage() {
     try {
       const data = await getDiscoverySession(id, actor);
       setSession(prev => {
-        if (prev?.status === data.status && prev?.messages?.length === data.messages?.length) return prev;
+        if (
+          prev?.status === data.status
+          && prev?.messages?.length === data.messages?.length
+          && prev?.phaseZeroPacket?.state === data.phaseZeroPacket?.state
+          && prev?.phaseZeroPacket?.documents.length === data.phaseZeroPacket?.documents.length
+        ) return prev;
         return data;
       });
-      if (!AI_PROCESSING_STATUSES.has(data.status)) stopPolling();
+      if (!isProcessing(data)) stopPolling();
     } catch {
       // ignore transient poll errors
     }
@@ -90,9 +108,13 @@ export default function DiscoverySessionPage() {
 
   // Auto-poll if session is already in an AI-processing state when page loads
   useEffect(() => {
-    if (session && AI_PROCESSING_STATUSES.has(session.status)) startPolling();
+    if (session && isProcessing(session)) startPolling();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session?.status]);
+  }, [session?.status, session?.phaseZeroPacket?.state]);
+
+  useEffect(() => {
+    if (session?.phaseZeroPacket) setView("packet");
+  }, [session?.phaseZeroPacket?.state]);
 
   // Live progress stream — one connection per session view, persists across
   // turns. Failure (network error, connection drop) just leaves activeStages
@@ -128,7 +150,7 @@ export default function DiscoverySessionPage() {
       const updated = await fn();
       setSession(updated);
       // If AI is still processing, start polling so updates appear automatically
-      if (AI_PROCESSING_STATUSES.has(updated.status)) startPolling();
+      if (isProcessing(updated)) startPolling();
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred.");
     } finally {
@@ -159,37 +181,28 @@ export default function DiscoverySessionPage() {
   };
 
   const handleSelectDirection = async (solutionId: string) => {
-    await withBusy(async () => {
-      const updated = await selectDirection(id, solutionId, actor);
-      // Proposal + manifest generation are automatic once a direction is
-      // picked — generateManifest composes the proposal itself if missing,
-      // so one call gets both. No manual "Generate Proposal"/"Generate
-      // Manifest" step for the user.
-      if (updated.status === "direction_selected" && !updated.manifest) {
-        return generateManifest(id, actor);
-      }
-      return updated;
-    });
+    await withBusy(() => selectDirection(id, solutionId, actor));
+    startPolling();
   };
 
-  const handleSendToEvaluation = async () => {
-    setBusy(true);
+  const handleGeneratePhaseZero = async () => {
+    await withBusy(() => generatePhaseZero(id, actor));
+    setView("packet");
+    startPolling();
+  };
+
+  const handleDownloadPhaseZero = async () => {
     setError(null);
     try {
-      const result = await sendToEvaluation(id, actor);
-      setSession(result.session);
-      // Navigate to the created intake if one was returned
-      if (result.intakeRecord && typeof result.intakeRecord === "object") {
-        const record = result.intakeRecord as { id?: string };
-        if (record.id) {
-          router.push(`/intakes/${record.id}`);
-          return;
-        }
-      }
+      const blob = await downloadPhaseZero(id, actor);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `phase-zero-${id}.zip`;
+      link.click();
+      URL.revokeObjectURL(url);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to send to evaluation.");
-    } finally {
-      setBusy(false);
+      setError(err instanceof Error ? err.message : "Unable to download the Phase 0 packet.");
     }
   };
 
@@ -229,6 +242,20 @@ export default function DiscoverySessionPage() {
           <span className="font-mono text-xs text-gray-500">{id.slice(0, 14)}…</span>
         </div>
         <div className="flex items-center gap-2">
+          <div className="flex rounded-lg border border-gray-200 p-0.5" aria-label="Workspace view">
+            <button
+              className={`rounded-md px-3 py-1.5 text-xs font-medium ${view === "discovery" ? "bg-slate-900 text-white" : "text-slate-600 hover:bg-slate-50"}`}
+              onClick={() => setView("discovery")}
+            >
+              Discovery
+            </button>
+            <button
+              className={`rounded-md px-3 py-1.5 text-xs font-medium ${view === "packet" ? "bg-slate-900 text-white" : "text-slate-600 hover:bg-slate-50"}`}
+              onClick={() => setView("packet")}
+            >
+              Phase 0 Packet
+            </button>
+          </div>
           <button
             onClick={load}
             disabled={loading || busy}
@@ -236,9 +263,9 @@ export default function DiscoverySessionPage() {
           >
             Refresh
           </button>
-          {session.status === "sent_to_evaluation" && (
-            <span className="text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-1 rounded">
-              Sent to Evaluation
+          {session.phaseZeroPacket && (
+            <span className="text-xs font-medium text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-1 rounded">
+              {session.phaseZeroPacket.state.replaceAll("_", " ")}
             </span>
           )}
         </div>
@@ -251,34 +278,17 @@ export default function DiscoverySessionPage() {
         </div>
       )}
 
-      {/* Intake handoff callout */}
-      {session.status === "sent_to_evaluation" && (
-        <div className="shrink-0 mx-6 mt-3 mb-1 flex items-center gap-3 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm">
-          <span className="text-emerald-600 font-medium">
-            ✓ Sent to evaluation
-          </span>
-          <span className="text-emerald-700/60">—</span>
-          {session.linkedIntakeId ? (
-            <Link
-              href={`/intakes/${session.linkedIntakeId}`}
-              className="text-emerald-700 font-medium hover:text-emerald-900 hover:underline"
-            >
-              View intake →
-            </Link>
-          ) : (
-            <Link
-              href="/intakes"
-              className="text-emerald-700 font-medium hover:text-emerald-900 hover:underline"
-            >
-              View in intakes list →
-            </Link>
-          )}
-        </div>
-      )}
-
-      {/* Three-panel layout — fills remaining height */}
       <div className="flex-1 min-h-0">
-        <DiscoveryLayout
+        {view === "packet" ? (
+          <PhaseZeroPacketPanel
+            packet={session.phaseZeroPacket}
+            confidence={overallConfidence(session)}
+            directionSelected={Boolean(session.selectedSolutionId)}
+            busy={busy}
+            onGenerate={handleGeneratePhaseZero}
+            onDownload={handleDownloadPhaseZero}
+          />
+        ) : <DiscoveryLayout
           left={
             <DiscoveryTimeline
               currentStatus={session.status}
@@ -291,14 +301,11 @@ export default function DiscoverySessionPage() {
               clarificationQuestions={session.clarificationQuestions}
               confidence={session.confidence}
               proposal={session.proposal}
-              manifest={session.manifest}
-              discoveryStatus={session.status}
               busy={busy}
               activeStages={activeStages}
               onSendMessage={handleSendMessage}
               onAnswerClarification={handleAnswerClarification}
               onSkipClarifications={handleSkipClarifications}
-              onSendToEvaluation={handleSendToEvaluation}
             />
           }
           right={
@@ -312,7 +319,7 @@ export default function DiscoverySessionPage() {
               onSelectDirection={handleSelectDirection}
             />
           }
-        />
+        />}
       </div>
     </div>
   );

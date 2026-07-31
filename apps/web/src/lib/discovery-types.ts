@@ -162,6 +162,39 @@ export type DiscoveryConfidence = {
   downstreamMapping: number;
 };
 
+export type PhaseZeroPacketState =
+  | "idle"
+  | "queued"
+  | "generating"
+  | "repairing"
+  | "ready"
+  | "ready_with_warnings"
+  | "failed";
+
+export type PhaseZeroDocument = {
+  id: string;
+  path: string;
+  mediaType: "text/markdown" | "text/plain" | "image/svg+xml";
+  status: "generated" | "not_applicable";
+  content: string;
+  evidence: string[];
+  assumptions: string[];
+  confidence: number;
+  sha256: string;
+};
+
+export type PhaseZeroPacket = {
+  version: "1.0";
+  state: PhaseZeroPacketState;
+  evaluationId?: string;
+  qualityScore?: number;
+  assumptions: string[];
+  warnings: string[];
+  documents: PhaseZeroDocument[];
+  generatedAt?: string;
+  error?: string;
+};
+
 export type DiscoverySession = {
   id: string;
   userId: string;
@@ -175,6 +208,7 @@ export type DiscoverySession = {
   selectedSolutionId: string | null;
   proposal: DiscoveryProposal | null;
   manifest: DiscoveryManifest | null;
+  phaseZeroPacket?: PhaseZeroPacket;
   confidence: DiscoveryConfidence;
   linkedIntakeId?: string | null;
 };

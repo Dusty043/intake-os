@@ -8,6 +8,10 @@ The system intentionally avoids deep bidirectional synchronization.
 
 However, it should retain lightweight downstream lifecycle awareness so internal users can understand whether distributed work is active, blocked, completed, canceled, or archived.
 
+## Phase 0 note
+
+Downloading a Phase 0 ZIP does not transition a project to `distributed` and creates no post-distribution lifecycle record. The lifecycle rules below apply only to historical records or a future explicitly re-enabled external distribution capability.
+
 ---
 
 ## Core Philosophy

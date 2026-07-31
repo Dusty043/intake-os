@@ -468,9 +468,13 @@ export class IntakeWorkflowService {
       depth,
       provider,
       model: input.model,
-      discoveryNotes: record.discovery?.notes ? [record.discovery.notes] : undefined,
+      discoveryNotes: [
+        ...(record.discovery?.notes ? [record.discovery.notes] : []),
+        ...(input.discoveryContext ? [JSON.stringify(input.discoveryContext)] : []),
+      ],
       priorClarifications: record.priorClarifications ? [...record.priorClarifications] : undefined,
       allowDepthUpgrade: input.allowDepthUpgrade ?? true,
+      allowClarificationBlocking: input.nonBlockingClarifications !== true,
     };
 
     let result: Awaited<ReturnType<typeof this.orchestrator.orchestrate>>;
