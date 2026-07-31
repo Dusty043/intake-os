@@ -2928,3 +2928,18 @@ real-provider smoke test in an environment with Postgres and approved AI spend.
 `TASK-0080-phase-zero-generation-pipeline.md`,
 `TASK-0081-phase-zero-packet-zip.md`, and
 `TASK-0082-discovery-ui-legacy-shutdown.md`
+
+## 2026-07-31 — Phase 0 branch deployed to oreochiserver for testing (TASK-0082)
+
+Updated `/home/oreo/intake-os` from its older `main` checkout to commit
+`a19b3e2` on `feat/different-direction`. Preserved `.env.server`, the Postgres
+volume, and a pre-existing unrelated local modification to `docker-compose.yml`.
+Rebuilt and started the API, web, Postgres, and Caddy services with
+`docker-compose.server.yml`.
+
+`deploy/healthcheck-server.sh` passed web, API liveness, database readiness, and
+OpenAPI. `/discovery` returned HTTP 200 locally and through the server's Tailscale
+address. API logs confirmed `Analysis engine: orchestrator (Phase 0 packet mode)`
+and `Provisioning executors: disabled (Phase 0 packet mode)`. The health endpoint
+reported the OpenAI provider enabled and live provisioning disabled. No real
+packet generation was run, avoiding an unapproved AI-cost-bearing smoke test.

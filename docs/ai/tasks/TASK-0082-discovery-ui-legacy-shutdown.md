@@ -31,3 +31,16 @@ history remain available for compatibility.
   primary navigation, Phase 0 branding, and packet-state column.
 - A live end-to-end generation was not run because local Postgres on port 5433
   was unavailable; API and ownership behavior are covered by automated tests.
+
+## Test server deployment
+
+Deployed commit `a19b3e2` from `feat/different-direction` to
+`/home/oreo/intake-os` on `oreochiserver` on 2026-07-31. Rebuilt and started the
+existing `docker-compose.server.yml` stack without changing `.env.server` or the
+Postgres volume. The repository healthcheck passed for web, API, database, and
+OpenAPI; `/discovery` returned HTTP 200 over the Tailscale address. Runtime logs
+confirmed the full Phase 0 orchestrator is active and provisioning executors are
+disabled. No cost-bearing packet generation was triggered.
+
+The server already had an unrelated local modification to `docker-compose.yml`.
+It is preserved and is not used by the server stack.
