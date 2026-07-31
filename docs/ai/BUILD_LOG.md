@@ -3001,3 +3001,14 @@ Added regression coverage for the allowance and the safe `work_breakdown`
 fallback. Verification: core suite 817/817, core typecheck, API build, and
 `git diff --check` passed. Deployment intentionally does not trigger another
 cost-bearing repair run; the authorized user can use **Improve packet**.
+
+## 2026-07-31 — Fix Phase 0 synthesis repair truncation (TASK-0083)
+
+The next authorized repair passed Work Breakdown and exposed the remaining
+response-budget failure: final `synthesis` was capped at 2,000 tokens. The
+original 46.5 packet again remained downloadable, with a safe warning naming
+only the failing schema.
+
+Raised only final Synthesis to 16,000 tokens and added its allowance regression
+test. Verification: core suite 818/818, core typecheck, API build, and
+`git diff --check` passed. Deployment does not initiate another paid AI run.

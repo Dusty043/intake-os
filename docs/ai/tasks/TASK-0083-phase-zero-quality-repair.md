@@ -1,6 +1,6 @@
 # TASK-0083 — Phase 0 quality repair
 
-**Status:** Complete
+**Status:** In progress
 **GitHub:** https://github.com/Dusty043/intake-os/issues/46
 
 ## Request
@@ -57,3 +57,14 @@ suite verifies both that allowance and safe schema-specific fallback wording.
 Verification: full core suite 817/817, core typecheck, API build, and
 `git diff --check` passed. The server deployment does not invoke another paid
 repair; the authorized user can select **Improve packet** after deployment.
+
+## Synthesis repair follow-up
+
+The next authorized live improvement passed the work-breakdown stage and then
+identified `synthesis` as the remaining constrained response. Final synthesis
+was still limited to 2,000 tokens despite requiring cross-section reasoning.
+It now reserves 16,000 tokens, with a regression check for that allowance.
+
+Verification: full core suite 818/818, core typecheck, API build, and
+`git diff --check` passed. Deployment remains non-cost-bearing; a subsequent
+user-selected **Improve packet** performs the live verification.

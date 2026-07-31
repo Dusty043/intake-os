@@ -17,6 +17,7 @@ import {
 import { OpenAICustomBuildAgent } from "../dist/src/application/agents/openai/openai-custom-build-agent.js";
 import { OpenAICriticQAAgent } from "../dist/src/application/agents/openai/openai-critic-qa-agent.js";
 import { OpenAIWorkBreakdownAgent } from "../dist/src/application/agents/openai/openai-work-breakdown-agent.js";
+import { OpenAIFinalSynthesisAgent } from "../dist/src/application/agents/openai/openai-final-synthesis-agent.js";
 
 const NOW = "2026-07-31T00:00:00.000Z";
 
@@ -315,6 +316,29 @@ test("work breakdown reserves completion headroom for full-depth repairs", async
     provider: "openai",
     idFactory: (prefix) => `${prefix}-1`,
     now: NOW,
+  });
+
+  assert.equal(maxTokens, 16000);
+});
+
+test("final synthesis reserves completion headroom for full-depth repairs", async () => {
+  let maxTokens;
+  const agent = new OpenAIFinalSynthesisAgent({
+    completeStructured: async (params) => {
+      maxTokens = params.maxTokens;
+      return {
+        content: {
+          executiveSummary: "Benchmark platform recommendation.",
+          recommendedPath: "Build the baseline first.",
+          keyDecisions: [], reviewNotes: [], approvalReadinessSummary: "Ready with notes — see review notes.",
+        },
+        inputTokens: 10, outputTokens: 10, finishReason: "stop",
+      };
+    },
+  }, "gpt-5.6-sol");
+
+  await agent.run({ intake: { title: "Benchmark platform", description: "Run and compare model benchmarks." }, depth: "full", sections: {} }, {
+    actor: { id: "user-1", role: "intake_owner" }, provider: "openai", idFactory: (prefix) => `${prefix}-1`, now: NOW,
   });
 
   assert.equal(maxTokens, 16000);
