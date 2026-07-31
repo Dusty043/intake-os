@@ -3,6 +3,7 @@ import { overallConfidence, type DiscoverySession, type PhaseZeroPacket } from "
 import type { AnalysisProviderName } from "../intake-analysis-provider.js";
 import { ConflictError, NotFoundError, ValidationError } from "../errors.js";
 import { IntakeWorkflowService } from "../intake-workflow-service.js";
+import { getSection, type IntakeEvaluation, type QualityReviewSectionContent } from "../intake-evaluation.js";
 import type { DiscoveryController } from "./discovery-controller.js";
 import type { IDiscoverySessionStore } from "./discovery-session-store.js";
 import type { DiscoveryStreamRegistry } from "./discovery-stream-registry.js";
@@ -38,9 +39,10 @@ export class PhaseZeroPacketService {
   async queue(sessionId: string, force = false): Promise<DiscoverySession> {
     let session = await this.requireSession(sessionId);
     const currentState = session.phaseZeroPacket?.state;
-    if (currentState === "ready" || currentState === "ready_with_warnings" || this.active.has(sessionId)) {
+    if (currentState === "ready" || this.active.has(sessionId)) {
       return session;
     }
+    if (currentState === "ready_with_warnings" && !force) return session;
     if (currentState === "failed" && !force) return session;
     if (!session.selectedSolutionId) {
       throw new ValidationError("Select a Discovery direction before generating the Phase 0 packet.");
@@ -111,14 +113,32 @@ export class PhaseZeroPacketService {
       if (!evaluation) throw new Error("Full evaluation completed without a persisted result.");
       this.publish(sessionId, { type: "stage-end", stage: "phase_zero_evaluation" });
 
+      let repairWarning: string | undefined;
       if ((evaluation.qualityScore?.overall ?? 0) < 90) {
         await this.store.update(sessionId, {
           phaseZeroPacket: { ...queued, state: "repairing", evaluationId: evaluation.id },
           updatedAt: this.now(),
         });
+        try {
+          await this.workflow.regenerateAnalysisDraft(intakeId, {
+            guidance: repairGuidance(evaluation),
+            requestedBy: SYSTEM_ACTOR.displayName ?? SYSTEM_ACTOR.id,
+            depth: "full",
+            provider: this.options.provider,
+            discoveryContext: queued.source,
+            nonBlockingClarifications: true,
+          }, SYSTEM_ACTOR);
+          const repaired = await this.workflow.getLatestEvaluationForIntake(intakeId);
+          if (repaired.evaluation) evaluation = repaired.evaluation;
+        } catch {
+          repairWarning = "The automatic quality repair could not complete; the original packet remains downloadable.";
+        }
       }
       this.publish(sessionId, { type: "stage-start", stage: "phase_zero_packet" });
-      const packet = buildPhaseZeroPacket(queued.source, evaluation, this.now());
+      const built = buildPhaseZeroPacket(queued.source, evaluation, this.now());
+      const packet = repairWarning
+        ? { ...built, state: "ready_with_warnings" as const, warnings: unique([...built.warnings, repairWarning]) }
+        : built;
       await this.store.update(sessionId, { phaseZeroPacket: packet, updatedAt: this.now() });
       this.publish(sessionId, { type: "stage-end", stage: "phase_zero_packet" });
     } catch (error) {
@@ -149,4 +169,14 @@ export class PhaseZeroPacketService {
 
 function unique(items: readonly string[]): string[] {
   return [...new Set(items)];
+}
+
+function repairGuidance(evaluation: IntakeEvaluation): string {
+  const review = getSection<QualityReviewSectionContent>(evaluation, "quality_review")?.content;
+  return [
+    "Repair the evaluation using the critic feedback below. Preserve supported decisions, replace vague language with concrete implementation detail, and resolve gaps as explicit assumptions when Discovery evidence is unavailable.",
+    ...(review?.weaknesses ?? []),
+    ...(review?.requiredRevisions ?? []),
+    ...(review?.reviewerWarnings ?? []),
+  ].join("\n- ").slice(0, 6000);
 }

@@ -220,6 +220,7 @@ The numbers can be adjusted as the trace becomes more detailed.
 | P0-006 | Packet preview/download is scoped to the Discovery owner or Admin | `permissions-and-ownership.md` | Discovery HTTP controller | TASK-0081 | existing shared ownership gate plus endpoint coverage | implemented | Internal intake IDs are stripped from public session responses. |
 | P0-007 | ZIP export is unapproved local planning material, not external distribution | `distribution-rules.md`, ADR-0004 | ZIP endpoint and manifest | TASK-0079, TASK-0081 | ZIP manifest test | tested | Download does not change request lifecycle state. |
 | P0-008 | Legacy provisioning mutations and executors are disabled | `distribution-rules.md` | Runtime registration and mutation controllers | TASK-0082 | API build and shutdown coverage | implemented | Read-only historical records remain available. |
+| P0-009 | Critic reviews complete evaluation evidence and low scores receive one bounded feedback-guided repair pass | `ai-orchestration.md`, `ai-cost-governance.md` | `OpenAICriticQAAgent`, `PhaseZeroPacketService` | TASK-0083 | `tests/phase-zero-packet.test.mjs`, PhaseZeroPacketPanel test | tested | Repair failure preserves the original downloadable packet; users may explicitly improve `ready_with_warnings`, while `ready` remains immutable. |
 
 ---
 

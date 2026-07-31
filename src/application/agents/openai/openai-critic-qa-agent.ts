@@ -59,7 +59,7 @@ export class OpenAICriticQAAgent implements EvaluationAgent<QualityReviewSection
   async run(ctx: AgentRunContext, opts: AgentRunOptions): Promise<AgentOutput<QualityReviewSectionContent>> {
     const { intake, sections } = ctx;
     const sectionSummary = Object.entries(sections)
-      .map(([kind, s]) => `[${kind}]: ${JSON.stringify(s?.content).slice(0, 300)}`)
+      .map(([kind, s]) => `[${kind}]: ${JSON.stringify(s?.content)}`)
       .join("\n");
     const userPrompt = `Title: ${intake.title}\n\nEvaluation sections to review:\n${sectionSummary}`;
     const { content: out } = await this.client.completeStructured<Omit<QualityReviewSectionContent, "qualityScore"> & { qualityScore: { dimensions: QualityReviewSectionContent["qualityScore"]["dimensions"]; overall: number } }>({

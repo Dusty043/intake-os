@@ -250,6 +250,10 @@ export interface ProjectIntakeRecord extends ProjectRequestSnapshot {
 export interface RegenerateAnalysisDraftInput {
   guidance: string;
   requestedBy: string;
+  depth?: EvaluationDepth;
+  provider?: "mock" | "openai" | "anthropic" | "bedrock";
+  discoveryContext?: PhaseZeroSourceSnapshot;
+  nonBlockingClarifications?: boolean;
 }
 
 export interface CreateIntakeInput {

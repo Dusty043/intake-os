@@ -2959,3 +2959,21 @@ budget and failure-message sanitization.
 
 Verification: focused Phase 0 tests 6/6, full core suite 812/812, core
 typecheck, API build, and `git diff --check` passed.
+
+## 2026-07-31 — Add bounded Phase 0 quality repair (TASK-0083)
+
+The live 46.5/100 packet exposed that Critic/QA received only the first 300
+characters of every evaluation section. Its warnings therefore described nearly
+all sections as truncated even though the persisted sections were complete. The
+`repairing` state also did not perform a repair.
+
+Critic/QA now receives complete schema-bounded section content. Scores below 90
+feed weaknesses, required revisions, and reviewer warnings into exactly one
+full-depth regeneration, followed by a fresh score. A failed repair preserves
+the original downloadable packet with a warning. `ready_with_warnings` packets
+offer **Improve packet**; `ready` remains immutable.
+
+Verification before deployment: focused Phase 0 tests 9/9, full core suite
+816/816, full web suite 34/34, core and web typechecks, API build, web production
+build, and `git diff --check` passed. Live oreochiserver verification follows
+before completion.

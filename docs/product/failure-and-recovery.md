@@ -33,7 +33,7 @@ The system should avoid:
 
 ## Phase 0 packet recovery
 
-Packet generation exposes `queued`, `generating`, `repairing`, `ready`, `ready_with_warnings`, and `failed` states on the Discovery session. Repeated active or completed triggers are idempotent. A failed run may be retried with the same frozen evidence; archive validation failures prevent download.
+Packet generation exposes `queued`, `generating`, `repairing`, `ready`, `ready_with_warnings`, and `failed` states on the Discovery session. Repeated active triggers and `ready` packets are idempotent. A failed run may be retried with the same frozen evidence; a user may force one new improvement attempt for `ready_with_warnings`. A critic score below 90 triggers one feedback-guided repair pass. If that repair call fails, the original complete packet remains downloadable as `ready_with_warnings` and records the repair failure. Archive validation failures still prevent download.
 
 The current implementation reuses the single-process, in-memory background continuation used elsewhere in the application. A process restart may leave an active state without automatic recovery. A durable unique job key and startup sweep are required before horizontal scaling or restart recovery becomes a product requirement.
 

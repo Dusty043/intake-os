@@ -294,6 +294,24 @@ describe("regenerateAnalysisDraft — orchestrator routing", () => {
     assert.ok(regenEvent.metadata?.evaluationId, "must include evaluationId");
     assert.ok(regenEvent.metadata?.previousEvaluationId, "must include previousEvaluationId");
   });
+
+  it("preserves the evaluation depth and provider during regeneration", async () => {
+    _seq = 0;
+    const store = new InMemoryProjectIntakeStore();
+    const service = new IntakeWorkflowService({ store, clock: () => NOW, idFactory: makeIdFactory(), orchestrator: makeOrchestrator() });
+    const submitted = await createAndSubmitIntake(service);
+    await service.generateEvaluation(submitted.id, { depth: "full", provider: "openai", nonBlockingClarifications: true }, intakeOwner);
+
+    await service.regenerateAnalysisDraft(submitted.id, {
+      guidance: "Improve specificity using the critic feedback.",
+      requestedBy: "Discovery Engine",
+    }, intakeOwner);
+
+    const latest = await store.getLatestEvaluationForIntake(submitted.id);
+    assert.equal(latest.depth, "full");
+    assert.ok(latest.sections.every((section) => section.provenance.provider === "openai"));
+  });
+
 });
 
 // ─── generateEvaluation: failure path (Q-EVAL-1) ────────────────────────────

@@ -52,4 +52,28 @@ describe("PhaseZeroPacketPanel", () => {
     await userEvent.click(screen.getByRole("button", { name: /Download ZIP/i }));
     expect(onDownload).toHaveBeenCalledOnce();
   });
+
+  it("offers one improvement pass for ready packets with warnings", async () => {
+    const onGenerate = vi.fn().mockResolvedValue(undefined);
+    render(
+      <PhaseZeroPacketPanel
+        confidence={0.91}
+        directionSelected={true}
+        busy={false}
+        onGenerate={onGenerate}
+        onDownload={vi.fn()}
+        packet={{
+          version: "1.0",
+          state: "ready_with_warnings",
+          qualityScore: 46.5,
+          assumptions: [],
+          warnings: ["Needs more implementation detail."],
+          documents: [],
+        }}
+      />,
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: /Improve packet/i }));
+    expect(onGenerate).toHaveBeenCalledOnce();
+  });
 });

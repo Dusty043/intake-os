@@ -145,9 +145,16 @@ export function PhaseZeroPacketPanel({
             {packet.documents.length} documents · Quality {packet.qualityScore ?? "not scored"}/100 · Unapproved planning material
           </p>
         </div>
-        <button className="btn-primary" disabled={downloading} onClick={() => void handleDownload()}>
-          {downloading ? "Preparing ZIP…" : "Download ZIP"}
-        </button>
+        <div className="flex items-center gap-2">
+          {packet.state === "ready_with_warnings" && (
+            <button className="btn-secondary" disabled={busy} onClick={() => void onGenerate()}>
+              {busy ? "Improving…" : "Improve packet"}
+            </button>
+          )}
+          <button className="btn-primary" disabled={downloading} onClick={() => void handleDownload()}>
+            {downloading ? "Preparing ZIP…" : "Download ZIP"}
+          </button>
+        </div>
       </div>
 
       {(packet.warnings.length > 0 || packet.assumptions.length > 0) && (

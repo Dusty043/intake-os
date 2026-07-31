@@ -37,7 +37,7 @@ The system should avoid:
 
 ## Phase 0 cost boundary
 
-Automatic generation runs once per frozen Discovery session when confidence exceeds 80%; forced low-confidence generation is an explicit user action. The existing full evaluation and Critic/QA pass are reused. Packet documents are composed deterministically from persisted evaluation sections rather than making one additional AI request per document. Ready packets do not regenerate in v1; only failed runs retry.
+Automatic generation runs once per frozen Discovery session when confidence exceeds 80%; forced low-confidence generation is an explicit user action. The existing full evaluation and Critic/QA pass are reused. When the first critic score is below 90, generation may spend one additional full-depth evaluation pass using the critic feedback; the pass is never repeated automatically. Packet documents are composed deterministically from persisted evaluation sections rather than making one additional AI request per document. `ready` packets do not regenerate. A user may explicitly improve `ready_with_warnings`, and failed runs may retry.
 
 ---
 

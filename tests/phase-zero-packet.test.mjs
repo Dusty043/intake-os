@@ -15,6 +15,7 @@ import {
   proposalToIntakeRecord,
 } from "../dist/src/index.js";
 import { OpenAICustomBuildAgent } from "../dist/src/application/agents/openai/openai-custom-build-agent.js";
+import { OpenAICriticQAAgent } from "../dist/src/application/agents/openai/openai-critic-qa-agent.js";
 
 const NOW = "2026-07-31T00:00:00.000Z";
 
@@ -197,6 +198,76 @@ describe("PhaseZeroPacketService", () => {
     assert.equal(packet.error, "The evaluator could not complete this packet. Retry generation to continue.");
     assert.doesNotMatch(packet.error, /secret partial JSON/);
   });
+
+  test("forces one feedback-guided repair for a ready packet below 90", async () => {
+    const store = new InMemoryDiscoverySessionStore();
+    const session = makeSession();
+    session.phaseZeroPacket = {
+      version: "1.0",
+      state: "ready_with_warnings",
+      source: capturePhaseZeroSource(session, NOW),
+      qualityScore: 46.5,
+      assumptions: [],
+      warnings: ["Needs repair."],
+      documents: [],
+    };
+    await store.create(session);
+    let evaluation = makeEvaluation(46.5);
+    evaluation.sections = [{
+      id: "quality-1",
+      evaluationId: evaluation.id,
+      kind: "quality_review",
+      content: {
+        qualityScore: evaluation.qualityScore,
+        strengths: [],
+        weaknesses: ["Add concrete interfaces."],
+        requiredRevisions: ["Define acceptance thresholds."],
+        reviewerWarnings: [],
+      },
+      version: 1,
+      provenance: { provider: "openai", agentRole: "quality_review", generatedAt: NOW },
+    }];
+    let repairs = 0;
+    const service = new PhaseZeroPacketService({
+      composeProposal: async () => store.getById("discovery-1"),
+      sendToEvaluation: async () => ({ session: await store.getById("discovery-1"), intakeRecord: { id: "intake-1" } }),
+    }, store, {
+      getLatestEvaluationForIntake: async () => ({ evaluation, agentRuns: [] }),
+      generateEvaluation: async () => { throw new Error("existing full evaluation should be reused"); },
+      regenerateAnalysisDraft: async (_id, input) => {
+        repairs += 1;
+        assert.match(input.guidance, /Define acceptance thresholds/);
+        evaluation = { ...makeEvaluation(95), id: "evaluation-2", evaluationVersion: 2 };
+      },
+    }, { provider: "openai", now: () => NOW });
+
+    await service.queue("discovery-1", true);
+    await waitFor(async () => (await store.getById("discovery-1")).phaseZeroPacket?.state === "ready");
+    const packet = (await store.getById("discovery-1")).phaseZeroPacket;
+    assert.equal(repairs, 1);
+    assert.equal(packet.qualityScore, 95);
+    assert.equal(packet.evaluationId, "evaluation-2");
+  });
+
+  test("keeps the original packet downloadable when automatic repair fails", async () => {
+    const store = new InMemoryDiscoverySessionStore();
+    await store.create(makeSession());
+    const evaluation = makeEvaluation(70);
+    const service = new PhaseZeroPacketService({
+      composeProposal: async () => store.getById("discovery-1"),
+      sendToEvaluation: async () => ({ session: await store.getById("discovery-1"), intakeRecord: { id: "intake-1" } }),
+    }, store, {
+      getLatestEvaluationForIntake: async () => ({ evaluation, agentRuns: [] }),
+      generateEvaluation: async () => { throw new Error("existing full evaluation should be reused"); },
+      regenerateAnalysisDraft: async () => { throw new Error("repair provider unavailable"); },
+    }, { provider: "openai", now: () => NOW });
+
+    await service.queue("discovery-1", true);
+    await waitFor(async () => (await store.getById("discovery-1")).phaseZeroPacket?.state === "ready_with_warnings");
+    const packet = (await store.getById("discovery-1")).phaseZeroPacket;
+    assert.match(packet.warnings.join(" "), /original packet remains downloadable/i);
+    assert.ok(buildPhaseZeroZip(packet).byteLength > 0);
+  });
 });
 
 test("custom build reserves completion headroom for reasoning models", async () => {
@@ -221,6 +292,31 @@ test("custom build reserves completion headroom for reasoning models", async () 
   });
 
   assert.equal(maxTokens, 16000);
+});
+
+test("critic reviews complete evaluation sections instead of truncated fragments", async () => {
+  const marker = "END-OF-SECTION-MARKER";
+  let prompt = "";
+  const agent = new OpenAICriticQAAgent({
+    completeStructured: async (params) => {
+      prompt = params.userPrompt;
+      return {
+        content: {
+          qualityScore: { dimensions: { completeness: 90, consistency: 90, specificity: 90, feasibility: 90, riskCoverage: 90, handoffReadiness: 90 }, overall: 90 },
+          strengths: [], weaknesses: [], requiredRevisions: [], reviewerWarnings: [],
+        },
+        inputTokens: 10, outputTokens: 10, finishReason: "stop",
+      };
+    },
+  }, "gpt-5.6-sol");
+
+  await agent.run({
+    intake: { title: "Benchmark platform", description: "Compare models." },
+    depth: "full",
+    sections: { architecture: { content: { details: `${"x".repeat(600)}${marker}` } } },
+  }, { actor: { id: "user-1", role: "intake_owner" }, provider: "openai", idFactory: (prefix) => `${prefix}-1`, now: NOW });
+
+  assert.match(prompt, new RegExp(marker));
 });
 
 async function waitFor(predicate) {

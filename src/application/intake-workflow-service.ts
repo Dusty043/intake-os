@@ -727,10 +727,14 @@ export class IntakeWorkflowService {
 
       const orchResult = await this.orchestrator.orchestrate(record, {
         actor,
-        depth: "standard",
-        provider: "mock",
-        discoveryNotes: [input.guidance],
+        depth: input.depth ?? currentEval.depth,
+        provider: input.provider ?? currentEval.sections.find((section) => !section.supersededById)?.provenance.provider ?? "mock",
+        discoveryNotes: [
+          input.guidance,
+          ...(input.discoveryContext ? [JSON.stringify(input.discoveryContext)] : []),
+        ],
         allowDepthUpgrade: false,
+        allowClarificationBlocking: input.nonBlockingClarifications !== true,
       });
 
       if (orchResult.kind === "clarification_required") {

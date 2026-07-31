@@ -101,6 +101,7 @@ Generated at: 2026-07-16T21:50:06.853Z
 - `docs/ai/tasks/TASK-0079-discovery-first-product-contract.md`
 - `docs/ai/tasks/TASK-0080-phase-zero-generation-pipeline.md`
 - `docs/ai/tasks/TASK-0081-phase-zero-packet-zip.md`
+- `docs/ai/tasks/TASK-0083-phase-zero-quality-repair.md`
 - `docs/ai/tasks/TASK-0082-discovery-ui-legacy-shutdown.md`
 - `docs/ai/tasks/TASK-DISCOVERY-PHASE1.md`
 - `docs/ai/tasks/TASK-DISCOVERY-PHASE2.md`
