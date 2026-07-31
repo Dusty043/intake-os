@@ -1,6 +1,6 @@
 # TASK-0083 — Phase 0 quality repair
 
-**Status:** In progress
+**Status:** Complete
 **GitHub:** https://github.com/Dusty043/intake-os/issues/46
 
 ## Request
@@ -68,3 +68,7 @@ It now reserves 16,000 tokens, with a regression check for that allowance.
 Verification: full core suite 818/818, core typecheck, API build, and
 `git diff --check` passed. Deployment remains non-cost-bearing; a subsequent
 user-selected **Improve packet** performs the live verification.
+
+Live deployment: oreochiserver API health, database readiness, and OpenAPI
+checks passed at `a696c3a`; the running image contains the 16,000-token
+Synthesis allowance.

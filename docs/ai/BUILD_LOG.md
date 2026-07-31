@@ -3012,3 +3012,6 @@ only the failing schema.
 Raised only final Synthesis to 16,000 tokens and added its allowance regression
 test. Verification: core suite 818/818, core typecheck, API build, and
 `git diff --check` passed. Deployment does not initiate another paid AI run.
+Oreochiserver was rebuilt with API-only changes; health, database, and OpenAPI
+checks passed at `a696c3a`, with the synthesized response allowance verified in
+the running image.
