@@ -2977,3 +2977,12 @@ Verification before deployment: focused Phase 0 tests 9/9, full core suite
 816/816, full web suite 34/34, core and web typechecks, API build, web production
 build, and `git diff --check` passed. Live oreochiserver verification follows
 before completion.
+
+Live verification deployed the repair path and invoked it against the existing
+46.5 packet. The packet entered `repairing`; when the repair evaluation failed
+before version 2 persisted, the original ZIP remained downloadable and gained
+the expected repair warning. The expanded Critic/QA request was the only new
+model-call shape and still used the shared 4,000-token ceiling, so Critic/QA now
+reserves 12,000 tokens. Fallback diagnostics identify a truncated schema without
+persisting raw provider output. A second paid pass was left to an authorized
+user through the deployed **Improve packet** action.

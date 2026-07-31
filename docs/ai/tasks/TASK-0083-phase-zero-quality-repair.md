@@ -1,6 +1,6 @@
 # TASK-0083 — Phase 0 quality repair
 
-**Status:** In progress
+**Status:** Complete
 **GitHub:** https://github.com/Dusty043/intake-os/issues/46
 
 ## Request
@@ -35,5 +35,13 @@ warnings explicitly reported that nearly every section ended mid-sentence. The
 
 ## Follow-up
 
-Real-provider verification incurs AI cost and will be run once after deployment
-against the existing 46.5 packet.
+The first live improvement attempt preserved the original 46.5 packet but the
+repair evaluation failed before version 2 persisted. The only newly expanded
+model call was Critic/QA: its input grew from truncated fragments to the complete
+evaluation while retaining the shared 4,000-token completion ceiling. Critic/QA
+now reserves 12,000 tokens, and repair fallback warnings identify the failed
+schema without exposing raw provider output.
+
+A second live call was not triggered automatically because it would resend the
+stored internal evaluation to OpenAI and incur additional cost. The deployed UI
+now exposes **Improve packet** for an authorized user to run that pass.

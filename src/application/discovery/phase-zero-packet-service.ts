@@ -130,8 +130,8 @@ export class PhaseZeroPacketService {
           }, SYSTEM_ACTOR);
           const repaired = await this.workflow.getLatestEvaluationForIntake(intakeId);
           if (repaired.evaluation) evaluation = repaired.evaluation;
-        } catch {
-          repairWarning = "The automatic quality repair could not complete; the original packet remains downloadable.";
+        } catch (error) {
+          repairWarning = repairFailureWarning(error);
         }
       }
       this.publish(sessionId, { type: "stage-start", stage: "phase_zero_packet" });
@@ -179,4 +179,12 @@ function repairGuidance(evaluation: IntakeEvaluation): string {
     ...(review?.requiredRevisions ?? []),
     ...(review?.reviewerWarnings ?? []),
   ].join("\n- ").slice(0, 6000);
+}
+
+function repairFailureWarning(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error);
+  const schema = message.match(/for ([a-z_]+)(?::|\.)/)?.[1];
+  return message.includes("response truncated")
+    ? `The automatic quality repair could not complete because ${schema ?? "an AI section"} exceeded its response budget; the original packet remains downloadable.`
+    : "The automatic quality repair could not complete; the original packet remains downloadable.";
 }

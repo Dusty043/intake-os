@@ -63,7 +63,7 @@ export class OpenAICriticQAAgent implements EvaluationAgent<QualityReviewSection
       .join("\n");
     const userPrompt = `Title: ${intake.title}\n\nEvaluation sections to review:\n${sectionSummary}`;
     const { content: out } = await this.client.completeStructured<Omit<QualityReviewSectionContent, "qualityScore"> & { qualityScore: { dimensions: QualityReviewSectionContent["qualityScore"]["dimensions"]; overall: number } }>({
-      model: this.model, systemPrompt: SYSTEM, userPrompt: userPrompt, schemaName: "quality_review", schema: schema as unknown as Record<string,unknown>,
+      model: this.model, systemPrompt: SYSTEM, userPrompt: userPrompt, schemaName: "quality_review", schema: schema as unknown as Record<string,unknown>, maxTokens: 12000,
     });
 
     const clamp = (v: number) => Math.max(0, Math.min(100, v));

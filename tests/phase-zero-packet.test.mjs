@@ -259,13 +259,14 @@ describe("PhaseZeroPacketService", () => {
     }, store, {
       getLatestEvaluationForIntake: async () => ({ evaluation, agentRuns: [] }),
       generateEvaluation: async () => { throw new Error("existing full evaluation should be reused"); },
-      regenerateAnalysisDraft: async () => { throw new Error("repair provider unavailable"); },
+      regenerateAnalysisDraft: async () => { throw new Error("response truncated at max_completion_tokens=4000 before valid JSON for quality_review: {raw provider content}"); },
     }, { provider: "openai", now: () => NOW });
 
     await service.queue("discovery-1", true);
     await waitFor(async () => (await store.getById("discovery-1")).phaseZeroPacket?.state === "ready_with_warnings");
     const packet = (await store.getById("discovery-1")).phaseZeroPacket;
-    assert.match(packet.warnings.join(" "), /original packet remains downloadable/i);
+    assert.match(packet.warnings.join(" "), /quality_review exceeded its response budget/i);
+    assert.doesNotMatch(packet.warnings.join(" "), /raw provider content/i);
     assert.ok(buildPhaseZeroZip(packet).byteLength > 0);
   });
 });
@@ -297,9 +298,11 @@ test("custom build reserves completion headroom for reasoning models", async () 
 test("critic reviews complete evaluation sections instead of truncated fragments", async () => {
   const marker = "END-OF-SECTION-MARKER";
   let prompt = "";
+  let maxTokens;
   const agent = new OpenAICriticQAAgent({
     completeStructured: async (params) => {
       prompt = params.userPrompt;
+      maxTokens = params.maxTokens;
       return {
         content: {
           qualityScore: { dimensions: { completeness: 90, consistency: 90, specificity: 90, feasibility: 90, riskCoverage: 90, handoffReadiness: 90 }, overall: 90 },
@@ -317,6 +320,7 @@ test("critic reviews complete evaluation sections instead of truncated fragments
   }, { actor: { id: "user-1", role: "intake_owner" }, provider: "openai", idFactory: (prefix) => `${prefix}-1`, now: NOW });
 
   assert.match(prompt, new RegExp(marker));
+  assert.equal(maxTokens, 12000);
 });
 
 async function waitFor(predicate) {
