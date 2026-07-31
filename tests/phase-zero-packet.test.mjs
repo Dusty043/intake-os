@@ -16,6 +16,7 @@ import {
 } from "../dist/src/index.js";
 import { OpenAICustomBuildAgent } from "../dist/src/application/agents/openai/openai-custom-build-agent.js";
 import { OpenAICriticQAAgent } from "../dist/src/application/agents/openai/openai-critic-qa-agent.js";
+import { OpenAIWorkBreakdownAgent } from "../dist/src/application/agents/openai/openai-work-breakdown-agent.js";
 
 const NOW = "2026-07-31T00:00:00.000Z";
 
@@ -259,13 +260,13 @@ describe("PhaseZeroPacketService", () => {
     }, store, {
       getLatestEvaluationForIntake: async () => ({ evaluation, agentRuns: [] }),
       generateEvaluation: async () => { throw new Error("existing full evaluation should be reused"); },
-      regenerateAnalysisDraft: async () => { throw new Error("response truncated at max_completion_tokens=4000 before valid JSON for quality_review: {raw provider content}"); },
+      regenerateAnalysisDraft: async () => { throw new Error("response truncated at max_completion_tokens=3000 before valid JSON for work_breakdown: {raw provider content}"); },
     }, { provider: "openai", now: () => NOW });
 
     await service.queue("discovery-1", true);
     await waitFor(async () => (await store.getById("discovery-1")).phaseZeroPacket?.state === "ready_with_warnings");
     const packet = (await store.getById("discovery-1")).phaseZeroPacket;
-    assert.match(packet.warnings.join(" "), /quality_review exceeded its response budget/i);
+    assert.match(packet.warnings.join(" "), /work_breakdown exceeded its response budget/i);
     assert.doesNotMatch(packet.warnings.join(" "), /raw provider content/i);
     assert.ok(buildPhaseZeroZip(packet).byteLength > 0);
   });
@@ -278,6 +279,30 @@ test("custom build reserves completion headroom for reasoning models", async () 
       maxTokens = params.maxTokens;
       return {
         content: { required: true, rationale: "Custom code is required.", backendNeeds: [], frontendNeeds: [], integrationNeeds: [], infrastructureNeeds: [] },
+        inputTokens: 10,
+        outputTokens: 10,
+        finishReason: "stop",
+      };
+    },
+  }, "gpt-5.6-sol");
+
+  await agent.run({ intake: { title: "Benchmark platform", description: "Run and compare model benchmarks." }, depth: "full", sections: {} }, {
+    actor: { id: "user-1", role: "intake_owner" },
+    provider: "openai",
+    idFactory: (prefix) => `${prefix}-1`,
+    now: NOW,
+  });
+
+  assert.equal(maxTokens, 16000);
+});
+
+test("work breakdown reserves completion headroom for full-depth repairs", async () => {
+  let maxTokens;
+  const agent = new OpenAIWorkBreakdownAgent({
+    completeStructured: async (params) => {
+      maxTokens = params.maxTokens;
+      return {
+        content: { subtasks: [], milestones: [], dependencies: [] },
         inputTokens: 10,
         outputTokens: 10,
         finishReason: "stop",

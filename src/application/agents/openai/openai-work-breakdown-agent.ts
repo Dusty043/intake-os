@@ -43,7 +43,9 @@ export class OpenAIWorkBreakdownAgent implements EvaluationAgent<WorkBreakdownSe
     const stackNote = arch?.recommendedTechStack ? `Tech stack: ${arch.recommendedTechStack.join(", ")}\n` : "";
     const userPrompt = `${stackNote}Title: ${intake.title}\nDescription:\n${intake.description}`;
     const { content: out } = await this.client.completeStructured<WorkBreakdownSectionContent>({
-      model: this.model, systemPrompt: SYSTEM, userPrompt: userPrompt, schemaName: "work_breakdown", schema: schema as unknown as Record<string,unknown>, maxTokens: 3000,
+      // Full-depth repair runs need room for the bounded 5–12 task schema and
+      // the model's reasoning; the shared default truncates this structured response.
+      model: this.model, systemPrompt: SYSTEM, userPrompt: userPrompt, schemaName: "work_breakdown", schema: schema as unknown as Record<string,unknown>, maxTokens: 16000,
     });
     return { sectionKind: "work_breakdown", content: out, confidence: 0.75, warnings: [] };
   }

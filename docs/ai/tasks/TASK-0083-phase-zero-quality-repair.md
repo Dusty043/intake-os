@@ -36,12 +36,24 @@ warnings explicitly reported that nearly every section ended mid-sentence. The
 ## Follow-up
 
 The first live improvement attempt preserved the original 46.5 packet but the
-repair evaluation failed before version 2 persisted. The only newly expanded
-model call was Critic/QA: its input grew from truncated fragments to the complete
-evaluation while retaining the shared 4,000-token completion ceiling. Critic/QA
-now reserves 12,000 tokens, and repair fallback warnings identify the failed
-schema without exposing raw provider output.
+repair evaluation failed before version 2 persisted. The safe fallback warning
+identifies the confirmed failure as `work_breakdown` exhausting its 3,000-token
+response allowance, not Critic/QA. The work-breakdown agent is being given
+schema-specific headroom and regression coverage before another authorized live
+improvement pass.
 
 A second live call was not triggered automatically because it would resend the
 stored internal evaluation to OpenAI and incur additional cost. The deployed UI
 now exposes **Improve packet** for an authorized user to run that pass.
+
+## Work-breakdown repair follow-up
+
+The authorized live improvement attempt confirmed the next response-budget
+constraint: `work_breakdown` exhausted its 3,000-token limit before returning
+valid JSON. The original 46.5 packet remained downloadable by design. The
+full-depth work-breakdown agent now reserves 16,000 tokens and the regression
+suite verifies both that allowance and safe schema-specific fallback wording.
+
+Verification: full core suite 817/817, core typecheck, API build, and
+`git diff --check` passed. The server deployment does not invoke another paid
+repair; the authorized user can select **Improve packet** after deployment.

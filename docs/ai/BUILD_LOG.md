@@ -2986,3 +2986,18 @@ model-call shape and still used the shared 4,000-token ceiling, so Critic/QA now
 reserves 12,000 tokens. Fallback diagnostics identify a truncated schema without
 persisting raw provider output. A second paid pass was left to an authorized
 user through the deployed **Improve packet** action.
+
+## 2026-07-31 — Fix Phase 0 work-breakdown repair truncation (TASK-0083)
+
+The subsequent authorized improvement attempt retained the 46.5 packet because
+the `work_breakdown` response exhausted its 3,000-token allowance before valid
+JSON completed. This was a separate response-budget constraint from the critic
+input expansion. The packet fallback correctly preserved the downloadable ZIP
+and exposed only the schema name, never raw provider content.
+
+Raised only the full-depth Work Breakdown allowance to 16,000 tokens, matching
+the existing custom-build headroom and preserving the bounded 5–12-task schema.
+Added regression coverage for the allowance and the safe `work_breakdown`
+fallback. Verification: core suite 817/817, core typecheck, API build, and
+`git diff --check` passed. Deployment intentionally does not trigger another
+cost-bearing repair run; the authorized user can use **Improve packet**.
