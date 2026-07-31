@@ -98,6 +98,10 @@ Generated at: 2026-07-16T21:50:06.853Z
 - `docs/ai/tasks/TASK-0070-discovery-a11y-and-toast-audit.md`
 - `docs/ai/tasks/TASK-0071-intake-form-unsaved-changes-guard.md`
 - `docs/ai/tasks/TASK-0072-distribution-tab-page-export-build-fix.md`
+- `docs/ai/tasks/TASK-0079-discovery-first-product-contract.md`
+- `docs/ai/tasks/TASK-0080-phase-zero-generation-pipeline.md`
+- `docs/ai/tasks/TASK-0081-phase-zero-packet-zip.md`
+- `docs/ai/tasks/TASK-0082-discovery-ui-legacy-shutdown.md`
 - `docs/ai/tasks/TASK-DISCOVERY-PHASE1.md`
 - `docs/ai/tasks/TASK-DISCOVERY-PHASE2.md`
 - `docs/ai/tasks/TASK-DISCOVERY-PHASE3.md`
