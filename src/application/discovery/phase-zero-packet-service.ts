@@ -122,12 +122,12 @@ export class PhaseZeroPacketService {
       await this.store.update(sessionId, { phaseZeroPacket: packet, updatedAt: this.now() });
       this.publish(sessionId, { type: "stage-end", stage: "phase_zero_packet" });
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
+      const message = "The evaluator could not complete this packet. Retry generation to continue.";
       await this.store.update(sessionId, {
         phaseZeroPacket: {
           ...queued,
           state: "failed",
-          error: message.slice(0, 1000),
+          error: message,
           warnings: unique([...queued.warnings, "Generation failed before the packet was complete."]),
         },
         updatedAt: this.now(),

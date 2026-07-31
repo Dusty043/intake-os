@@ -44,3 +44,13 @@ disabled. No cost-bearing packet generation was triggered.
 
 The server already had an unrelated local modification to `docker-compose.yml`.
 It is preserved and is not used by the server stack.
+
+### Live truncation follow-up
+
+The first real packet attempt exposed a recurring `custom_build` truncation:
+`gpt-5.6-sol` consumed the agent's 6,000 completion-token allowance before
+closing its otherwise bounded JSON. The agent now reserves 16,000 tokens while
+retaining the six-item, concise-phrase output limits. Phase 0 failures persist
+and stream a retry-safe message rather than raw partial provider output.
+Regression coverage passes in `tests/phase-zero-packet.test.mjs`; the full core
+suite passed 812/812 and the API build passed.

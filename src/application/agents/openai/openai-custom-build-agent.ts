@@ -33,7 +33,7 @@ export class OpenAICustomBuildAgent implements EvaluationAgent<CustomBuildSectio
     const { intake } = ctx;
     const userPrompt = `Title: ${intake.title}\nDescription:\n${intake.description}`;
     const { content: out } = await this.client.completeStructured<CustomBuildSectionContent>({
-      model: this.model, systemPrompt: SYSTEM, userPrompt: userPrompt, schemaName: "custom_build", schema: schema as unknown as Record<string,unknown>, maxTokens: 6000,
+      model: this.model, systemPrompt: SYSTEM, userPrompt: userPrompt, schemaName: "custom_build", schema: schema as unknown as Record<string,unknown>, maxTokens: 16000,
     });
     return { sectionKind: "custom_build", content: out, confidence: 0.80, warnings: [] };
   }

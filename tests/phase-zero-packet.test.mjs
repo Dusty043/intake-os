@@ -14,6 +14,7 @@ import {
   emptyProjectProposal,
   proposalToIntakeRecord,
 } from "../dist/src/index.js";
+import { OpenAICustomBuildAgent } from "../dist/src/application/agents/openai/openai-custom-build-agent.js";
 
 const NOW = "2026-07-31T00:00:00.000Z";
 
@@ -178,6 +179,48 @@ describe("PhaseZeroPacketService", () => {
     await service.queue("discovery-1", true);
     assert.equal(handoffs, 1);
   });
+
+  test("does not expose raw provider output when generation fails", async () => {
+    const store = new InMemoryDiscoverySessionStore();
+    await store.create(makeSession());
+    const service = new PhaseZeroPacketService({
+      composeProposal: async () => store.getById("discovery-1"),
+      sendToEvaluation: async () => ({ session: await store.getById("discovery-1"), intakeRecord: { id: "intake-1" } }),
+    }, store, {
+      getLatestEvaluationForIntake: async () => ({ evaluation: null, agentRuns: [] }),
+      generateEvaluation: async () => { throw new Error("secret partial JSON from provider"); },
+    }, { provider: "openai", now: () => NOW });
+
+    await service.queue("discovery-1", true);
+    await waitFor(async () => (await store.getById("discovery-1")).phaseZeroPacket?.state === "failed");
+    const packet = (await store.getById("discovery-1")).phaseZeroPacket;
+    assert.equal(packet.error, "The evaluator could not complete this packet. Retry generation to continue.");
+    assert.doesNotMatch(packet.error, /secret partial JSON/);
+  });
+});
+
+test("custom build reserves completion headroom for reasoning models", async () => {
+  let maxTokens;
+  const agent = new OpenAICustomBuildAgent({
+    completeStructured: async (params) => {
+      maxTokens = params.maxTokens;
+      return {
+        content: { required: true, rationale: "Custom code is required.", backendNeeds: [], frontendNeeds: [], integrationNeeds: [], infrastructureNeeds: [] },
+        inputTokens: 10,
+        outputTokens: 10,
+        finishReason: "stop",
+      };
+    },
+  }, "gpt-5.6-sol");
+
+  await agent.run({ intake: { title: "Benchmark platform", description: "Run and compare model benchmarks." }, depth: "full", sections: {} }, {
+    actor: { id: "user-1", role: "intake_owner" },
+    provider: "openai",
+    idFactory: (prefix) => `${prefix}-1`,
+    now: NOW,
+  });
+
+  assert.equal(maxTokens, 16000);
 });
 
 async function waitFor(predicate) {

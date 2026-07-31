@@ -2943,3 +2943,19 @@ address. API logs confirmed `Analysis engine: orchestrator (Phase 0 packet mode)
 and `Provisioning executors: disabled (Phase 0 packet mode)`. The health endpoint
 reported the OpenAI provider enabled and live provisioning disabled. No real
 packet generation was run, avoiding an unapproved AI-cost-bearing smoke test.
+
+## 2026-07-31 — Fix live Phase 0 custom-build truncation (TASK-0082)
+
+The first cost-bearing packet attempt on oreochiserver failed because the
+`custom_build` agent reached `max_completion_tokens=6000` before
+`gpt-5.6-sol` closed its JSON response. This recurred despite the earlier
+six-item, concise-phrase prompt bound, confirming the remaining constraint was
+reasoning/completion headroom rather than requested output size.
+
+Raised only the `custom_build` allowance to 16,000 tokens. Phase 0 background
+failures now persist and stream a short retry-safe message instead of exposing
+raw partial provider JSON in the UI. Added regression checks for the agent token
+budget and failure-message sanitization.
+
+Verification: focused Phase 0 tests 6/6, full core suite 812/812, core
+typecheck, API build, and `git diff --check` passed.
